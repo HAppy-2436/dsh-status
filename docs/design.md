@@ -1,121 +1,140 @@
-# dsh-status 设计方案
+# dsh-status 设计方案（v2 · 简化版）
 
-> 状态：**提案，待确认**（2026-11-03）
-> 目标：在 macOS 菜单栏常驻一个图标，实时显示 DeepSeek Harness 各项目（workspace）的运行状态，
-> 支持单击浮窗、双击打开主页面、状态切换系统通知，并能在浮窗里直接回答问题。
+> 状态：**提案 v2，待确认**（2026-11-03）
+> v2 相对 v1 的简化：去掉双击语义、逐状态单击行为、摘要详情、浮窗内直接作答；
+> 改为「数字角标 + 一个面板 + 点击跳转」。
 
-## 1. 结论
+## 1. 需求（v2）
 
-方向可行，值得做。但有一个架构性约束：
+- 菜单栏图标旁显示一个数字 = **待回答 + 已完成 + 已停止** 的会话总数（运行中、空闲不计）。
+- 单击图标弹出面板，只列非空闲会话：运行中 / 已完成 / 已停止 / 待回答；空闲会话不显示。
+- 点击面板某一行 → 跳到 DSH 主窗口并打开该会话。
+- （v1 保留项，待确认）状态切换系统通知，点击打开主页面。
 
-**DSH 桌面版没有对外的 macOS 菜单栏 / 托盘接口，纯插件做不了菜单栏图标。**
-所以方案必须拆成两部分：
+## 2. 结论与架构
 
-- **DSH 插件（中枢）**：运行在 DSH Host / Client 中，负责取状态、执行动作、对外暴露一个本地桥。
-- **原生菜单栏 App（门面）**：Swift/AppKit 写的独立 `.app`，负责 NSStatusItem、浮窗、通知。
+架构约束与 v1 相同：**DSH 桌面版没有 macOS 菜单栏 API，纯插件做不出图标**。所以仍是两部分：
 
-两者通过本机回环 HTTP + 共享 token 通信。安装时用户只需两步：装插件包（DSH 设置 → 插件 → 添加本地目录）、
-构建并首次授权菜单栏 App（`install.sh` 自动完成）。
+- **DSH 插件**（Host 桥 + Client 状态）：取状态、执行跳转。
+- **原生 Swift 菜单栏 App**：图标、数字、面板、通知。
 
-## 2. 已验证的 DSH 事实
+v2 的实现量大幅下降，原因见 §3：**状态模型 DSH 客户端已经算好了，直接复用**。
 
-基于本机 `DeepSeek Harness 0.2.1-rc.5`（desktop profile）的源码 / 文档核实：
+## 3. 关键发现：DSH 客户端已有现成状态
 
-| 事实 | 依据 |
-| --- | --- |
-| macOS 没有菜单栏 API；Desktop 的 Tray 是 Windows 专用 | `app.asar/lib/main.js` 中 `// Windows system tray` |
-| Desktop 注册了 `dsh://open` 深链，可唤起主窗口 | `main.js` `setAsDefaultProtocolClient("dsh")` |
-| 插件体系是 Cordis（Host + Client 两半），支持本地目录安装、HMR | `dsh-plugin-manager` / `dsh-client-ui-plugin-manager` 文档 |
-| `desktop` profile 由 Electron 独占管理，CLI 不能装插件；必须走 GUI | `dsh --profile desktop --dump-config` 报错 |
-| Host 侧可拿到 workspace 列表与会话归属 | `ctx.workspaceRegistry.list()` |
-| 会话实时状态：`ctx.agents.get(sessionId).status === 'running'` | `dsh-api-session-controller` `summaryFor()` |
-| 会话事件全局可订阅：`turn/start`、`turn/end`（reason.kind: completed / aborted / error / blocked / max-tokens） | `dsh-session` / `dsh-agent-loop` |
-| 提问状态可从投影读：`sessionProjections.stateOf(session, 'userQuestions')` | `dsh-user-questions` |
-| 审批有审计事件：`approval/asked` / `approval/decided` | `dsh-user-approval` |
-| 可停止运行：`agent.cancel()`；后台 job 另有 `ctx.jobs` | `dsh-agent` / `dsh-jobs` |
-| 「已超时/继续中」的问题可以 Host 侧直接回答：`ctx.userQuestions.answer(agent, callId, answer)` | `dsh-user-questions` |
-| **前台阻塞中的问题/审批只能由 Client 侧回传答案**（Host→Client waterfall 事件，Web UI 用 `ctx.remote.$on` 接管） | `dsh-api-remotes` 转发 `user-questions/request`、`approval/request` |
-| 本地 Web 服务已存在（Desktop 也跑，renderer 经 Electron IPC 转发）；插件可挂路由 | `dsh-host-webserver`、`dsh-client-connection` |
+`@deepseek-ai/dsh-client-ui-session` 在 Client 侧暴露了 `ctx.uiSession.sessionStatus`
+（`getSnapshot()` / `subscribe()`，`Map<sessionId, SessionStatus>`）：
 
-最后一条是方案里唯一的硬骨头，见 §7。
-
-## 3. 状态模型
-
-「项目」= DSH workspace（`~/Developer/projects/<slug>` 这类目录）。一个项目可以有多个会话，状态取聚合。
-
-| 状态 | 判定 | 菜单栏表现 |
+| 字段 | 含义 | 直接对应的需求状态 |
 | --- | --- | --- |
-| 需要回答 | 有待答 `user_questions` 或待批准 request | 🔴 最高优先级，数字角标 |
-| 运行中 | 任一会话 `agent.status === 'running'`（含工具执行 / 子 agent） | 🔵 呼吸动画 |
-| 异常 | `turn/end` reason.kind 为 error / blocked | 🟠 未读 |
-| 已停止 | `turn/end` reason.kind 为 aborted | ⚪️ 未读 |
-| 已完成 | `turn/end` reason.kind 为 completed，且未读 | 🟢 未读 |
-| 空闲 | 无运行、无未读结果 | ⚫️ 常态 |
+| `running` | 会话正在跑 turn | 运行中 |
+| `pendingInteraction` | 待回答的问题 / 待批准（含 `kind`、`questions`） | 待回答 |
+| `completionUnread` | 本次运行结束后用户还没看过该会话 | 已完成 / 已停止 |
 
-- 聚合优先级：需要回答 > 运行中 > 异常 > 未读完成/停止 > 空闲；角标数字 = 需要关注的项目数。
-- 「已完成 / 已停止」是**未读态**：在浮窗里展开看过、或超过 N 分钟（默认 10，可配置）后回落空闲。
-- 摘要内容：会话标题 + 最后一条 assistant 文本（截断）+ 本次 turn 用时 / 工具数 / 模型。
+配套的现成能力：
 
-## 4. 交互
+| 需要 | 现成 API |
+| --- | --- |
+| 会话列表、标题、cwd、更新时间 | `ctx.sessions.list.getSnapshot()`（`items[]`：`sessionId`、`title`、`cwd`、`updatedAt`、`parentSessionId`、`blank`…） |
+| 项目（workspace）列表与归属 | `ctx.workspaces.list.getSnapshot()`（`workspaceIds`、`titles`、`archivedSessionIds`…） |
+| 跳转到会话 | `ctx.uiWorkspace.openSession(sessionId)` |
+| 唤起主窗口 | `open "dsh://open"`（Desktop 已注册该 scheme） |
+| 运行结束原因（区分已完成 / 已停止） | Host 侧 `ctx.on('session/event')` 的 `turn/end.reason.kind`：`completed` / `aborted` / `error` / `blocked` / `max-tokens` |
 
-- **单击图标** → NSPopover 浮窗：
-  - 项目列表：状态圆点 + 项目名 + 一句话摘要；点开某项目看详情。
-  - 运行中：当前动作（最近工具调用 / 正在生成）、已耗时。
-  - 已完成 / 已停止：摘要、耗时、token。
-  - 需要回答：直接显示问题选项 / 文本框 / 审批按钮（阶段 P2）。
-  - 底部：全部未读清除、打开主页面、设置。
-- **双击图标** → `dsh://open`（或 `open -a "DeepSeek Harness"`）唤起主窗口。
-  - 代价：单击/双击共存需要约 250ms 的单击延迟；这是 macOS 菜单栏的常见取舍，可接受。
-- **通知**：状态切换时发 UNUserNotificationCenter 通知，点击 → 打开主页面。
-  - 按项目聚合、去抖（同一项目 3s 内合并）；按项目静音；首次使用申请通知权限。
-- **右键**：打开全部 / 仅在需要时提醒 / 退出。
+`completionUnread` 的清除规则正好符合直觉：用户打开该会话（成为主视图）就清；
+`pendingInteraction` 则要回答/批准后才清。
 
-## 5. 组件与数据流
+## 4. 状态判定与计数
 
 ```
+待回答   = pendingInteraction != null
+运行中   = running == true（且不参与计数）
+已完成   = completionUnread && lastTurnOutcome == completed
+已停止   = completionUnread && lastTurnOutcome == aborted / blocked
+异常     = completionUnread && lastTurnOutcome == error（v2 先并入「已停止」或单独标红，待定）
+空闲     = 其余（面板不显示）
+```
+
+- **角标数字** = `pendingInteraction` 数 + `completionUnread` 数。
+- **不清零规则**：打开面板本身不清零；点某一行跳过去后，DSH 自己会清掉该会话的
+  `completionUnread`，数字自然减一；待回答必须回答/批准后才减。
+- **过滤**：不显示空闲会话、`parentSessionId` 存在的子会话、已归档会话、空（blank）会话。
+- **已知限制**：`completionUnread` 是 Client 进程内的内存态，DSH 重启后归零（与 DSH 自带提醒一致）；
+  多窗口/多标签同时打开时各自维护，桥接取最近活跃的那个 Client 的快照（MVP 先按单窗口假设）。
+
+## 5. 面板与交互
+
+```
+┌──────────────────────────────────────┐
+│  ● 待回答 (1)                         │
+│    erhu · 「选哪种调音方案？」   [红]  │   ← 点击跳转
+│  ● 运行中 (2)                         │
+│    dsh-status · 正在执行 bash…  02:14 │   ← 显示实时动作/耗时
+│  ● 已完成 (1)                         │
+│    stability · 3 分钟前               │
+│  ● 已停止 (1)                         │
+│    homebrew · 1 小时前                │
+├──────────────────────────────────────┤
+│  打开 DSH            通知 ⏰    设置   │
+└──────────────────────────────────────┘
+```
+
+- 分组顺序：待回答 → 运行中 → 已完成 → 已停止；组内按更新时间倒序。
+- 行内容：状态点 + 项目名 · 会话标题（截断）+ 右侧辅助信息
+  （待回答显示问题标题；运行中显示当前动作/已耗时；完成/停止显示相对时间）。
+- 行点击：`open "dsh://open"`（唤起窗口）+ 通知 Client 桥执行 `openSession(sessionId)`。
+- 图标：模板图标（SF Symbol）+ 数字文本；有任何待回答时数字用红色，否则橙色，0 时只显示图标。
+- 单击即开面板，没有双击延迟问题；面板再次点击图标关闭。
+
+## 6. 组件与数据流
+
+```
+DSH renderer（Desktop 主窗口 / Web 标签页）
+ └─ 插件 Client 半
+      ├─ 订阅 ctx.uiSession.sessionStatus + ctx.sessions + ctx.workspaces
+      ├─ 聚合出 { sessions[], counts, updatedAt } 快照
+      ├─ POST /dsh-status/state  → Host 桥
+      ├─ 长轮询 GET /dsh-status/commands ← Host 桥
+      ├─ 执行 openSession(sessionId)（ctx.uiWorkspace）
+      └─ 如需「已完成 vs 已停止」：接收 Host 侧 turn/end 结果映射
+
 DSH Host 进程
- ├─ 插件 Host 半（@dsh-status/bridge）
- │    ├─ 订阅 workspace / agents / session 事件，维护状态模型
- │    ├─ 注册 /dsh-status/* 路由（用 ctx.connection.admit 校验浏览器同源）
- │    ├─ 写 ~/.dsh-status/bridge.json（端口 + 本地 token）
- │    └─ 启动 / 监视菜单栏 App（可配置 appPath）
- └─ 插件 Client 半（仅 P2 需要）
-      └─ 接管 user-questions/request、approval/request 的 waterfall，
-         把问题中继给 App，把 App 的答案回传（相当于第二个 Web 标签页）
+ └─ 插件 Host 半（薄桥）
+      ├─ 注册 /dsh-status/* 路由（ctx.webServer.register，admit 校验浏览器请求）
+      ├─ 全局监听 session/event，维护 lastTurnOutcome[sessionId]
+      ├─ 写 ~/.dsh-status/bridge.json（端口 + 本机 token）
+      └─ 启动 / 监视 DSHStatusBar.app
 
-原生 App：DSHStatusBar.app
- ├─ NSStatusItem / NSPopover / UNUserNotificationCenter
- ├─ 连 Host 桥（SSE 收状态、POST 发命令），断线自动重连
- └─ open "dsh://open" 唤起主页面
+原生 App：DSHStatusBar.app（Swift/AppKit）
+ ├─ NSStatusItem + NSPopover（状态排序、行点击）
+ ├─ SSE/长轮询 Host 桥，断线重连
+ ├─ UNUserNotificationCenter 通知（可选）+ 点击打开主页面
+ └─ open "dsh://open"
 ```
 
-- 插件安装：DSH 侧边栏 → Plugins → Add plugin → 填插件包绝对路径（已确认支持本地目录 + HMR）。
-- App 安装：`install.sh` 用 `swift build` 构建，放入 `~/Applications`，ad-hoc 签名；插件在激活时拉起。
+- **插件安装**：DSH 侧边栏 → Plugins → Add plugin → 填插件包绝对路径（支持本地目录 + HMR）。
+- **App 安装**：`install.sh` 构建放入 `~/Applications`，ad-hoc 签名；Host 插件激活时拉起。
+- **桥安全**：只绑 127.0.0.1；浏览器侧路由用 `ctx.connection.admit` 校验同源；App 侧用
+  `~/.dsh-status/bridge.json` 里的随机 token。
 
-## 6. 分期
+## 7. 分期
 
 | 阶段 | 内容 | 产出 |
 | --- | --- | --- |
-| P0 | Swift 菜单栏骨架 + 假数据桥：图标、浮窗、通知、双击、断线重连 | 可点可看的原型 |
-| P1 | 插件 Host 半 + 真实状态/摘要/通知 + 停止任务 | 日常可用的 MVP |
-| P2 | Client 半：浮窗内直接回答 / 批准；通知点击定位会话 | 完整目标 |
-| P3 | 打磨：设置页、登录项、图标样式、多项目 layout、静音规则 | 稳定版 |
+| P0 | Swift 菜单栏骨架 + 假数据（图标/数字/面板/点击/SSE 重连） | 可看可点的原型 |
+| P1 | Client 状态聚合 + Host 薄桥 + 点击跳转 | 核心功能可用 |
+| P2 | 通知（待回答必发、完成/停止可选）+ 设置（开机启动、静音）+ 图标样式 | 日常可用 |
+| P3（可选） | 面板内直接回答/批准（需 Client waterfall 中继，即 v1 的硬骨头） | 增强 |
 
-## 7. 风险与对策
+## 8. 风险
 
-1. **直接回答（唯一硬骨头）**：前台阻塞中的问题/审批，答案必须由 Client（web 页面）经 waterfall 回传，
-   原生 App 无法直接调 Host 内部 API。
-   - 对策 A（推荐，P2）：插件带一个 Client 半，作为「第二个客户端」注册同样的 `$on` 监听，中继给 App。
-     与多开浏览器标签页的语义一致，Web UI 不受影响。
-   - 对策 B（P1 可先做）：只对「已超时 / 继续中」的问题用 Host 侧 `userQuestions.answer` 直接回答；
-     前台阻塞中的问题先显示 + 一键跳到 DSH 作答。
-2. **单击/双击延迟**：可接受，或在设置里提供「单击直接打开主页面、不显示浮窗」选项。
-3. **通知权限与签名**：本地 ad-hoc 即可；分发需 notarize。
-4. **DSH API 变动**：rc 版本可能调整插件 API；把取数集中在插件 Host 半的一层里，App 不感知 DSH 细节。
-5. **通知轰炸**：聚合 + 去抖 + 每项目静音，默认只对「需要回答 / 已完成 / 已停止 / 异常」通知。
+1. **已完成/已停止的区分**依赖 Host 侧 `turn/end` 结果缓存；插件启动前已结束的会话拿不到原因，先按「已完成」处理。
+2. `completionUnread` 是 Client 内存态：DSH 重启归零；多窗口快照可能不一致（MVP 取最新推送）。
+3. 菜单栏 App 的通知权限、签名；分发需 notarize（本机 ad-hoc 即可）。
+4. 插件 API 是 rc 版本，后续变动风险集中在 Client 半的取数层。
 
-## 8. 待确认
+## 9. 待确认
 
-1. 项目粒度：按 workspace 聚合（推荐）还是按会话逐条列出？
-2. 直接回答：P1 先做「显示 + 跳转」（推荐，先拿到可用产品），P2 再上原生作答；还是第一版就要完整作答？
-3. 是否按本方案开始 P0 + P1？
+1. 通知还要不要？建议：待回答发通知、已完成/已停止默认不发（角标已提示），设置里可开。
+2. 「异常结束（error）」单独算一个状态，还是并入已停止？
+3. 确认后是否直接开始 P0 + P1？

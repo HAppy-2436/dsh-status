@@ -131,7 +131,7 @@ setInterval(() => {
       sseClients.delete(res)
     }
   }
-}, 15_000).unref()
+}, 5_000).unref()
 
 // ---------- 场景推进（--cycle） ----------
 let phase = 0

@@ -16,7 +16,7 @@ enum AppConfig {
     }
 
     static let pollInterval: TimeInterval = 2.0
-    static let staleAfter: TimeInterval = 6.0
+    static let staleAfter: TimeInterval = 12.0
 
     static var appVersion: String {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.1.0"

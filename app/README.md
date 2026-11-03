@@ -30,12 +30,13 @@ DSH_STATUS_BRIDGE_FILE="$HOME/.dsh-status/bridge.mock.json" \
 ../dist/DSHStatusBar.app/Contents/MacOS/DSHStatusBar --render-previews ../docs/previews
 ```
 
-生成：`icon-preview-dark/light.png`（单圆形图标 × 状态矩阵 × disc/ring）、
-`panel-preview-dark/light.png`（面板三态）、`scene-preview-dark.png`（菜单栏 + 面板场景示意）。
+生成：`icon-preview-dark/light.png`（鲸鱼/分段圆环状态矩阵）、`panel-preview-dark/light.png`（面板三态）、
+`scene-preview-dark.png`（菜单栏 + 面板场景示意）。
 
 ## 结构
 
-- `MenuBarIconRenderer.swift` — 单圆形图标绘制（disc / ring 两变体，深色优先，2x 渲染）
+- `MenuBarIconRenderer.swift` — 图标绘制（空闲鲸鱼 / 非空闲分段圆环，深色优先）
+- `WhaleLogo.swift` — DeepSeek 鲸鱼 Logo 矢量路径 + SVG path 解析器
 - `BridgeClient.swift` — bridge.json 轮询 + SSE + 命令 POST + 重连
 - `StatusItemController.swift` — NSStatusItem、左右键行为、样式切换菜单
 - `StatusPanelView.swift` — SwiftUI 面板

@@ -115,7 +115,7 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `GET` | `/dsh-status/state` | 返回当前 `BridgeState`（无状态时也返回结构，sessions 为空、client.connected=false） |
-| `GET` | `/dsh-status/stream` | SSE 推送：连接后立即发一条 `event: state`，之后每次状态变化发一条；每 15s 发 `: ping` 注释保活 |
+| `GET` | `/dsh-status/stream` | SSE 推送：连接后立即发一条 `event: state`，之后每次状态变化发一条；每 5s 发 `: ping` 注释保活 |
 | `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400 |
 | `GET` | `/dsh-status/health` | 无需鉴权，返回 `{ "ok": true, "version": 1 }`，供 App 判断端口存活 |
 
@@ -158,7 +158,7 @@ Client 行为要求：
 ## 5. App 实现要点
 
 - 轮询 `bridge.json`（2s）→ 连 `/dsh-status/stream`（SSE）；断线后指数退避重连（0.5s→5s 封顶）。
-- 超过 6s 没有收到任何 state 视为断线：图标降透明度，面板显示「DSH 未连接」。
+- 超过 12s 没有收到任何数据（含心跳）视为断线：图标显示未连接态，面板显示「DSH 未连接」。
 - 点击会话行：先 `POST /dsh-status/command`（失败进重试队列），再 `open "dsh://open"`。
 - DSH 完全退出时 App 保持运行、显示未连接；bridge.json 重新出现后自动恢复。
 

@@ -19,10 +19,18 @@ final class AppModel: ObservableObject {
     private var previousStatus: [String: String] = [:]
 
     var iconModel: IconModel {
-        guard connected else {
-            return IconModel(waiting: 0, running: 0, completed: 0, stopped: 0, connected: false)
-        }
-        return IconModel.demo(state: state)
+        guard connected else { return IconModel(statuses: [], connected: false) }
+        let priority: [SessionStatus: Int] = [.waiting: 0, .running: 1, .completed: 2, .stopped: 3]
+        let statuses = state.sessions
+            .filter { $0.statusKind != .idle }
+            .sorted { lhs, rhs in
+                let lp = priority[lhs.statusKind] ?? 9
+                let rp = priority[rhs.statusKind] ?? 9
+                if lp != rp { return lp < rp }
+                return (lhs.updatedAt ?? 0) > (rhs.updatedAt ?? 0)
+            }
+            .map { $0.statusKind }
+        return IconModel(statuses: statuses, connected: true)
     }
 
     var sections: [(status: SessionStatus, rows: [SessionRow])] {

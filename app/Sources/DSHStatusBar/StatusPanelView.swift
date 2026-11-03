@@ -32,8 +32,8 @@ struct StatusPanelView: View {
                 Circle()
                     .fill(Color.primary.opacity(0.08))
                     .frame(width: 26, height: 26)
-                Image(systemName: "fish.fill")
-                    .font(.system(size: 12, weight: .semibold))
+                Image(nsImage: WhaleLogo.templateImage(height: 11))
+                    .renderingMode(.template)
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 1) {

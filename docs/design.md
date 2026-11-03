@@ -83,6 +83,21 @@ v2 的实现量大幅下降，原因见 §3：**状态模型 DSH 客户端已经
 - 行内容：状态点 + 项目名 · 会话标题（截断）+ 右侧辅助信息
   （待回答显示问题标题；运行中显示当前动作/已耗时；完成/停止显示相对时间）。
 - 行点击：`open "dsh://open"`（唤起窗口）+ 通知 Client 桥执行 `openSession(sessionId)`。
+
+### 5.1 跳转的实现细节（已验证）
+
+- `ctx.uiWorkspace.openSession(sessionId)` 就是 Web UI 会话列表的导航入口：
+  `replaceMain()` → `sessions.retain(sessionId, {source:'mainView'})` → 写 selection → `layout.selectPanel(null)`。
+  调用后该会话变为主视图，DSH 自己的 `completionUnread` 随之清除（角标数字自动减一）；
+  若是待回答会话，聊天区会自动展开问题卡片，可直接作答。
+- 命令链路：App → `POST /dsh-status/commands {openSession: id}` → Host 桥排队 → Client 半长轮询取走 →
+  `openSession(id)`。App 同时 `open "dsh://open"` 唤起窗口。
+- **窗口隐藏也能跳**：DSH 关闭窗口是 hide（`window.on('close')` preventDefault），renderer 与插件仍存活。
+- **完全退出 DSH**：App 记住最后一次点击命令，等桥重连后补发；DSH 启动后自动落到目标会话。
+- **避免后台节流**：Client→Host 用事件驱动 push（微任务合并，不用 `setTimeout`），Host→Client 用长轮询，
+  防止窗口隐藏时 Chromium 定时器节流导致命令延迟。
+- **风险**：`uiWorkspace` 是 DSH Client 内部服务（非公开稳定 API），rc 升级可能变；
+  封装在 Client 半一层里，降级方案 = 只唤起主窗口（`dsh://open`）。
 - 图标：模板图标（SF Symbol）+ 数字文本；有任何待回答时数字用红色，否则橙色，0 时只显示图标。
 - 单击即开面板，没有双击延迟问题；面板再次点击图标关闭。
 

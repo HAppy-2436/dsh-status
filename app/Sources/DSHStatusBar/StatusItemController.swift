@@ -8,16 +8,16 @@ final class StatusItemController: NSObject {
     var onTogglePopover: (() -> Void)?
     var onOpenDSH: (() -> Void)?
     var onQuit: (() -> Void)?
-    var onStyleChange: ((IconStyle) -> Void)?
+    var onVariantChange: ((IconVariant) -> Void)?
 
-    private var style: IconStyle
+    private var variant: IconVariant
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
 
     init(model: AppModel) {
         self.model = model
-        let raw = UserDefaults.standard.string(forKey: "iconStyle") ?? IconStyle.fish.rawValue
-        self.style = IconStyle(rawValue: raw) ?? .fish
+        let raw = UserDefaults.standard.string(forKey: "iconVariant") ?? IconVariant.disc.rawValue
+        self.variant = IconVariant(rawValue: raw) ?? .disc
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -51,7 +51,7 @@ final class StatusItemController: NSObject {
         guard let button = statusItem.button else { return }
         let model = self.model.iconModel
         let appearance = button.effectiveAppearance
-        let image = MenuBarIconRenderer.image(for: model, style: style, appearance: appearance)
+        let image = MenuBarIconRenderer.image(for: model, variant: variant, appearance: appearance)
         button.image = image
         button.imageScaling = .scaleNone
         button.toolTip = MenuBarIconRenderer.tooltip(for: model)
@@ -77,17 +77,17 @@ final class StatusItemController: NSObject {
 
         menu.addItem(.separator())
 
-        let styleItem = NSMenuItem(title: "图标样式", action: nil, keyEquivalent: "")
-        let styleMenu = NSMenu()
-        for candidate in IconStyle.allCases {
-            let item = NSMenuItem(title: candidate.label, action: #selector(menuPickStyle(_:)), keyEquivalent: "")
+        let variantItem = NSMenuItem(title: "图标样式", action: nil, keyEquivalent: "")
+        let variantMenu = NSMenu()
+        for candidate in IconVariant.allCases {
+            let item = NSMenuItem(title: candidate.label, action: #selector(menuPickVariant(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = candidate.rawValue
-            item.state = candidate == style ? .on : .off
-            styleMenu.addItem(item)
+            item.state = candidate == variant ? .on : .off
+            variantMenu.addItem(item)
         }
-        styleItem.submenu = styleMenu
-        menu.addItem(styleItem)
+        variantItem.submenu = variantMenu
+        menu.addItem(variantItem)
 
         menu.addItem(.separator())
 
@@ -103,11 +103,12 @@ final class StatusItemController: NSObject {
     @objc private func menuOpenDSH() { onOpenDSH?() }
     @objc private func menuQuit() { onQuit?() }
 
-    @objc private func menuPickStyle(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let newStyle = IconStyle(rawValue: raw) else { return }
-        style = newStyle
-        UserDefaults.standard.set(newStyle.rawValue, forKey: "iconStyle")
-        onStyleChange?(newStyle)
+    @objc private func menuPickVariant(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let newVariant = IconVariant(rawValue: raw) else { return }
+        variant = newVariant
+        UserDefaults.standard.set(newVariant.rawValue, forKey: "iconVariant")
+        onVariantChange?(newVariant)
         refresh()
     }
 }

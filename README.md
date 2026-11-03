@@ -5,10 +5,11 @@
 
 ## 当前状态（2026-11-03）
 
-- **P0 已完成**：Swift 菜单栏 App 可用（图标三方案 / 面板 / SSE 桥客户端 / 未连接态 / 待回答通知），
-  配套 mock 桥可以脱离 DSH 演示；设计预览图在 [`docs/previews/`](docs/previews/README.md)。
+- **P0 已完成**：Swift 菜单栏 App 可用——**单圆形图标**（数字 = 关注数、颜色 = 原因、外圈蓝弧 = 运行中，
+  深色模式优先调校，disc / ring 两个变体）、面板、SSE 桥客户端、未连接态、待回答通知；
+  配套 mock 桥可脱离 DSH 演示；设计预览图在 [`docs/previews/`](docs/previews/README.md)。
 - **P1 待做**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令），之后接入真实会话。
-- 图标基础方案（A fish / B sessions stack / C harness nodes）**待选定**。
+- 图标最终形态（disc 填充圆盘 / ring 细圆环）**待选定**。
 
 ## 快速开始（P0 演示，假数据）
 

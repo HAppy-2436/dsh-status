@@ -28,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController.onTogglePopover = { [weak self] in self?.popoverController.toggle() }
         statusItemController.onOpenDSH = { [weak self] in self?.openDSH() }
         statusItemController.onQuit = { NSApp.terminate(nil) }
-        statusItemController.onStyleChange = { [weak self] _ in self?.statusItemController.refresh() }
+        statusItemController.onVariantChange = { [weak self] _ in self?.statusItemController.refresh() }
 
         popoverController = PopoverController(model: model, statusItem: statusItemController.statusItem)
 

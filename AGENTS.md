@@ -28,4 +28,4 @@
 4. 跑 `dev done <slug>`：校验提交/推送、标记 done、刷新索引；有问题会**非零退出**，修完重跑
 5. **不要自行 `dev archive`**：归档会移动目录、让 DSH 工作区绑定失效，留给人在终端做
 
-> 中途每轮结束只需要更新 `STATUS.md` 的 `updated` 与 `next`，不用跑 `dev done`。
+> 中途每轮结束：更新 `STATUS.md` 的 `updated` 与 `next`，顺手跑 `dev index` 刷新根索引；不用跑 `dev done`。

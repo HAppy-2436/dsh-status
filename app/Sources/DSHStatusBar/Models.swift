@@ -59,7 +59,7 @@ struct LastTurn: Codable, Equatable {
     let at: Double?
 }
 
-enum SessionStatus: String, Codable {
+enum SessionStatus: String, Codable, CaseIterable {
     case waiting
     case running
     case completed

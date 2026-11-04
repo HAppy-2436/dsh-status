@@ -190,6 +190,9 @@ struct StatusPanelView: View {
                 model.notificationsEnabled.toggle()
                 model.onToggleNotifications?()
             }
+            iconButton(systemName: "gearshape", help: "设置") {
+                model.onOpenSettings?()
+            }
             iconButton(systemName: "power", help: "退出") {
                 model.onQuit?()
             }

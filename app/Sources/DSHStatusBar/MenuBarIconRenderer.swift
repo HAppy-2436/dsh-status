@@ -11,13 +11,35 @@ import AppKit
 //  · 未连接：灰色虚线环 + 短横。
 
 struct IconModel: Equatable {
-    /// 非空闲任务（会话）状态，已按优先级排序。空数组 = 空闲。
+    /// 非空闲任务（会话）状态，已按优先级排序、已按设置过滤。空数组 = 空闲。
     var statuses: [SessionStatus] = []
     var connected = true
+    /// 0 = 不限；>0 时圆环最多画这么多段。
+    var segmentCap: Int = 0
+    var numberMode: CenterNumberMode = .attention
 
     var attention: Int { statuses.filter { $0 != .running }.count }
     var runningCount: Int { statuses.filter { $0 == .running }.count }
     var isEmpty: Bool { statuses.isEmpty }
+
+    /// 圆环实际绘制的段（受上限约束）。
+    var drawnSegments: [SessionStatus] {
+        guard segmentCap > 0 else { return statuses }
+        return Array(statuses.prefix(segmentCap))
+    }
+
+    /// 中心数字（nil = 不显示）。
+    var centerNumber: Int? {
+        switch numberMode {
+        case .hidden:
+            return nil
+        case .attention:
+            let value = attention
+            return value > 0 ? value : nil
+        case .nonIdle:
+            return statuses.isEmpty ? nil : statuses.count
+        }
+    }
 }
 
 enum MenuBarIconRenderer {
@@ -64,10 +86,10 @@ enum MenuBarIconRenderer {
             return
         }
 
-        drawSegmentRing(model: model, dark: dark)
+        drawSegmentRing(statuses: model.drawnSegments, dark: dark)
 
-        if model.attention > 0 {
-            drawCount(model.attention, dark: dark)
+        if let number = model.centerNumber {
+            drawCount(number, dark: dark)
         }
     }
 
@@ -88,8 +110,7 @@ enum MenuBarIconRenderer {
 
     // MARK: 分段圆环
 
-    private static func drawSegmentRing(model: IconModel, dark: Bool) {
-        let statuses = model.statuses
+    private static func drawSegmentRing(statuses: [SessionStatus], dark: Bool) {
         let count = statuses.count
         guard count > 0 else { return }
 

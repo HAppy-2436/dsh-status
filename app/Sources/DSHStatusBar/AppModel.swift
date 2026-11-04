@@ -3,12 +3,14 @@ import Combine
 
 /// UI 状态模型：由 BridgeClient 推送更新，SwiftUI 面板观察。
 final class AppModel: ObservableObject {
+    let settings: AppSettings
     @Published private(set) var state: BridgeState = .empty
     @Published private(set) var connected: Bool = false
     @Published private(set) var lastUpdate: Date?
 
-    /// 状态跃迁：某会话从非 waiting 变为 waiting（用于通知）。
-    var onWaitingTransition: ((SessionRow) -> Void)?
+    /// 状态跃迁：某会话进入新状态（用于通知；首帧基线不触发）。
+    var onStatusTransition: ((SessionRow, SessionStatus) -> Void)?
+    var onOpenSettings: (() -> Void)?
 
     var onOpenSession: ((String) -> Void)?
     var onOpenDSH: (() -> Void)?
@@ -17,24 +19,37 @@ final class AppModel: ObservableObject {
     var notificationsEnabled: Bool = true
 
     private var previousStatus: [String: String] = [:]
+    private var hasBaseline = false
+    private var settingsCancellable: AnyCancellable?
+
+    init(settings: AppSettings = .shared) {
+        self.settings = settings
+        settingsCancellable = settings.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { self?.objectWillChange.send() }
+            }
+    }
 
     var iconModel: IconModel {
-        guard connected else { return IconModel(statuses: [], connected: false) }
-        let priority: [SessionStatus: Int] = [.waiting: 0, .running: 1, .completed: 2, .stopped: 3]
-        let statuses = state.sessions
-            .filter { $0.statusKind != .idle }
+        let statuses = visibleSessions
             .sorted { lhs, rhs in
-                let lp = priority[lhs.statusKind] ?? 9
-                let rp = priority[rhs.statusKind] ?? 9
+                let lp = priority(lhs.statusKind)
+                let rp = priority(rhs.statusKind)
                 if lp != rp { return lp < rp }
                 return (lhs.updatedAt ?? 0) > (rhs.updatedAt ?? 0)
             }
             .map { $0.statusKind }
-        return IconModel(statuses: statuses, connected: true)
+        return IconModel(
+            statuses: connected ? statuses : [],
+            connected: connected,
+            segmentCap: settings.segmentCap.rawValue,
+            numberMode: settings.centerNumberMode
+        )
     }
 
     var sections: [(status: SessionStatus, rows: [SessionRow])] {
-        let visible = state.sessions.filter { $0.statusKind != .idle }
+        let visible = visibleSessions
         var grouped: [SessionStatus: [SessionRow]] = [:]
         for row in visible { grouped[row.statusKind, default: []].append(row) }
         return [SessionStatus.waiting, .running, .completed, .stopped].compactMap { status in
@@ -50,15 +65,36 @@ final class AppModel: ObservableObject {
         let rows = state.sessions
         var next: [String: String] = [:]
         for row in rows { next[row.id] = row.status }
-        // 检测「变为待回答」
-        for row in rows where row.status == "waiting" {
-            if previousStatus[row.id] != "waiting" {
-                onWaitingTransition?(row)
+
+        var transitions: [(SessionRow, SessionStatus)] = []
+        if hasBaseline {
+            for row in rows where settings.isVisible(row) {
+                if let previous = previousStatus[row.id], previous != row.status {
+                    transitions.append((row, row.statusKind))
+                }
             }
         }
         previousStatus = next
+        hasBaseline = true
         self.state = state
         self.lastUpdate = Date()
+        for (row, status) in transitions { onStatusTransition?(row, status) }
+    }
+
+    // MARK: - 过滤
+
+    private var visibleSessions: [SessionRow] {
+        state.sessions.filter { $0.statusKind != .idle && settings.isVisible($0) }
+    }
+
+    private func priority(_ status: SessionStatus) -> Int {
+        switch status {
+        case .waiting: return 0
+        case .running: return 1
+        case .completed: return 2
+        case .stopped: return 3
+        case .idle: return 9
+        }
     }
 
     func setConnected(_ value: Bool) {
@@ -72,8 +108,8 @@ final class AppModel: ObservableObject {
 
     // MARK: - 预览用
 
-    static func demo() -> AppModel {
-        let model = AppModel()
+    static func demo(settings: AppSettings = .preview()) -> AppModel {
+        let model = AppModel(settings: settings)
         model.connected = true
         model.state = DemoState.state
         model.lastUpdate = Date()
@@ -81,7 +117,7 @@ final class AppModel: ObservableObject {
     }
 
     static func demoDisconnected() -> AppModel {
-        let model = AppModel()
+        let model = AppModel(settings: .preview())
         model.connected = false
         model.state = .empty
         return model

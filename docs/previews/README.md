@@ -12,6 +12,7 @@
 | `panel-real-dark.png` | 真机 NSPopover（深色） |
 | `panel-preview-dark.png` / `panel-preview-light.png` | 面板三态：有会话 / 全部空闲 / 未连接 |
 | `scene-preview-dark.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板） |
+| `settings-preview-dark.png` | 设置页（离屏渲染，深色）：显示状态 / 项目显示 / 菜单栏图标 / 通知 |
 
 图标语义：空闲 = 纯白鲸鱼；非空闲 = 按任务数等分的彩色圆环（段色 = 任务状态）；
 中心数字 = 待回答+已完成+已停止，只有运行中时不显示数字。

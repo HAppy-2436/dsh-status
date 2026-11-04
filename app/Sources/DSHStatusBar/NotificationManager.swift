@@ -28,18 +28,30 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    func notifyWaiting(_ row: SessionRow) {
+    func notify(_ row: SessionRow, status: SessionStatus) {
         guard isBundled, authorized else { return }
+        let key = "\(row.id)-\(status.rawValue)"
         let now = Date()
-        if let last = lastNotified[row.id], now.timeIntervalSince(last) < 30 { return }
-        lastNotified[row.id] = now
+        if let last = lastNotified[key], now.timeIntervalSince(last) < 30 { return }
+        lastNotified[key] = now
 
         let content = UNMutableNotificationContent()
-        content.title = "需要回答：\(row.displayTitle)"
-        content.body = "\(row.projectName) · \(row.pendingSummary ?? "等待你的回复")"
+        switch status {
+        case .waiting:
+            content.title = "需要回答：\(row.displayTitle)"
+            content.body = "\(row.projectName) · \(row.pendingSummary ?? "等待你的回复")"
+        case .completed:
+            content.title = "已完成：\(row.displayTitle)"
+            content.body = "\(row.projectName) · 本轮已结束"
+        case .stopped:
+            content.title = "已停止：\(row.displayTitle)"
+            content.body = "\(row.projectName) · 任务已停止"
+        default:
+            return
+        }
         content.sound = .default
         content.userInfo = ["sessionId": row.id]
-        let identifier = "waiting-\(row.id)-\(Int(now.timeIntervalSince1970))"
+        let identifier = "\(status.rawValue)-\(row.id)-\(Int(now.timeIntervalSince1970))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }

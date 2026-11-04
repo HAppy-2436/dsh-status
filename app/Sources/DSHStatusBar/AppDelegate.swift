@@ -1,16 +1,20 @@
 import AppKit
+import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var model: AppModel!
     private var bridge: BridgeClient!
     private var statusItemController: StatusItemController!
     private var popoverController: PopoverController!
+    private var settingsWindow: SettingsWindowController!
+    private let settings = AppSettings.shared
     private let notifications = NotificationManager()
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        model = AppModel()
+        model = AppModel(settings: settings)
         model.notificationsEnabled = UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true
         model.onOpenSession = { [weak self] sessionId in self?.openSession(sessionId) }
         model.onOpenDSH = { [weak self] in self?.openDSH() }
@@ -19,20 +23,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             UserDefaults.standard.set(self.model.notificationsEnabled, forKey: "notificationsEnabled")
         }
-        model.onWaitingTransition = { [weak self] row in
-            guard let self, self.model.notificationsEnabled else { return }
-            self.notifications.notifyWaiting(row)
+        model.onStatusTransition = { [weak self] row, status in
+            guard let self else { return }
+            switch status {
+            case .waiting:
+                if self.settings.notifyWaiting { self.notifications.notify(row, status: .waiting) }
+            case .completed:
+                if self.settings.notifyCompleted { self.notifications.notify(row, status: .completed) }
+            case .stopped:
+                if self.settings.notifyStopped { self.notifications.notify(row, status: .stopped) }
+            default:
+                break
+            }
         }
+        model.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
 
         statusItemController = StatusItemController(model: model)
         statusItemController.onTogglePopover = { [weak self] in self?.popoverController.toggle() }
         statusItemController.onOpenDSH = { [weak self] in self?.openDSH() }
         statusItemController.onQuit = { NSApp.terminate(nil) }
+        statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
 
         popoverController = PopoverController(model: model, statusItem: statusItemController.statusItem)
+        settingsWindow = SettingsWindowController(settings: settings, model: model)
+
+        // 设置变化 → 立即重绘图标
+        settings.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { self?.statusItemController.refresh() }
+            }
+            .store(in: &cancellables)
 
         notifications.setup()
-        notifications.onClick = { [weak self] _ in self?.openDSH() }
+        notifications.onClick = { [weak self] sessionId in
+            guard let self else { return }
+            if let sessionId { self.bridge.sendOpenSession(sessionId) }
+            self.openDSH()
+        }
 
         bridge = BridgeClient(bridgeFile: AppConfig.bridgeFile)
         bridge.onState = { [weak self] state in
@@ -56,6 +84,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.popoverController.show()
             }
         }
+        if CommandLine.arguments.contains("--open-settings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+                self?.settingsWindow.show()
+            }
+        }
 
         // 定时刷新（运行时长/tooltip）
         Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
@@ -66,6 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         bridge?.stop()
     }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     // MARK: - 动作
 

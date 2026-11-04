@@ -21,8 +21,10 @@ DSH_STATUS_BRIDGE_FILE="$HOME/.dsh-status/bridge.mock.json" \
   ../dist/DSHStatusBar.app/Contents/MacOS/DSHStatusBar
 ```
 
-或直接 `bash ../scripts/demo.sh`（mock + App 一键起）。加 `--open-panel` 可启动后自动打开面板
-（截图/调试用）；加 `--bridge-file <path>` 可指定桥文件。
+或直接 `bash ../scripts/demo.sh`（mock + App 一键起）。加 `--open-panel` / `--open-settings` 可启动后
+自动打开面板/设置（截图/调试用）；加 `--bridge-file <path>` 可指定桥文件。
+
+设置入口：面板底部齿轮按钮，或右键菜单栏图标 →「设置…」（⌘,）。设置即时生效并保存在 UserDefaults。
 
 ## 设计预览图
 
@@ -41,4 +43,5 @@ DSH_STATUS_BRIDGE_FILE="$HOME/.dsh-status/bridge.mock.json" \
 - `StatusItemController.swift` — NSStatusItem、左右键行为、样式切换菜单
 - `StatusPanelView.swift` — SwiftUI 面板
 - `PreviewRenderer.swift` — 离屏预览图
-- `NotificationManager.swift` — 待回答系统通知
+- `NotificationManager.swift` — 待回答/已完成/已停止系统通知
+- `Settings.swift` — 设置模型（UserDefaults 持久化）、设置窗口与 SwiftUI 设置页

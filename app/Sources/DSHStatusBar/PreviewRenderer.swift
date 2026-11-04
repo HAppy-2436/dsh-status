@@ -36,6 +36,8 @@ enum PreviewRenderer {
         )
         try renderScene(appearance: dark, colorScheme: .dark,
                         to: directory.appendingPathComponent("scene-preview-dark.png"))
+        try renderSettingsSheet(appearance: dark,
+                                to: directory.appendingPathComponent("settings-preview-dark.png"))
     }
 
     // MARK: - 图标矩阵
@@ -50,6 +52,9 @@ enum PreviewRenderer {
         ("1 待回答 + 2 运行中", "三等分 · 中心 1（只数非运行中）", IconModel(statuses: [.waiting, .running, .running])),
         ("2 待回答 + 1 已完成 + 2 运行中", "五等分 · 中心 3", IconModel(statuses: [.waiting, .waiting, .completed, .running, .running])),
         ("未连接", "灰色虚线环", IconModel(statuses: [], connected: false)),
+        ("数字 = 非空闲总数", "设置：中心数字改为「非空闲总数」", IconModel(statuses: [.waiting, .running, .running], numberMode: .nonIdle)),
+        ("段数上限 4（共 5 个任务）", "设置：最多画 4 段，中心数字仍完整", IconModel(statuses: [.waiting, .waiting, .completed, .running, .running], segmentCap: 4)),
+        ("隐藏「运行中」", "设置：状态过滤后只剩待回答+已完成", IconModel(statuses: [.waiting, .completed])),
     ]
 
     private static func renderIconSheet(appearance: NSAppearance,
@@ -229,6 +234,53 @@ enum PreviewRenderer {
                                width: symbol.size.width, height: symbol.size.height))
     }
 
+    // MARK: - 设置页预览
+
+    private static func renderSettingsSheet(appearance: NSAppearance, to url: URL) throws {
+        let settings = AppSettings.preview()
+        let model = AppModel.demo(settings: settings)
+        let root = SettingsView(settings: settings, model: model)
+            .environment(\.colorScheme, .dark)
+        let hosting = NSHostingView(rootView: root)
+        hosting.appearance = appearance
+        hosting.frame = NSRect(x: 0, y: 0, width: 470, height: 760)
+        hosting.layoutSubtreeIfNeeded()
+
+        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
+            throw NSError(domain: "PreviewRenderer", code: 9, userInfo: [NSLocalizedDescriptionKey: "settings bitmap failed"])
+        }
+        rep.size = hosting.bounds.size
+        hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        let image = NSImage(size: NSSize(width: 470, height: 760))
+        image.addRepresentation(rep)
+
+        let margin: CGFloat = 34
+        let titleHeight: CGFloat = 86
+        let width = 470 + margin * 2
+        let height = 760 + margin + titleHeight
+
+        try savePNG(width: width, height: height, appearance: appearance, to: url) { rect in
+            NSColor(hex: 0x0E0E10).setFill()
+            rect.fill()
+            drawText("DSH Status 设置页 · 深色", font: .systemFont(ofSize: 15, weight: .semibold),
+                     color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
+            drawText("显示状态 / 隐藏项目 / 菜单栏数字 / 圆环段数上限 / 通知；修改即时生效",
+                     font: .systemFont(ofSize: 11), color: .secondaryLabelColor,
+                     at: NSPoint(x: margin, y: height - margin - 36))
+
+            let x = margin
+            let y = margin
+            NSColor.labelColor.withAlphaComponent(0.14).setFill()
+            NSBezierPath(roundedRect: NSRect(x: x - 1, y: y - 1, width: 472, height: 762),
+                         xRadius: 13, yRadius: 13).fill()
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: 470, height: 760),
+                         xRadius: 12, yRadius: 12).addClip()
+            image.draw(in: NSRect(x: x, y: y, width: 470, height: 760))
+            NSGraphicsContext.restoreGraphicsState()
+        }
+    }
+
     // MARK: - 面板预览
 
     private static func renderPanelSheet(appearance: NSAppearance,
@@ -282,7 +334,7 @@ enum PreviewRenderer {
     }
 
     private static func emptyModel() -> AppModel {
-        let model = AppModel()
+        let model = AppModel(settings: .preview())
         model.setConnected(true)
         model.apply(state: DemoState.emptyState)
         return model

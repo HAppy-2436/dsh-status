@@ -8,6 +8,7 @@ final class StatusItemController: NSObject {
     var onTogglePopover: (() -> Void)?
     var onOpenDSH: (() -> Void)?
     var onQuit: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
 
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
@@ -71,6 +72,10 @@ final class StatusItemController: NSObject {
         open.target = self
         menu.addItem(open)
 
+        let settings = NSMenuItem(title: "设置…", action: #selector(menuOpenSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+
         menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "退出 DSH Status", action: #selector(menuQuit), keyEquivalent: "q")
@@ -84,5 +89,6 @@ final class StatusItemController: NSObject {
 
     @objc private func menuOpenDSH() { onOpenDSH?() }
     @objc private func menuQuit() { onQuit?() }
+    @objc private func menuOpenSettings() { onOpenSettings?() }
 
 }

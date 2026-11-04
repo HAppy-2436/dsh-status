@@ -122,7 +122,6 @@ struct StatusPanelView: View {
 
             ForEach(rows) { row in
                 SessionRowView(row: row,
-                               color: statusColor(status),
                                emphasized: status == .waiting,
                                onOpen: { model.onOpenSession?(row.id) })
             }
@@ -234,7 +233,6 @@ struct StatusPanelView: View {
 
 private struct SessionRowView: View {
     let row: SessionRow
-    let color: Color
     let emphasized: Bool
     let onOpen: () -> Void
     @State private var hovering = false
@@ -242,14 +240,10 @@ private struct SessionRowView: View {
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(color.opacity(0.15)).frame(width: 15, height: 15)
-                    Circle().fill(color).frame(width: 6.5, height: 6.5)
-                }
+            HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.displayTitle)
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(.system(size: 12.5, weight: emphasized ? .semibold : .medium))
                         .lineLimit(1)
                         .foregroundStyle(.primary)
                     Text(subtitle)
@@ -265,6 +259,7 @@ private struct SessionRowView: View {
                 }
             }
             .padding(.horizontal, 10)
+            .padding(.leading, 13)
             .frame(height: 46)
             .background(
                 RoundedRectangle(cornerRadius: Theme.Radius.row)
@@ -279,9 +274,7 @@ private struct SessionRowView: View {
     }
 
     private var background: Color {
-        if hovering { return Theme.hoverFill(colorScheme) }
-        if emphasized { return Theme.statusColor(.waiting, scheme: colorScheme).opacity(0.055) }
-        return .clear
+        hovering ? Theme.hoverFill(colorScheme) : .clear
     }
 
     private var subtitle: String {

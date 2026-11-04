@@ -359,6 +359,7 @@ enum PreviewRenderer {
                                     colorScheme: ColorScheme) -> NSImage {
         let root = StatusPanelView(model: model)
             .environment(\.colorScheme, colorScheme)
+            .environment(\.panelUsesMaterial, false)
         let hosting = NSHostingView(rootView: root)
         hosting.appearance = appearance
         hosting.frame = NSRect(x: 0, y: 0, width: width, height: 220)

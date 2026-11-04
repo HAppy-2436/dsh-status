@@ -3,6 +3,8 @@ import SwiftUI
 /// 面板主视图（深色优先）。
 struct StatusPanelView: View {
     @ObservedObject var model: AppModel
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.panelUsesMaterial) private var usesMaterial
 
     private let width: CGFloat = 344
 
@@ -15,12 +17,18 @@ struct StatusPanelView: View {
             footer
         }
         .frame(width: width)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Group {
+            if usesMaterial {
+                VisualEffectBackground()
+            } else {
+                Color(nsColor: .windowBackgroundColor)
+            }
+        })
     }
 
     private var hairline: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.08))
+            .fill(Theme.hairline(colorScheme))
             .frame(height: 1)
     }
 
@@ -30,7 +38,7 @@ struct StatusPanelView: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(Theme.subtleFill(colorScheme))
                     .frame(width: 26, height: 26)
                 Image(nsImage: WhaleLogo.templateImage(height: 11))
                     .renderingMode(.template)
@@ -53,7 +61,9 @@ struct StatusPanelView: View {
     private var statusPill: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(model.connected ? Color.green : Color.orange)
+                .fill(model.connected
+                      ? Theme.statusColor(.completed, scheme: colorScheme)
+                      : Theme.statusColor(.stopped, scheme: colorScheme))
                 .frame(width: 6, height: 6)
             Text(model.connected ? "实时" : "未连接")
                 .font(.system(size: 10.5, weight: .medium))
@@ -62,7 +72,9 @@ struct StatusPanelView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            Capsule().fill((model.connected ? Color.green : Color.orange).opacity(0.12))
+            Capsule().fill((model.connected
+                            ? Theme.statusColor(.completed, scheme: colorScheme)
+                            : Theme.statusColor(.stopped, scheme: colorScheme)).opacity(0.12))
         )
     }
 
@@ -102,7 +114,7 @@ struct StatusPanelView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.primary.opacity(0.07)))
+                    .background(Capsule().fill(Theme.subtleFill(colorScheme)))
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)
@@ -130,7 +142,7 @@ struct StatusPanelView: View {
         VStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .fill(Color.primary.opacity(0.05))
+                    .fill(Theme.subtleFill(colorScheme))
                     .frame(width: 44, height: 44)
                 Image(systemName: "sparkles")
                     .font(.system(size: 18))
@@ -149,7 +161,7 @@ struct StatusPanelView: View {
     private var disconnected: some View {
         VStack(spacing: 9) {
             HStack(spacing: 6) {
-                Circle().fill(Color.orange).frame(width: 7, height: 7)
+                Circle().fill(Theme.statusColor(.stopped, scheme: colorScheme)).frame(width: 7, height: 7)
                 Text("DSH 未连接")
                     .font(.system(size: 13, weight: .semibold))
             }
@@ -157,7 +169,7 @@ struct StatusPanelView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             Button("打开 DSH") { model.onOpenDSH?() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .controlSize(.small)
                 .padding(.top, 2)
         }
@@ -179,7 +191,7 @@ struct StatusPanelView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
-                .background(Capsule().fill(Color.primary.opacity(0.06)))
+                .background(Capsule().fill(Theme.subtleFill(colorScheme)))
             }
             .buttonStyle(.plain)
 
@@ -207,20 +219,14 @@ struct StatusPanelView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .frame(width: 26, height: 26)
-                .background(Circle().fill(Color.primary.opacity(0.06)))
+                .background(Circle().fill(Theme.subtleFill(colorScheme)))
         }
         .buttonStyle(.plain)
         .help(help)
     }
 
     private func statusColor(_ status: SessionStatus) -> Color {
-        switch status {
-        case .waiting: return .red
-        case .running: return .blue
-        case .completed: return .green
-        case .stopped: return .orange
-        case .idle: return .gray
-        }
+        Theme.statusColor(status, scheme: colorScheme)
     }
 }
 
@@ -232,12 +238,13 @@ private struct SessionRowView: View {
     let emphasized: Bool
     let onOpen: () -> Void
     @State private var hovering = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle().fill(color.opacity(0.16)).frame(width: 15, height: 15)
+                    Circle().fill(color.opacity(0.15)).frame(width: 15, height: 15)
                     Circle().fill(color).frame(width: 6.5, height: 6.5)
                 }
                 VStack(alignment: .leading, spacing: 2) {
@@ -260,7 +267,7 @@ private struct SessionRowView: View {
             .padding(.horizontal, 10)
             .frame(height: 46)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Theme.Radius.row)
                     .fill(background)
             )
             .padding(.horizontal, 6)
@@ -272,8 +279,8 @@ private struct SessionRowView: View {
     }
 
     private var background: Color {
-        if hovering { return Color.primary.opacity(0.06) }
-        if emphasized { return Color.red.opacity(0.06) }
+        if hovering { return Theme.hoverFill(colorScheme) }
+        if emphasized { return Theme.statusColor(.waiting, scheme: colorScheme).opacity(0.055) }
         return .clear
     }
 

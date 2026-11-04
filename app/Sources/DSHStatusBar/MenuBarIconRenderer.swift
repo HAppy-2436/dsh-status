@@ -104,7 +104,7 @@ enum MenuBarIconRenderer {
         )
         let path = WhaleLogo.path(fitting: logoRect)
         // 深色菜单栏 = 纯白；浅色菜单栏自动用近黑，保证可见
-        (dark ? NSColor.white : NSColor(hex: 0x0F1115)).setFill()
+        (dark ? NSColor.white : NSColor(hex: 0x1F1F23)).setFill()
         path.fill()
     }
 
@@ -130,27 +130,29 @@ enum MenuBarIconRenderer {
         }
 
         let step = 360.0 / CGFloat(count)
-        let gap = min(9.0, step * 0.22)
+        let gap = min(24.0, step * 0.34)
         let sweep = step - gap
 
         for (index, color) in colors.enumerated() {
             let start = 90.0 - CGFloat(index) * step - gap / 2
             let end = start - sweep
 
-            // 外发光（让深色菜单栏上更有层次）
-            color.withAlphaComponent(dark ? 0.13 : 0.10).setStroke()
+            // 柔和外发光
+            color.withAlphaComponent(dark ? 0.10 : 0.08).setStroke()
             let halo = NSBezierPath()
             halo.appendArc(withCenter: center, radius: ringRadius,
                            startAngle: start, endAngle: end, clockwise: true)
-            halo.lineWidth = ringWidth + 1.2
+            halo.lineWidth = ringWidth + 0.8
+            halo.lineCapStyle = .round
             halo.stroke()
 
-            // 分段本体
+            // 分段本体（圆头端点，更接近 macOS 的柔和风格）
             color.setStroke()
             let segment = NSBezierPath()
             segment.appendArc(withCenter: center, radius: ringRadius,
                               startAngle: start, endAngle: end, clockwise: true)
             segment.lineWidth = ringWidth
+            segment.lineCapStyle = .round
             segment.stroke()
         }
     }
@@ -167,7 +169,7 @@ enum MenuBarIconRenderer {
         }
         let font = roundedFont(size: size, weight: .bold)
         let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(dark ? 0.45 : 0.20)
+        shadow.shadowColor = NSColor.black.withAlphaComponent(dark ? 0.30 : 0.16)
         shadow.shadowBlurRadius = 1.2
         shadow.shadowOffset = NSSize(width: 0, height: -0.4)
         let attrs: [NSAttributedString.Key: Any] = [
@@ -187,7 +189,7 @@ enum MenuBarIconRenderer {
     // MARK: 未连接
 
     private static func drawDisconnected(dark: Bool) {
-        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.42 : 0.34)
+        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.36 : 0.30)
         color.setStroke()
         let ring = NSBezierPath(ovalIn: NSRect(
             x: center.x - ringRadius,
@@ -196,7 +198,8 @@ enum MenuBarIconRenderer {
             height: ringRadius * 2
         ))
         ring.lineWidth = 1.6
-        ring.setLineDash([2.2, 2.2], count: 2, phase: 0)
+        ring.lineCapStyle = .round
+        ring.setLineDash([2.0, 3.0], count: 2, phase: 0)
         ring.stroke()
 
         color.setFill()
@@ -207,18 +210,7 @@ enum MenuBarIconRenderer {
     // MARK: 状态色
 
     private static func statusColor(_ status: SessionStatus, dark: Bool) -> NSColor {
-        switch status {
-        case .waiting:
-            return NSColor(hex: dark ? 0xFF5A50 : 0xE01B24)
-        case .running:
-            return NSColor(hex: dark ? 0x4DA3FF : 0x007AFF)
-        case .completed:
-            return NSColor(hex: dark ? 0x3DDC6A : 0x28B24B)
-        case .stopped:
-            return NSColor(hex: dark ? 0xFFB340 : 0xE07800)
-        case .idle:
-            return NSColor.labelColor.withAlphaComponent(0.3)
-        }
+        Theme.statusNSColor(status, dark: dark)
     }
 
     // MARK: 工具

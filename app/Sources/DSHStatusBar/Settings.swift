@@ -151,6 +151,7 @@ final class SettingsWindowController {
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var model: AppModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -174,7 +175,7 @@ struct SettingsView: View {
                     }
                     Text("隐藏的状态既不在面板里出现，也不计入菜单栏圆环与数字。")
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 card(title: "项目显示") {
@@ -182,7 +183,7 @@ struct SettingsView: View {
                     if workspaces.isEmpty {
                         Text("暂无已知项目（连接 DSH 后出现）")
                             .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     } else {
                         ForEach(workspaces, id: \.id) { workspace in
                             Toggle(isOn: binding(workspaceId: workspace.id)) {
@@ -198,7 +199,7 @@ struct SettingsView: View {
                         }
                         Text("关闭开关即隐藏该项目；会话本身不受影响。")
                             .font(.system(size: 10.5))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -227,7 +228,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     Text("任务数超过上限时，按优先级只画前 N 段；中心数字仍表示完整数量。")
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 card(title: "通知") {
@@ -239,7 +240,7 @@ struct SettingsView: View {
                         .toggleStyle(.switch).controlSize(.small)
                     Text("点击通知会打开 DSH 主页面；同会话 30 秒内不重复。")
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 }
@@ -268,7 +269,7 @@ struct SettingsView: View {
     private var header: some View {
         HStack(spacing: 10) {
             ZStack {
-                Circle().fill(Color.primary.opacity(0.08)).frame(width: 34, height: 34)
+                Circle().fill(Theme.subtleFill(colorScheme)).frame(width: 34, height: 34)
                 Image(nsImage: WhaleLogo.templateImage(height: 13))
                     .renderingMode(.template)
                     .foregroundStyle(.secondary)
@@ -293,12 +294,12 @@ struct SettingsView: View {
             .padding(9)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.primary.opacity(0.045))
+                RoundedRectangle(cornerRadius: Theme.Radius.card)
+                    .fill(Theme.cardFill(colorScheme))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.Radius.card)
+                    .stroke(Theme.cardStroke(colorScheme), lineWidth: 1)
             )
         }
     }
@@ -347,12 +348,6 @@ struct SettingsView: View {
     }
 
     private func color(_ status: SessionStatus) -> Color {
-        switch status {
-        case .waiting: return .red
-        case .running: return .blue
-        case .completed: return .green
-        case .stopped: return .orange
-        case .idle: return .gray
-        }
+        Theme.statusColor(status, scheme: colorScheme)
     }
 }

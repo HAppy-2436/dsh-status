@@ -44,4 +44,5 @@ DSH_STATUS_BRIDGE_FILE="$HOME/.dsh-status/bridge.mock.json" \
 - `StatusPanelView.swift` — SwiftUI 面板
 - `PreviewRenderer.swift` — 离屏预览图
 - `NotificationManager.swift` — 待回答/已完成/已停止系统通知
+- `Theme.swift` — 设计 token：低饱和状态色、圆角、毛玻璃背景，深色优先
 - `Settings.swift` — 设置模型（UserDefaults 持久化）、设置窗口与 SwiftUI 设置页

@@ -9,7 +9,8 @@
   段色=状态的圆环；中心=关注数，只有运行中时不显示数字）、面板、**设置页**（自定义显示状态 / 隐藏项目 / 中心数字 / 段数上限 / 通知）、
   SSE 桥客户端、未连接态、通知；
   配套 mock 桥可脱离 DSH 演示；设计预览图与真机截图在 [`docs/previews/`](docs/previews/README.md)。
-- **P1 待做**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令），之后接入真实会话。
+- **P1 已实现（待安装验证）**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令）代码与测试完成；
+  还差在 DSH 里通过 Plugins 页面安装（Desktop profile 只能 GUI 安装），然后真机验证。
 - 图标已按 v3 落地（鲸鱼 + 分段圆环），待你确认观感后进入 P1 插件。
 
 ## 快速开始（P0 演示，假数据）
@@ -23,11 +24,14 @@ bash scripts/demo.sh          # 起 mock 桥 + 菜单栏 App；Ctrl-C 退出
 
 打开设置：点面板底部齿轮，或右键菜单栏图标 →「设置…」；修改即时生效。
 
-真实接入（P1 完成后）：
+真实接入（一次性安装）：
 
 ```bash
 bash scripts/install.sh       # 构建 App 到 ~/Applications，并打印插件安装步骤
 ```
+
+然后在 DeepSeek Harness 左侧边栏 **Plugins → Add plugin → Install a third-party plugin**，
+粘贴本仓库 `plugin/` 的绝对路径安装并启用。插件会写 `~/.dsh-status/bridge.json` 并自动拉起 App。
 
 ## 架构
 
@@ -45,8 +49,9 @@ DSH Host ── 插件 Host 薄桥（bridge.json + 路由）────┘
 ## 目录结构
 
 - `app/` — Swift 菜单栏 App（SwiftPM，无第三方依赖）
-- `plugin/` — DSH 插件 bundle（P1）
+- `plugin/` — DSH 插件 bundle：Host 薄桥 + Client 状态聚合（含 `node --test` 测试与开发用 dev-host）
 - `mock/` — mock 桥（P0 演示 / App 联调）
+- `scripts/dev-*` — 开发辅助（见各脚本头部说明）
 - `scripts/` — 构建、安装、演示、协议测试
 - `docs/` — 设计文档与预览图
 

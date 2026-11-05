@@ -16,6 +16,14 @@ final class StatusItemController: NSObject {
     private var animationPhase: CGFloat = 0
     private var animationTime: TimeInterval = 0
     private var lastTick = Date()
+    /// 预渲染的动画帧（一次生成、逐帧切换），以及对应的缓存键。
+    private var animationFrames: [NSImage] = []
+    private var animationFrameIndex = 0
+    private var animationFramesKey = ""
+    /// 帧率与总帧数（4.8s 一轮：旋转 2 圈 @2.4s/圈 + 呼吸 1 个周期，首尾无缝）。
+    private let animationFPS: Double = 12
+    private let animationCycle: TimeInterval = 4.8
+    private var animationFrameCount: Int { Int((animationCycle * animationFPS).rounded()) }
     /// 动画一圈的时长。
     private let animationPeriod: TimeInterval = 1.8
 
@@ -57,7 +65,23 @@ final class StatusItemController: NSObject {
         iconModel.animationPhase = animationPhase
         iconModel.animationTime = animationTime
         let appearance = button.effectiveAppearance
-        let image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
+        let animating = shouldAnimate(iconModel)
+        let image: NSImage
+        if animating {
+            let key = staticLayerKey(iconModel, appearance: appearance)
+            if animationFramesKey != key || animationFrames.isEmpty {
+                buildAnimationFrames(baseModel: iconModel, appearance: appearance, key: key)
+                animationFrameIndex = 0
+            }
+            image = animationFrames.isEmpty
+                ? MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
+                : animationFrames[min(animationFrameIndex, animationFrames.count - 1)]
+        } else {
+            animationFrames = []
+            animationFramesKey = ""
+            animationFrameIndex = 0
+            image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
+        }
         button.image = image
         button.imageScaling = .scaleNone
         button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
@@ -71,28 +95,56 @@ final class StatusItemController: NSObject {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
-    private func updateAnimation(for iconModel: IconModel) {
-        let shouldAnimate = iconModel.connected
+    /// 静态层缓存键：所有不随动画变化的输入。
+    private func staticLayerKey(_ iconModel: IconModel, appearance: NSAppearance) -> String {
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let statuses = iconModel.statuses.map(\.rawValue).joined(separator: ",")
+        return "\(statuses)|\(iconModel.connected)|\(iconModel.numberMode.rawValue)|\(dark)"
+    }
+
+    private func shouldAnimate(_ iconModel: IconModel) -> Bool {
+        iconModel.connected
             && iconModel.runningCount > 0
             && model.settings.runAnimation
             && !reduceMotion
-        if shouldAnimate, animationTimer == nil {
-            lastTick = Date()
-            let timer = Timer(timeInterval: 1.0 / 18.0, repeats: true) { [weak self] _ in
-                guard let self else { return }
-                let now = Date()
-                let delta = now.timeIntervalSince(self.lastTick)
-                self.lastTick = now
-                self.animationTime += delta
-                // 转速做轻微节奏：伸长期略快、收缩期略慢
-                let cycle: TimeInterval = 2.4
-                let t = (self.animationTime.truncatingRemainder(dividingBy: cycle)) / cycle
+            && !ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+
+    /// 一次性把整轮动画渲染成帧序列；之后每帧只做一次图片切换。
+    private func buildAnimationFrames(baseModel: IconModel, appearance: NSAppearance, key: String) {
+        let total = animationFrameCount
+        guard total > 0 else { return }
+        let frameDuration = animationCycle / Double(total)
+        let breathingCycle: TimeInterval = animationCycle
+        var frames: [NSImage] = []
+        frames.reserveCapacity(total)
+        var phase: CGFloat = 0
+        for index in 0..<total {
+            let time = Double(index) * frameDuration
+            if index > 0 {
+                // 转速节奏：伸长期略快、收缩期略慢
+                let t = time.truncatingRemainder(dividingBy: breathingCycle) / breathingCycle
                 let eased = 0.5 - 0.5 * cos(t * 2 * .pi)
                 let speed = 0.82 + 0.36 * eased
-                self.animationPhase = (self.animationPhase
-                    + CGFloat(delta / self.animationPeriod * 360 * speed))
-                    .truncatingRemainder(dividingBy: 360)
-                self.refreshIconOnly()
+                phase += CGFloat(frameDuration / 2.4 * 360 * speed)
+                phase = phase.truncatingRemainder(dividingBy: 360)
+            }
+            var frameModel = baseModel
+            frameModel.animationPhase = phase
+            frameModel.animationTime = time
+            frames.append(MenuBarIconRenderer.image(for: frameModel, appearance: appearance))
+        }
+        animationFrames = frames
+        animationFramesKey = key
+    }
+
+    private func updateAnimation(for iconModel: IconModel) {
+        let shouldAnimate = shouldAnimate(iconModel)
+        if shouldAnimate, animationTimer == nil {
+            let timer = Timer(timeInterval: 1.0 / animationFPS, repeats: true) { [weak self] _ in
+                guard let self, !self.animationFrames.isEmpty else { return }
+                self.animationFrameIndex = (self.animationFrameIndex + 1) % self.animationFrames.count
+                self.statusItem.button?.image = self.animationFrames[self.animationFrameIndex]
             }
             timer.tolerance = 1.0 / 90.0
             RunLoop.main.add(timer, forMode: .common)
@@ -101,15 +153,6 @@ final class StatusItemController: NSObject {
             animationTimer?.invalidate()
             animationTimer = nil
         }
-    }
-
-    /// 只重画图标，避免每帧重复管理定时器。
-    private func refreshIconOnly() {
-        guard let button = statusItem.button else { return }
-        var iconModel = model.iconModel
-        iconModel.animationPhase = animationPhase
-        iconModel.animationTime = animationTime
-        button.image = MenuBarIconRenderer.image(for: iconModel, appearance: button.effectiveAppearance)
     }
 
     // MARK: 点击

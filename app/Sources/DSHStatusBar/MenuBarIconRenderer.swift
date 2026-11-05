@@ -76,7 +76,22 @@ enum MenuBarIconRenderer {
 
     static func image(for model: IconModel, appearance: NSAppearance) -> NSImage {
         render(width: canvas, height: canvas, appearance: appearance) { _ in
-            draw(model: model, appearance: appearance)
+            draw(model: model, appearance: appearance, includeComet: true)
+        }
+    }
+
+    /// 只渲染不动的部分（外环 / 轨道 / 数字 / 鲸鱼），供动画帧复用。
+    static func staticImage(for model: IconModel, appearance: NSAppearance) -> NSImage {
+        render(width: canvas, height: canvas, appearance: appearance) { _ in
+            draw(model: model, appearance: appearance, includeComet: false)
+        }
+    }
+
+    /// 在缓存的静态层上只重绘「彗星弧」，避免每帧重建文字与整圈。
+    static func animatedImage(base: NSImage, model: IconModel, appearance: NSAppearance) -> NSImage {
+        render(width: canvas, height: canvas, appearance: appearance) { rect in
+            base.draw(in: rect)
+            drawComet(model: model, appearance: appearance)
         }
     }
 
@@ -93,7 +108,7 @@ enum MenuBarIconRenderer {
 
     // MARK: 绘制
 
-    private static func draw(model: IconModel, appearance: NSAppearance) {
+    private static func draw(model: IconModel, appearance: NSAppearance, includeComet: Bool) {
         let dark = isDark(appearance)
 
         guard model.connected else {
@@ -122,14 +137,14 @@ enum MenuBarIconRenderer {
             ring.stroke()
         }
 
-        // 运行中：有外环时放内层细弧，否则直接用外环大小的动态弧
+        // 运行中：轨道（静态）+ 彗星弧（动画）
         if model.runningCount > 0 {
-            if hasOuter {
-                drawSpinner(dark: dark, radius: innerRadius, width: innerWidth,
-                            phase: model.animationPhase, time: model.animationTime, useTrack: true)
-            } else {
-                drawSpinner(dark: dark, radius: outerRadius, width: outerWidth,
-                            phase: model.animationPhase, time: model.animationTime, useTrack: true)
+            let radius = hasOuter ? innerRadius : outerRadius
+            let width = hasOuter ? innerWidth : outerWidth
+            drawSpinnerTrack(dark: dark, radius: radius, width: width)
+            if includeComet {
+                drawSpinnerComet(dark: dark, radius: radius, width: width,
+                                 phase: model.animationPhase, time: model.animationTime)
             }
         }
 
@@ -155,24 +170,21 @@ enum MenuBarIconRenderer {
 
     // MARK: 运行中动态弧
 
-    /// 运行中动画：**淡色整环（轨道）+ 亮弧**。
-    /// 整环始终同心，亮弧在轨道上旋转并做长度呼吸 —— 既解决「单段弧看起来不居中」，
-    /// 又能表达「在跑」与节奏感。
-    private static func drawSpinner(dark: Bool, radius: CGFloat, width: CGFloat,
-                                    phase: CGFloat, time: TimeInterval, useTrack: Bool) {
+    /// 轨道：淡色整环，始终同心、静止。
+    private static func drawSpinnerTrack(dark: Bool, radius: CGFloat, width: CGFloat) {
         let base = dark ? NSColor.white : NSColor(hex: 0x1F1F23)
+        base.withAlphaComponent(0.16).setStroke()
+        let track = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius,
+                                                width: radius * 2, height: radius * 2))
+        track.lineWidth = width
+        track.stroke()
+    }
 
-        // 淡轨道：整圈、低对比，作为同心参考（只在有外环、需要「内圈居中」时用）
-        if useTrack {
-            base.withAlphaComponent(0.16).setStroke()
-            let track = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius,
-                                                    width: radius * 2, height: radius * 2))
-            track.lineWidth = width
-            track.stroke()
-        }
-
-        // 亮弧：弧长呼吸 + 旋转
-        let cycle: TimeInterval = 2.4
+    /// 彗星弧：旋转 + 弧长呼吸（每帧只重绘这一层）。
+    private static func drawSpinnerComet(dark: Bool, radius: CGFloat, width: CGFloat,
+                                         phase: CGFloat, time: TimeInterval) {
+        let base = dark ? NSColor.white : NSColor(hex: 0x1F1F23)
+        let cycle: TimeInterval = 4.8
         let t = (time.truncatingRemainder(dividingBy: cycle)) / cycle
         let eased = 0.5 - 0.5 * cos(t * 2 * .pi)          // 0 → 1 → 0
         let sweep = 85 + 130 * CGFloat(eased)             // 85° ⇄ 215°
@@ -184,6 +196,17 @@ enum MenuBarIconRenderer {
         arc.lineWidth = width
         arc.lineCapStyle = .round
         arc.stroke()
+    }
+
+    /// 只画彗星弧（叠加在缓存的静态层上）。
+    private static func drawComet(model: IconModel, appearance: NSAppearance) {
+        let dark = isDark(appearance)
+        guard model.connected, !model.isEmpty, model.runningCount > 0 else { return }
+        let hasOuter = model.topPriorityStatus != nil
+        let radius = hasOuter ? innerRadius : outerRadius
+        let width = hasOuter ? innerWidth : outerWidth
+        drawSpinnerComet(dark: dark, radius: radius, width: width,
+                         phase: model.animationPhase, time: model.animationTime)
     }
 
     // MARK: 未连接

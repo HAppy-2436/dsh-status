@@ -213,8 +213,9 @@ struct SettingsView: View {
             aboutSection
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Theme.settingsContentBackground)
     }
 
     // MARK: 菜单栏图标
@@ -286,6 +287,7 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .listRowBackground(Theme.settingsCardBackground)
             } else {
                 ForEach(workspaces) { workspace in
                     SettingsRow(symbol: "folder.fill",
@@ -590,6 +592,7 @@ private struct SettingsRow<Trailing: View>: View {
             trailing
         }
         .frame(maxWidth: .infinity)
+        .listRowBackground(Theme.settingsCardBackground)
     }
 }
 

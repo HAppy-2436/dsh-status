@@ -111,7 +111,11 @@
 - 标准 `NSWindow`：`[.titled, .closable, .miniaturizable, .resizable]`，标题「DSH Status 设置」。
 - 默认内容尺寸 **540 × 640**，最小 **500 × 480**，可缩放；`setFrameAutosaveName("DSHStatusSettings")`
   记住大小/位置；首次打开居中；关闭不退出 App，再次打开复用同一窗口。
-- 打开时 `NSApp.activate` + `makeKeyAndOrderFront`；内容背景 `windowBackgroundColor`。
+- 打开时 `NSApp.activate` + `makeKeyAndOrderFront`。
+- **背景色为显式中性色板**（不透明度 100%）：深色内容 `#1F2024` / 卡片 `#26272B`、浅色内容 `#F2F2F6` / 卡片白，
+  分隔线 `#303135` / `#E3E3E8`。原因：直接用 `windowBackgroundColor` + SwiftUI grouped Form 的玻璃底会被
+  Liquid Glass 环境（桌面壁纸/窗口激活态）染色——聚焦时卡片偏蓝、失焦时变中性，同一窗口两副面孔；
+  固定为原生实测中性色后，**常态与失焦态一致**，与系统设置观感对齐。
 
 ### 4.2 内容
 

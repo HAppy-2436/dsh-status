@@ -90,6 +90,38 @@ enum Theme {
         }
     }
 
+    // MARK: - 设置窗口（原生实测色板，显式不透明色，避免跟随桌面/窗口激活态变色）
+
+    /// 设置窗口内容底（实测 System Settings 深色 #1F2024；浅色取系统浅灰白）。
+    static var settingsContentBackground: Color {
+        Color(nsColor: dynamicColor(dark: (0.122, 0.125, 0.141), light: (0.949, 0.949, 0.965)))
+    }
+
+    /// 设置分组卡片底（实测 System Settings 深色 #26272B；浅色为纯白）。
+    static var settingsCardBackground: Color {
+        Color(nsColor: dynamicColor(dark: (0.149, 0.153, 0.169), light: (1.0, 1.0, 1.0)))
+    }
+
+    /// 设置行分隔线（实测 #303135 / 浅色 #E3E3E8）。
+    static var settingsSeparator: Color {
+        Color(nsColor: dynamicColor(dark: (0.188, 0.192, 0.208), light: (0.890, 0.890, 0.906)))
+    }
+
+    /// 显式深/浅两套色值（不参与 vibrancy/壁纸染色）。
+    static func dynamicNSColor(dark: (Double, Double, Double),
+                               light: (Double, Double, Double)) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let rgb = isDark ? dark : light
+            return NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
+        }
+    }
+
+    private static func dynamicColor(dark: (Double, Double, Double),
+                                     light: (Double, Double, Double)) -> NSColor {
+        dynamicNSColor(dark: dark, light: light)
+    }
+
     // MARK: - 表面与描边（系统语义色）
 
     /// hover 底色：用主文字色的小透明度，深浅色通用。

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// 状态面板：参考 Status Trio 的 `AnchoredStatusPanel`——
@@ -9,26 +10,47 @@ final class StatusPanelController: NSObject {
     private let panel = AnchoredStatusPanel()
     private let model: AppModel
     private let statusItem: NSStatusItem
+    private let settings: AppSettings
+    private var styleCancellable: AnyCancellable?
+    private var themeObserver: NSObjectProtocol?
     private var hostingController: NSHostingController<StatusPanelView>?
     private var contentController: StatusPanelContentViewController?
     private var outsideMonitor: Any?
     private var localMonitor: Any?
     private var localMouseMonitor: Any?
     private var globalMonitor: Any?
+    private var anchorScreenRect: NSRect = .zero
 
-    init(model: AppModel, statusItem: NSStatusItem) {
+    init(model: AppModel, statusItem: NSStatusItem, settings: AppSettings) {
         self.model = model
         self.statusItem = statusItem
+        self.settings = settings
         super.init()
         let hosting = NSHostingController(rootView: StatusPanelView(model: model))
-        let content = StatusPanelContentViewController(hostingController: hosting)
+        let content = StatusPanelContentViewController(
+            hostingController: hosting,
+            backgroundStyle: settings.panelBackgroundStyle
+        )
         hostingController = hosting
         contentController = content
         panel.contentViewController = content
         panel.onClose = { [weak self] in self?.removeEventMonitors() }
+        self.themeObserver = DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.contentController?.refreshBackground() }
+        styleCancellable = settings.$panelBackgroundStyle
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] style in self?.contentController?.applyBackgroundStyle(style) }
     }
 
     var isShown: Bool { panel.isVisible }
+
+    deinit {
+        if let themeObserver {
+            DistributedNotificationCenter.default().removeObserver(themeObserver)
+        }
+    }
 
     // MARK: 显示 / 隐藏
 
@@ -41,6 +63,8 @@ final class StatusPanelController: NSObject {
         fitToContent()
         panel.alphaValue = 0
         panel.orderFrontRegardless()
+        // 非激活面板也让它成为 key window，内容才按 active 状态渲染（颜色不被去饱和）
+        panel.makeKey()
         positionPanel(button: button)
         panel.invalidateShadow()
         installEventMonitors()
@@ -72,7 +96,7 @@ final class StatusPanelController: NSObject {
 
     /// 语言/主题变化时重建背景材质。
     func refreshBackground() {
-        contentController?.applyBackgroundStyle()
+        contentController?.refreshBackground()
     }
 
     // MARK: 尺寸与位置
@@ -92,6 +116,7 @@ final class StatusPanelController: NSObject {
     private func positionPanel(button: NSStatusBarButton) {
         guard let buttonWindow = button.window else { return }
         let anchorRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        anchorScreenRect = anchorRect
         let size = panel.frame.size
         let gap: CGFloat = 6
         var x = anchorRect.midX - size.width / 2
@@ -133,6 +158,9 @@ final class StatusPanelController: NSObject {
             guard let self, self.panel.isVisible else { return event }
             if event.window === self.panel { return event }
             if event.window === self.statusItem.button?.window { return event }
+            if NSMouseInRect(NSEvent.mouseLocation, self.anchorScreenRect.insetBy(dx: -6, dy: -6), false) {
+                return event
+            }
             self.close()
             return event
         }
@@ -157,7 +185,7 @@ final class StatusPanelController: NSObject {
 // MARK: - 面板窗口
 
 final class AnchoredStatusPanel: NSPanel {
-    static let cornerRadius: CGFloat = 16
+    static let cornerRadius: CGFloat = 20
     var onClose: (() -> Void)?
 
     init() {
@@ -205,10 +233,12 @@ final class AnchoredStatusPanel: NSPanel {
 
 final class StatusPanelContentViewController: NSViewController {
     private let hostingController: NSViewController
+    private var backgroundStyle: PanelBackgroundStyle
     private var backgroundView: NSView?
 
-    init(hostingController: NSViewController) {
+    init(hostingController: NSViewController, backgroundStyle: PanelBackgroundStyle) {
         self.hostingController = hostingController
+        self.backgroundStyle = backgroundStyle
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -236,7 +266,14 @@ final class StatusPanelContentViewController: NSViewController {
         hostingController.view.fittingSize
     }
 
-    func applyBackgroundStyle() {
+    func applyBackgroundStyle(_ style: PanelBackgroundStyle) {
+        guard style != backgroundStyle else { return }
+        backgroundStyle = style
+        guard isViewLoaded else { return }
+        installBackground(in: view)
+    }
+
+    func refreshBackground() {
         guard isViewLoaded else { return }
         installBackground(in: view)
     }
@@ -261,30 +298,39 @@ final class StatusPanelContentViewController: NSViewController {
             hostingController.view.autoresizingMask = [.width, .height]
             container.addSubview(hostingController.view)
         }
+
     }
 
     private func makeBackgroundView(in container: NSView) -> NSView {
-        if reduceTransparency {
-            let solid = NSView(frame: container.bounds)
-            solid.wantsLayer = true
-            solid.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-            solid.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
-            solid.layer?.masksToBounds = true
-            solid.autoresizingMask = [.width, .height]
-            return solid
+        let style = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+            ? PanelBackgroundStyle.solid
+            : backgroundStyle
+        switch style {
+        case .solid:
+            return solidBackground(in: container)
+        case .classicMaterial:
+            return classicMaterialBackground(in: container)
+        case .liquidGlass:
+            if #available(macOS 26.0, *) {
+                let glass = NSGlassEffectView(frame: container.bounds)
+                glass.style = .regular
+                glass.cornerRadius = AnchoredStatusPanel.cornerRadius
+                if #available(macOS 27.0, *) {
+                    glass.effectIsInteractive = true
+                }
+                let glassContent = NSView(frame: glass.bounds)
+                glassContent.autoresizingMask = [.width, .height]
+                hostingController.view.frame = glassContent.bounds
+                hostingController.view.autoresizingMask = [.width, .height]
+                glassContent.addSubview(hostingController.view)
+                glass.contentView = glassContent
+                return glass
+            }
+            return classicMaterialBackground(in: container)
         }
-        if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView(frame: container.bounds)
-            glass.style = .regular
-            glass.cornerRadius = AnchoredStatusPanel.cornerRadius
-            let glassContent = NSView(frame: glass.bounds)
-            glassContent.autoresizingMask = [.width, .height]
-            hostingController.view.frame = glassContent.bounds
-            hostingController.view.autoresizingMask = [.width, .height]
-            glassContent.addSubview(hostingController.view)
-            glass.contentView = glassContent
-            return glass
-        }
+    }
+
+    private func classicMaterialBackground(in container: NSView) -> NSView {
         let effect = NSVisualEffectView(frame: container.bounds)
         effect.material = .popover
         effect.blendingMode = .behindWindow
@@ -293,6 +339,16 @@ final class StatusPanelContentViewController: NSViewController {
         effect.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
         effect.layer?.masksToBounds = true
         return effect
+    }
+
+    private func solidBackground(in container: NSView) -> NSView {
+        let solid = NSView(frame: container.bounds)
+        solid.wantsLayer = true
+        solid.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        solid.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        solid.layer?.masksToBounds = true
+        solid.autoresizingMask = [.width, .height]
+        return solid
     }
 
     override func viewDidLayout() {

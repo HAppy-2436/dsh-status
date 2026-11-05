@@ -9,7 +9,8 @@
   段色=状态（待回答黄 `#F2B900` / 运行中蓝 `#0A84FF` / 已完成绿 `#34C759` / 已停止红的系统色）
   的圆环；中心=关注数，只有运行中时不显示数字）、面板、**设置页**（自定义显示状态 / 隐藏项目 / 中心数字 / 段数上限 / 通知）、
   SSE 桥客户端、未连接态、通知；
-  界面按 macOS 原生风格调校（自定义无箭头 NSPanel + Liquid Glass 材质、16pt 圆角、系统强调色）；
+  界面按 macOS 原生风格调校（自定义无箭头 NSPanel + Liquid Glass 材质、20pt 圆角、系统强调色；
+可切换液态玻璃 / 经典磨砂 / 实色）；
   配套 mock 桥可脱离 DSH 演示；设计预览图与真机截图在 [`docs/previews/`](docs/previews/README.md)。
 - **P1 已实现（待安装验证）**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令）代码与测试完成；
   还差在 DSH 里通过 Plugins 页面安装（Desktop profile 只能 GUI 安装），然后真机验证。

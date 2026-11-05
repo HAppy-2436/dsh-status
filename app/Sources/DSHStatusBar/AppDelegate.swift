@@ -51,13 +51,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController.onQuit = { [weak self] in self?.confirmQuit() }
         statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
 
-        panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem)
+        panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem, settings: settings)
         settingsWindow = SettingsWindowController(settings: settings, model: model)
 
         // 设置变化 → 立即重绘图标
         settings.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                self?.panelController.refreshBackground()
                 DispatchQueue.main.async { self?.statusItemController.refresh() }
             }
             .store(in: &cancellables)

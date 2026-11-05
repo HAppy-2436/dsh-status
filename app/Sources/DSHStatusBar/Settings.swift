@@ -48,6 +48,39 @@ enum SegmentCap: Int, CaseIterable, Identifiable {
     }
 }
 
+enum PanelBackgroundStyle: String, CaseIterable, Identifiable {
+    case liquidGlass
+    case classicMaterial
+    case solid
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .liquidGlass: return "液态玻璃"
+        case .classicMaterial: return "经典磨砂"
+        case .solid: return "实色"
+        }
+    }
+
+    var available: Bool {
+        if self == .liquidGlass {
+            if #available(macOS 26.0, *) { return true }
+            return false
+        }
+        return true
+    }
+
+    static var systemDefault: PanelBackgroundStyle {
+        if #available(macOS 26.0, *) { return .liquidGlass }
+        return .classicMaterial
+    }
+
+    static var availableStyles: [PanelBackgroundStyle] {
+        allCases.filter(\.available)
+    }
+}
+
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
@@ -70,6 +103,9 @@ final class AppSettings: ObservableObject {
     @Published var notifyCompleted: Bool { didSet { save("notifyCompleted", notifyCompleted) } }
     @Published var notifyStopped: Bool { didSet { save("notifyStopped", notifyStopped) } }
     @Published var confirmBeforeQuit: Bool { didSet { save("confirmBeforeQuit", confirmBeforeQuit) } }
+    @Published var panelBackgroundStyle: PanelBackgroundStyle {
+        didSet { save("panelBackgroundStyle", panelBackgroundStyle.rawValue) }
+    }
 
     init(persist: Bool = true, defaults: UserDefaults = .standard) {
         self.persist = persist
@@ -84,6 +120,8 @@ final class AppSettings: ObservableObject {
         notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
         notifyStopped = defaults.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
         confirmBeforeQuit = defaults.object(forKey: "dshStatus.confirmBeforeQuit") as? Bool ?? true
+        let storedPanel = PanelBackgroundStyle(rawValue: defaults.string(forKey: "dshStatus.panelBackgroundStyle") ?? "")
+        panelBackgroundStyle = storedPanel ?? PanelBackgroundStyle.systemDefault
     }
 
     /// 预览/演示用：不落盘。
@@ -100,6 +138,7 @@ final class AppSettings: ObservableObject {
         notifyCompleted = false
         notifyStopped = false
         confirmBeforeQuit = true
+        panelBackgroundStyle = PanelBackgroundStyle.systemDefault
     }
 
     /// 某状态是否在面板/图标中显示。
@@ -308,9 +347,10 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SettingsMetrics.groupSpacing) {
                     displaySettings
-                    projectSettings
                     iconSettings
+                    panelSettings
                     notificationSettings
+                    projectSettings
                 }
                 .padding(SettingsMetrics.pageMargin)
             }
@@ -398,6 +438,28 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
                 .frame(width: 90)
+            }
+        }
+    }
+
+    private var panelSettings: some View {
+        SettingsGroup("面板背景",
+                      footnote: "开启系统「降低透明度」时会自动使用实色。") {
+            SettingsMenuRow(
+                symbol: "rectangle.on.rectangle",
+                tint: Color(red: 0.45, green: 0.50, blue: 0.62),
+                title: "材质",
+                subtitle: settings.panelBackgroundStyle.label,
+                showDivider: false
+            ) {
+                Picker("", selection: $settings.panelBackgroundStyle) {
+                    ForEach(PanelBackgroundStyle.availableStyles) { style in
+                        Text(style.label).tag(style)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 130)
             }
         }
     }

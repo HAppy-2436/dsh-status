@@ -10,7 +10,7 @@
 ## 1. 定位
 
 - 纯菜单栏 App（`LSUIElement = true`），无 Dock 图标、无主窗口。
-- 单击状态栏图标 → 打开/关闭 NSPopover 面板；再次单击关闭。
+- 单击状态栏图标 → 打开/关闭自定义 NSPanel 面板；再次单击关闭（无箭头）。
 - 面板里点击会话行 → 跳转到 DSH 对应会话（发命令 + `open "dsh://open"`）。
 - 不显示空闲会话；显示 待回答 / 运行中 / 已完成 / 已停止 四类。
 
@@ -53,31 +53,40 @@
   不依赖外部图片，任何分辨率都清晰。
 - 面板 header 复用同一鲸鱼路径（模板图片，随主题着色）。
 
-## 3. 面板（NSPopover）
+## 3. 面板（自定义 NSPanel，参考 Status Trio）
 
-- 宽 344pt；内容 SwiftUI（`NSHostingController`）。
-- header（高 46）：26pt 圆形鱼标 + 「DSH 会话」13pt semibold +「DeepSeek Harness」10pt 三级；
-  右侧状态胶囊（绿点+实时 / 橙点+未连接）。
+- 不用 `NSPopover`：无边框 `NSPanel`（`.borderless + .nonactivatingPanel`），**没有 popover 箭头**，
+  `.statusBar` 层级、跨 Space、不抢焦点；16→20pt continuous 圆角。
+- 材质（设置页「面板背景」可切换，默认液态玻璃）：
+  - macOS 26+ `NSGlassEffectView`（style `.regular`，`effectIsInteractive`）；
+  - 旧系统 `NSVisualEffectView(.popover)` 经典磨砂；
+  - 显式选「实色」或系统开启「降低透明度」时用不透明填充。
+  - 跟随系统深浅色与壁纸；打开时 `makeKey()` 让内容按 active 渲染（状态色不被去饱和）。
+- 定位：状态项下方 6pt，按屏幕可见区域夹取；0.08s 淡入（Reduce Motion 时直接显示）。
+- 关闭：再次点击状态项、点击面板外（含 DSH 主窗口等本应用窗口）、Esc。
+- 宽 330pt、14pt 边距；内容 SwiftUI（`NSHostingController`），背景透明由面板提供材质；
+  离屏预览时退回实色。
+- header：鲸鱼 +「DSH 会话」headline + 右侧连接小点/「实时 / 未连接」。
 - 分组（有内容才显示）：待回答（黄）、运行中（蓝）、已完成（绿）、已停止（红）。
-  - 分组标题：11pt semibold secondary + 右侧计数小胶囊。
-  - 行高 46：**行内不再重复状态色**（颜色只出现在分组标题的状态点上）；主标题 12.5pt medium
-    （待回答行用 semibold 轻强调），副标题 10.5pt secondary
-    （`项目名 · 待回答摘要` / `项目名 · 已运行 2:14` / `项目名 · 3 分钟前`）。
-  - 行文字与分组标题对齐（29pt）；hover 背景圆角 10；点击整行生效。
-- 空状态：44pt 圆形底 + sparkles 图标 +「全部空闲 / 没有需要关注的会话」。
-- 未连接：橙点 +「DSH 未连接」+ 说明 +「打开 DSH」按钮。
-- footer（高 40）：左侧「⚙ 设置…」（plain callout 文字），右侧 bell（待回答通知）与 power（退出）图标按钮；
-  退出走二次确认弹窗（默认焦点在「取消」；设置页底栏「退出前确认」可关闭）。
+  - 分组标题：`待回答 · 1`，11.5pt semibold secondary，无彩色圆点。
+  - 会话行：左侧 24pt SF Symbol（`questionmark.circle` / `play.circle` / `checkmark.circle` /
+    `stop.circle`，对应状态色），标题 `.headline`、副标题 `.caption` secondary，右侧
+    `chevron.right` tertiary；hover 8pt 圆角浅底；点击整行跳转。
+  - 颜色收敛到行首小图标上（Status Trio 做法），不再有彩色圆点/红色底。
+- 尾部「打开 DSH」行（`arrow.up.forward.app` + chevron）。
+- 空状态：鲸鱼 +「全部空闲 / 没有需要关注的会话」。
+- 未连接：exclamationmark.circle +「DSH 未连接」+ 说明 +「打开 DSH」按钮。
+- footer（高 40）：左「⚙ 设置…」，右 bell（待回答通知）与 power（退出）；退出走二次确认。
 
-## 2.6 视觉规范（v3 修订）
+## 2.6 视觉规范
 
-- **深色适配**：面板背景改用原生 `NSVisualEffectView`（`.popover` 毛玻璃），跟随系统外观；
-  文字层级用系统语义色（primary / secondary），不写死颜色；离屏预览时退回实色背景。
-- **圆角**：卡片 14pt、行 10pt、图标容器 12pt、控件胶囊；避免直角与硬边。
-- **配色**：统一走 `Theme.swift`（低饱和状态色 + 深浅两套）；强调色只保留在状态点/分段环上，
-  其余 UI 用系统语义灰阶，整体更接近 macOS 原生风格。
-- **分隔线**：统一 1px、约 7% 前景色；悬停底色 4.5%–5.5%，不再使用高饱和红/蓝填充。
-- **图标**：分段圆环使用圆头端点、柔和外发光；未连接虚线改为圆头短划。
+- **材质**：面板用系统 Liquid Glass / 经典磨砂 / 实色（设置项），文字层级走系统语义色；
+  颜色只用于小面积（分段环、行首 SF Symbol、连接点）。
+- **圆角**：面板 20pt、设置卡片 10pt、行 8pt、图标容器 6.5pt（26pt 方块）。
+- **配色**：`Theme.swift` 统一系统强调色——待回答 `#F2B900`、运行中 `#0A84FF`、
+  已完成 `#34C759`、已停止系统红；未连接中性灰。
+- **分隔线**：1px、约 7% 前景色；hover 仅 4–6% 前景色。
+- **图标**：分段圆环圆头端点、自适应缺口；未连接虚线环。
 
 ## 3.1 设置页（NSWindow + SwiftUI）
 
@@ -94,6 +103,7 @@
 | 项目显示 | 按 workspace 列出当前有会话的项目开关 | 关掉即隐藏该项目（会话本身不受影响） |
 | 菜单栏图标 | 中心数字：关注数 / 非空闲总数 / 不显示 | 关注数 = 待回答+已完成+已停止（默认） |
 | 菜单栏图标 | 圆环段数上限：4 / 6 / 8 / 12 / 不限 | 超出上限按优先级只画前 N 段，数字仍完整 |
+| 面板背景 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 | 「降低透明度」开启时自动用实色 |
 | 通知 | 待回答（默认开）/ 已完成 / 已停止 | 首帧基线不通知；同会话同状态 30s 去重 |
 
 

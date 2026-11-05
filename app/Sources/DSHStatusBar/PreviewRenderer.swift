@@ -49,13 +49,13 @@ enum PreviewRenderer {
         ("1 个待回答", "整环 = 黄 · 中心 1", IconModel(statuses: [.waiting])),
         ("1 个已完成", "整环 = 绿 · 中心 1", IconModel(statuses: [.completed])),
         ("1 个已停止", "整环 = 红 · 中心 1", IconModel(statuses: [.stopped])),
-        ("2 待答 + 2 完成", "黄/绿各半 · 发丝分隔 · 中心 4", IconModel(statuses: [.waiting, .waiting, .completed, .completed])),
-        ("1 停止 + 1 待答", "红/黄 · 中心 2", IconModel(statuses: [.stopped, .waiting])),
-        ("2 运行 + 1 待答", "外环黄 + 内环动态弧（不显示数字）",
+        ("2 待答 + 2 完成", "一个任务一段（不合并）· 圆头端点 + 缺口 · 中心 4", IconModel(statuses: [.waiting, .waiting, .completed, .completed])),
+        ("1 停止 + 1 待答", "两段 · 红/黄 · 中心 2", IconModel(statuses: [.stopped, .waiting])),
+        ("2 运行 + 1 待答", "外环 1 段黄 + 内环动态弧（不显示数字）",
          IconModel(statuses: [.waiting, .running, .running], animationPhase: 0)),
-        ("2 运行 + 1 待答 + 1 完成", "外环黄/绿 + 内环动态弧",
+        ("2 运行 + 1 待答 + 1 完成", "外环两段（黄/绿）+ 内环动态弧",
          IconModel(statuses: [.waiting, .completed, .running, .running], animationPhase: 30)),
-        ("3 运行 + 1 停止", "外环红 + 内环动态弧",
+        ("3 运行 + 1 停止", "外环 1 段红 + 内环动态弧",
          IconModel(statuses: [.stopped, .running, .running, .running], animationPhase: 70)),
         ("数字 = 非空闲总数", "设置：中心数字改为「非空闲总数」",
          IconModel(statuses: [.waiting, .completed], numberMode: .nonIdle)),
@@ -84,7 +84,7 @@ enum PreviewRenderer {
 
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold), color: .labelColor,
                      at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("外层环 = 需要介入（黄待答/红停止/绿完成，按数量比例·发丝分隔）· 内层动态弧 = 运行中 · 中心数字见说明",
+            drawText("外层环 = 需要介入（一个任务一段，黄待答/红停止/绿完成）· 内层动态弧 = 运行中 · 中心数字见说明",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

@@ -92,7 +92,7 @@ enum MenuBarIconRenderer {
         let hasOuter = !segments.isEmpty
 
         if hasOuter {
-            drawAttentionRing(segments)
+            drawSegmentedRing(segments)
         }
 
         if model.runningCount > 0 {
@@ -183,14 +183,20 @@ enum MenuBarIconRenderer {
         return result
     }
 
-    /// 连续整环 + 颜色交界处的发丝分隔（1pt 白色 45%）。
-    /// 不做色相渐变：黄/绿/红在 22pt 上混合会发脏，改用清晰色块 + 极细分隔线。
-    private static func drawAttentionRing(_ weighted: [(NSColor, CGFloat)]) {
-        let segments = angledSegments(weighted)
-        guard !segments.isEmpty else { return }
+    /// 外层环：一个任务一段，等分 + 圆头端点 + 段间缺口（回到 v3 的圆润观感）。
+    /// 任务多时每段自然缩成小圆点（最小视觉单位 = 圆点）。
+    private static func drawSegmentedRing(_ segments: [(NSColor, CGFloat)]) {
+        // 展开成「一个任务一段」，不合并同色
+        var colors: [NSColor] = []
+        for (color, weight) in segments {
+            let count = max(1, Int(weight.rounded()))
+            colors.append(contentsOf: Array(repeating: color, count: count))
+        }
+        guard !colors.isEmpty else { return }
 
-        if segments.count == 1 {
-            segments[0].color.setStroke()
+        // 只有一段时保持整环（只有一个任务时仍是一圈，不显示接缝）
+        if colors.count == 1 {
+            colors[0].setStroke()
             let ring = NSBezierPath(ovalIn: NSRect(
                 x: center.x - outerRadius,
                 y: center.y - outerRadius,
@@ -202,43 +208,25 @@ enum MenuBarIconRenderer {
             return
         }
 
-        // 色块：首尾相接，不留背景缝（用 butt 端点避免圆头互相咬合）
-        for segment in segments {
+        let step = 360.0 / CGFloat(colors.count)
+        // 圆头端点会吃掉一部分视觉间隔：按线宽换算角度后保证约 8° 的可见缝隙
+        let capAngle = (outerWidth / 2) / outerRadius * 180 / .pi
+        let desired = max(capAngle * 2 + 8, min(30, step * 0.40))
+        let gap = min(desired, step * 0.55)
+        let sweep = step - gap
+
+        for (index, color) in colors.enumerated() {
+            let start = 90.0 - CGFloat(index) * step - gap / 2
+            let end = start - sweep
+            color.setStroke()
             let arc = NSBezierPath()
             arc.appendArc(withCenter: center, radius: outerRadius,
-                          startAngle: 90 - segment.start,
-                          endAngle: 90 - (segment.start + segment.length),
-                          clockwise: true)
+                          startAngle: start, endAngle: end, clockwise: true)
             arc.lineWidth = outerWidth
-            arc.lineCapStyle = .butt
-            segment.color.setStroke()
+            arc.lineCapStyle = .round
             arc.stroke()
         }
-
-        // 交界：径向发丝线，制造清晰分界
-        for segment in segments {
-            drawSeparator(at: segment.start)
-        }
     }
-
-    /// 在指定角度画一条径向发丝分隔线（略微超出环宽，端点是圆的）。
-    private static func drawSeparator(at angle: CGFloat) {
-        let radians = (90 - angle) * .pi / 180
-        let direction = NSPoint(x: cos(radians), y: sin(radians))
-        let innerRadius = outerRadius - outerWidth / 2 + 0.15
-        let outerR = outerRadius + outerWidth / 2 - 0.15
-        let path = NSBezierPath()
-        path.move(to: NSPoint(x: center.x + direction.x * innerRadius,
-                              y: center.y + direction.y * innerRadius))
-        path.line(to: NSPoint(x: center.x + direction.x * outerR,
-                              y: center.y + direction.y * outerR))
-        path.lineWidth = 0.9
-        path.lineCapStyle = .round
-        NSColor.white.withAlphaComponent(0.45).setStroke()
-        path.stroke()
-    }
-
-
 
     // MARK: 运行中动态弧
 

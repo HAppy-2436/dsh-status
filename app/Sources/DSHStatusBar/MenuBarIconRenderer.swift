@@ -179,8 +179,10 @@ enum MenuBarIconRenderer {
         ]
         let attributed = NSAttributedString(string: text, attributes: attrs)
         let line = CTLineCreateWithAttributedString(attributed)
-        // 用字形墨迹（ink bounds）而不是行高来居中，避免数字因上下留白看起来偏上
+        // 用字形墨迹（ink bounds）而不是行高来居中，避免数字因上下留白看起来偏上；
+        // 水平方向用字形面积质心，修正「1」这类重心偏右的窄数字的视觉偏移。
         let ink = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+        let centroidX = lineAreaCentroidX(line)
         guard let context = NSGraphicsContext.current?.cgContext else {
             let textSize = attributed.size()
             attributed.draw(at: NSPoint(
@@ -197,7 +199,7 @@ enum MenuBarIconRenderer {
                          : NSColor.black.withAlphaComponent(0.16)).cgColor
         )
         context.textPosition = CGPoint(
-            x: center.x - ink.midX,
+            x: center.x - (centroidX ?? ink.midX),
             y: center.y - ink.midY
         )
         CTLineDraw(line, context)
@@ -235,6 +237,95 @@ enum MenuBarIconRenderer {
 
     private static func isDark(_ appearance: NSAppearance) -> Bool {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+
+    /// 按字形轮廓面积质心计算水平中心（对「1」这类重心偏右的字形做视觉居中）。
+    private static func lineAreaCentroidX(_ line: CTLine) -> CGFloat? {
+        let runs = CTLineGetGlyphRuns(line) as! [CTRun]
+        var totalArea: CGFloat = 0
+        var totalMoment: CGFloat = 0
+        for run in runs {
+            let count = CTRunGetGlyphCount(run)
+            guard count > 0 else { continue }
+            var glyphs = [CGGlyph](repeating: 0, count: count)
+            var positions = [CGPoint](repeating: .zero, count: count)
+            CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &glyphs)
+            CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
+            let runFont = (CTRunGetAttributes(run) as NSDictionary)[kCTFontAttributeName] as! CTFont
+            for i in 0..<count {
+                guard let path = CTFontCreatePathForGlyph(runFont, glyphs[i], nil) else { continue }
+                let (area, moment) = pathAreaMomentX(path, offsetX: positions[i].x)
+                totalArea += area
+                totalMoment += moment
+            }
+        }
+        guard abs(totalArea) > 0.0001 else { return nil }
+        return totalMoment / totalArea
+    }
+
+    /// 返回 (有向面积, ∫x dA)；轮廓按 0.05 步长采样，精度足够 icon 尺寸。
+    private static func pathAreaMomentX(_ path: CGPath, offsetX: CGFloat) -> (CGFloat, CGFloat) {
+        var totalArea: CGFloat = 0
+        var totalMoment: CGFloat = 0
+        var points: [CGPoint] = []
+
+        func flush() {
+            guard points.count > 2 else { points = []; return }
+            var area: CGFloat = 0
+            var moment: CGFloat = 0
+            var j = points.count - 1
+            for i in 0..<points.count {
+                let a = points[j], b = points[i]
+                let cross = a.x * b.y - b.x * a.y
+                area += cross
+                moment += (a.x + b.x) * cross
+                j = i
+            }
+            area *= 0.5
+            if abs(area) > 0.000001 {
+                totalArea += area
+                totalMoment += moment / 6
+            }
+            points = []
+        }
+
+        path.applyWithBlock { element in
+            let p = element.pointee
+            switch p.type {
+            case .moveToPoint:
+                flush()
+                points = [CGPoint(x: p.points[0].x + offsetX, y: p.points[0].y)]
+            case .addLineToPoint:
+                points.append(CGPoint(x: p.points[0].x + offsetX, y: p.points[0].y))
+            case .addQuadCurveToPoint:
+                let s = points.last ?? CGPoint(x: p.points[0].x + offsetX, y: p.points[0].y)
+                let c = CGPoint(x: p.points[0].x + offsetX, y: p.points[0].y)
+                let e = CGPoint(x: p.points[1].x + offsetX, y: p.points[1].y)
+                for t in stride(from: CGFloat(0.05), through: 1.0, by: 0.05) {
+                    let mt = 1 - t
+                    points.append(CGPoint(x: mt * mt * s.x + 2 * mt * t * c.x + t * t * e.x,
+                                          y: mt * mt * s.y + 2 * mt * t * c.y + t * t * e.y))
+                }
+            case .addCurveToPoint:
+                let s = points.last ?? CGPoint(x: p.points[0].x + offsetX, y: p.points[0].y)
+                let c1 = CGPoint(x: p.points[0].x + offsetX, y: p.points[0].y)
+                let c2 = CGPoint(x: p.points[1].x + offsetX, y: p.points[1].y)
+                let e = CGPoint(x: p.points[2].x + offsetX, y: p.points[2].y)
+                for t in stride(from: CGFloat(0.05), through: 1.0, by: 0.05) {
+                    let mt = 1 - t
+                    points.append(CGPoint(
+                        x: mt * mt * mt * s.x + 3 * mt * mt * t * c1.x + 3 * mt * t * t * c2.x + t * t * t * e.x,
+                        y: mt * mt * mt * s.y + 3 * mt * mt * t * c1.y + 3 * mt * t * t * c2.y + t * t * t * e.y
+                    ))
+                }
+            case .closeSubpath:
+                flush()
+            @unknown default:
+                break
+            }
+        }
+        flush()
+        return (totalArea, totalMoment)
     }
 
     private static func roundedFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {

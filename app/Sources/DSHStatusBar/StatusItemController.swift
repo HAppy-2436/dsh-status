@@ -12,20 +12,13 @@ final class StatusItemController: NSObject {
 
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
-    private var animationTimer: Timer?
-    private var animationPhase: CGFloat = 0
-    private var animationTime: TimeInterval = 0
-    private var lastTick = Date()
-    /// 预渲染的动画帧（一次生成、逐帧切换），以及对应的缓存键。
-    private var animationFrames: [NSImage] = []
-    private var animationFrameIndex = 0
-    private var animationFramesKey = ""
-    /// 帧率与总帧数（4.8s 一轮：旋转 2 圈 @2.4s/圈 + 呼吸 1 个周期，首尾无缝）。
-    private let animationFPS: Double = 12
-    private let animationCycle: TimeInterval = 4.8
-    private var animationFrameCount: Int { Int((animationCycle * animationFPS).rounded()) }
-    /// 动画一圈的时长。
-    private let animationPeriod: TimeInterval = 1.8
+    /// 状态变化时的一次性过渡动画。
+    private var transitionTimer: Timer?
+    private var transitionFrames: [NSImage] = []
+    private var transitionIndex = 0
+    private var lastModelSignature: String?
+    private let transitionFPS: Double = 18
+    private let transitionFrameCount = 10
 
     init(model: AppModel) {
         self.model = model
@@ -52,7 +45,7 @@ final class StatusItemController: NSObject {
     }
 
     deinit {
-        animationTimer?.invalidate()
+        transitionTimer?.invalidate()
         if let appearanceObserver { NotificationCenter.default.removeObserver(appearanceObserver) }
         if let themeObserver { DistributedNotificationCenter.default().removeObserver(themeObserver) }
     }
@@ -61,98 +54,84 @@ final class StatusItemController: NSObject {
 
     func refresh() {
         guard let button = statusItem.button else { return }
-        var iconModel = model.iconModel
-        iconModel.animationPhase = animationPhase
-        iconModel.animationTime = animationTime
+        let iconModel = model.iconModel
         let appearance = button.effectiveAppearance
-        let animating = shouldAnimate(iconModel)
-        let image: NSImage
-        if animating {
-            let key = staticLayerKey(iconModel, appearance: appearance)
-            if animationFramesKey != key || animationFrames.isEmpty {
-                buildAnimationFrames(baseModel: iconModel, appearance: appearance, key: key)
-                animationFrameIndex = 0
-            }
-            image = animationFrames.isEmpty
-                ? MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
-                : animationFrames[min(animationFrameIndex, animationFrames.count - 1)]
-        } else {
-            animationFrames = []
-            animationFramesKey = ""
-            animationFrameIndex = 0
-            image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
-        }
-        button.image = image
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let signature = "\(iconModel.statuses.map(\.rawValue).joined(separator: ","))|\(iconModel.connected)|\(iconModel.numberMode.rawValue)"
+
+        let modelChanged = lastModelSignature != nil && lastModelSignature != signature
+        lastModelSignature = signature
+
         button.imageScaling = .scaleNone
         button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
         button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: iconModel))
-        updateAnimation(for: iconModel)
+
+        if modelChanged, shouldPlayTransition {
+            playTransition(model: iconModel, appearance: appearance, dark: dark)
+        } else {
+            cancelTransition()
+            button.image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
+        }
     }
 
-    // MARK: 运行中动画
+    // MARK: 状态变化动效（一次性，播完即停）
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
-    /// 静态层缓存键：所有不随动画变化的输入。
-    private func staticLayerKey(_ iconModel: IconModel, appearance: NSAppearance) -> String {
-        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let statuses = iconModel.statuses.map(\.rawValue).joined(separator: ",")
-        return "\(statuses)|\(iconModel.connected)|\(iconModel.numberMode.rawValue)|\(dark)"
-    }
-
-    private func shouldAnimate(_ iconModel: IconModel) -> Bool {
-        iconModel.connected
-            && iconModel.runningCount > 0
-            && model.settings.runAnimation
+    private var shouldPlayTransition: Bool {
+        model.settings.runAnimation
             && !reduceMotion
             && !ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
-    /// 一次性把整轮动画渲染成帧序列；之后每帧只做一次图片切换。
-    private func buildAnimationFrames(baseModel: IconModel, appearance: NSAppearance, key: String) {
-        let total = animationFrameCount
-        guard total > 0 else { return }
-        let frameDuration = animationCycle / Double(total)
-        let breathingCycle: TimeInterval = animationCycle
-        var frames: [NSImage] = []
-        frames.reserveCapacity(total)
-        var phase: CGFloat = 0
-        for index in 0..<total {
-            let time = Double(index) * frameDuration
-            if index > 0 {
-                // 转速节奏：伸长期略快、收缩期略慢
-                let t = time.truncatingRemainder(dividingBy: breathingCycle) / breathingCycle
-                let eased = 0.5 - 0.5 * cos(t * 2 * .pi)
-                let speed = 0.82 + 0.36 * eased
-                phase += CGFloat(frameDuration / 2.4 * 360 * speed)
-                phase = phase.truncatingRemainder(dividingBy: 360)
-            }
-            var frameModel = baseModel
-            frameModel.animationPhase = phase
-            frameModel.animationTime = time
-            frames.append(MenuBarIconRenderer.image(for: frameModel, appearance: appearance))
-        }
-        animationFrames = frames
-        animationFramesKey = key
+    private func cancelTransition() {
+        transitionTimer?.invalidate()
+        transitionTimer = nil
+        transitionFrames = []
+        transitionIndex = 0
     }
 
-    private func updateAnimation(for iconModel: IconModel) {
-        let shouldAnimate = shouldAnimate(iconModel)
-        if shouldAnimate, animationTimer == nil {
-            let timer = Timer(timeInterval: 1.0 / animationFPS, repeats: true) { [weak self] _ in
-                guard let self, !self.animationFrames.isEmpty else { return }
-                self.animationFrameIndex = (self.animationFrameIndex + 1) % self.animationFrames.count
-                self.statusItem.button?.image = self.animationFrames[self.animationFrameIndex]
-            }
-            timer.tolerance = 1.0 / 90.0
-            RunLoop.main.add(timer, forMode: .common)
-            animationTimer = timer
-        } else if !shouldAnimate {
-            animationTimer?.invalidate()
-            animationTimer = nil
+    /// 播放一次过渡：10 帧 × 1/18s ≈ 0.55s，之后回到静态图（0% CPU）。
+    private func playTransition(model iconModel: IconModel, appearance: NSAppearance, dark: Bool) {
+        cancelTransition()
+        let total = transitionFrameCount
+        var frames: [NSImage] = []
+        frames.reserveCapacity(total)
+        for index in 0..<total {
+            let progress = CGFloat(index) / CGFloat(total - 1)
+            frames.append(MenuBarIconRenderer.image(for: iconModel, appearance: appearance, transition: progress))
         }
+        transitionFrames = frames
+        transitionIndex = 0
+        statusItem.button?.image = frames[0]
+
+        let timer = Timer(timeInterval: 1.0 / transitionFPS, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            self.transitionIndex += 1
+            if self.transitionIndex >= self.transitionFrames.count {
+                timer.invalidate()
+                self.transitionTimer = nil
+                // 收尾：固定到稳定帧
+                if let button = self.statusItem.button {
+                    button.image = MenuBarIconRenderer.image(for: self.model.iconModel, appearance: button.effectiveAppearance)
+                }
+                self.transitionFrames = []
+                return
+            }
+            self.statusItem.button?.image = self.transitionFrames[self.transitionIndex]
+        }
+        timer.tolerance = 1.0 / 120.0
+        RunLoop.main.add(timer, forMode: .common)
+        transitionTimer = timer
+        _ = dark
+    }
+
+    /// 调试：手动播放一次状态变化动效。
+    func playTransitionForTesting() {
+        guard let button = statusItem.button else { return }
+        playTransition(model: model.iconModel, appearance: button.effectiveAppearance, dark: false)
     }
 
     // MARK: 点击

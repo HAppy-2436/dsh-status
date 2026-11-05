@@ -454,8 +454,8 @@ struct SettingsView: View {
             SettingsToggleRow(
                 symbol: "arrow.triangle.2.circlepath",
                 tint: Theme.statusColor(.running, scheme: colorScheme),
-                title: "运行中动画",
-                subtitle: "有任务运行时，内层弧缓慢旋转（减弱动态效果时自动停止）",
+                title: "状态变化动效",
+                subtitle: "任务状态变化时播放一次短暂动效；平时静态（减弱动态效果时关闭）",
                 isOn: $settings.runAnimation,
                 showDivider: false
             )

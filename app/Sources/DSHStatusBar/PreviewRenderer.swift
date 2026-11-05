@@ -46,9 +46,9 @@ enum PreviewRenderer {
         ("空闲", "没有任何非空闲任务 · 纯白鲸鱼", IconModel(statuses: [])),
         ("1 个运行中", "整环 = 1 段 · 只有运行中不显示数字", IconModel(statuses: [.running])),
         ("2 个运行中", "对半分 = 2 段 · 无数字", IconModel(statuses: [.running, .running])),
-        ("1 个待回答", "整环 = 待回答红 · 中心 1", IconModel(statuses: [.waiting])),
+        ("1 个待回答", "整环 = 待回答黄 · 中心 1", IconModel(statuses: [.waiting])),
         ("1 个已完成", "整环 = 已完成绿 · 中心 1", IconModel(statuses: [.completed])),
-        ("1 个已停止", "整环 = 已停止橙 · 中心 1", IconModel(statuses: [.stopped])),
+        ("1 个已停止", "整环 = 已停止红 · 中心 1", IconModel(statuses: [.stopped])),
         ("1 待回答 + 2 运行中", "三等分 · 中心 1（只数非运行中）", IconModel(statuses: [.waiting, .running, .running])),
         ("2 待回答 + 1 已完成 + 2 运行中", "五等分 · 中心 3", IconModel(statuses: [.waiting, .waiting, .completed, .running, .running])),
         ("未连接", "灰色虚线环", IconModel(statuses: [], connected: false)),
@@ -312,7 +312,7 @@ enum PreviewRenderer {
             rect.fill()
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("click 会话行跳转 · 待回答红色 · 运行中蓝色 · 已完成绿色 · 已停止橙色",
+            drawText("click 会话行跳转 · 待回答黄色 · 运行中蓝色 · 已完成绿色 · 已停止红色",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

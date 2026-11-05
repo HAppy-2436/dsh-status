@@ -63,7 +63,7 @@ struct StatusPanelView: View {
             Circle()
                 .fill(model.connected
                       ? Theme.statusColor(.completed, scheme: colorScheme)
-                      : Theme.statusColor(.stopped, scheme: colorScheme))
+                      : Theme.disconnectedColor(colorScheme))
                 .frame(width: 6, height: 6)
             Text(model.connected ? "实时" : "未连接")
                 .font(.system(size: 10.5, weight: .medium))
@@ -74,7 +74,7 @@ struct StatusPanelView: View {
         .background(
             Capsule().fill((model.connected
                             ? Theme.statusColor(.completed, scheme: colorScheme)
-                            : Theme.statusColor(.stopped, scheme: colorScheme)).opacity(0.12))
+                            : Theme.disconnectedColor(colorScheme)).opacity(0.12))
         )
     }
 
@@ -160,7 +160,7 @@ struct StatusPanelView: View {
     private var disconnected: some View {
         VStack(spacing: 9) {
             HStack(spacing: 6) {
-                Circle().fill(Theme.statusColor(.stopped, scheme: colorScheme)).frame(width: 7, height: 7)
+                Circle().fill(Theme.disconnectedColor(colorScheme)).frame(width: 7, height: 7)
                 Text("DSH 未连接")
                     .font(.system(size: 13, weight: .semibold))
             }

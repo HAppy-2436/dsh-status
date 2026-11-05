@@ -30,16 +30,25 @@ enum Theme {
     private static func statusRGB(_ status: SessionStatus, dark: Bool) -> (Double, Double, Double) {
         switch status {
         case .waiting:
-            return dark ? (0.914, 0.498, 0.463) : (0.816, 0.396, 0.365)
+            // 待回答 = 黄色（暖沙色，低饱和）
+            return dark ? (0.878, 0.741, 0.427) : (0.678, 0.529, 0.216)
         case .running:
             return dark ? (0.478, 0.663, 0.843) : (0.353, 0.522, 0.741)
         case .completed:
             return dark ? (0.494, 0.753, 0.616) : (0.353, 0.604, 0.475)
         case .stopped:
-            return dark ? (0.859, 0.690, 0.459) : (0.722, 0.549, 0.318)
+            // 已停止 = 红色（柔和珊瑚）
+            return dark ? (0.914, 0.498, 0.463) : (0.816, 0.396, 0.365)
         case .idle:
             return dark ? (0.58, 0.58, 0.60) : (0.46, 0.46, 0.48)
         }
+    }
+
+    /// 未连接用独立的中性橙色，避免与「已停止=红」「待回答=黄」混淆。
+    static func disconnectedColor(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.851, green: 0.627, blue: 0.353)
+            : Color(red: 0.690, green: 0.498, blue: 0.251)
     }
 
     // MARK: 表面与描边

@@ -28,26 +28,6 @@ enum CenterNumberMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum SegmentCap: Int, CaseIterable, Identifiable {
-    case four = 4
-    case six = 6
-    case eight = 8
-    case twelve = 12
-    case unlimited = 0
-
-    var id: Int { rawValue }
-
-    var label: String {
-        switch self {
-        case .four: return "4"
-        case .six: return "6"
-        case .eight: return "8"
-        case .twelve: return "12"
-        case .unlimited: return "不限"
-        }
-    }
-}
-
 enum PanelBackgroundStyle: String, CaseIterable, Identifiable {
     case liquidGlass
     case classicMaterial
@@ -96,9 +76,7 @@ final class AppSettings: ObservableObject {
     @Published var centerNumberMode: CenterNumberMode {
         didSet { save("centerNumberMode", centerNumberMode.rawValue) }
     }
-    @Published var segmentCap: SegmentCap {
-        didSet { save("segmentCap", segmentCap.rawValue) }
-    }
+    @Published var runAnimation: Bool { didSet { save("runAnimation", runAnimation) } }
     @Published var notifyWaiting: Bool { didSet { save("notifyWaiting", notifyWaiting) } }
     @Published var notifyCompleted: Bool { didSet { save("notifyCompleted", notifyCompleted) } }
     @Published var notifyStopped: Bool { didSet { save("notifyStopped", notifyStopped) } }
@@ -121,7 +99,7 @@ final class AppSettings: ObservableObject {
         for domain in legacyDefaultsDomains {
             guard let legacy = UserDefaults(suiteName: domain),
                   legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
-            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "segmentCap",
+            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "confirmBeforeQuit",
                         "panelBackgroundStyle"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
@@ -141,7 +119,7 @@ final class AppSettings: ObservableObject {
         visibleStatuses = Set(statuses.isEmpty ? SessionStatus.allCases.filter { $0 != .idle } : statuses)
         hiddenWorkspaces = Set(defaults.stringArray(forKey: "dshStatus.hiddenWorkspaces") ?? [])
         centerNumberMode = CenterNumberMode(rawValue: defaults.string(forKey: "dshStatus.centerNumberMode") ?? "") ?? .attention
-        segmentCap = SegmentCap(rawValue: defaults.integer(forKey: "dshStatus.segmentCap")) ?? .eight
+        runAnimation = defaults.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
         notifyWaiting = defaults.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
         notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
         notifyStopped = defaults.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
@@ -159,7 +137,7 @@ final class AppSettings: ObservableObject {
         visibleStatuses = Set(SessionStatus.allCases.filter { $0 != .idle })
         hiddenWorkspaces = []
         centerNumberMode = .attention
-        segmentCap = .eight
+        runAnimation = true
         notifyWaiting = true
         notifyCompleted = false
         notifyStopped = false
@@ -433,7 +411,7 @@ struct SettingsView: View {
 
     private var iconSettings: some View {
         SettingsGroup("菜单栏图标",
-                      footnote: "任务数超过上限时，按优先级只画前 N 段；中心数字仍表示完整数量。") {
+                      footnote: "外层环 = 需要介入的任务（黄待答 / 红停止 / 绿完成，按数量渐变）；内层动态弧 = 运行中。") {
             SettingsMenuRow(
                 symbol: "number.circle.fill",
                 tint: Theme.statusColor(.running, scheme: colorScheme),
@@ -449,22 +427,14 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 150)
             }
-            SettingsMenuRow(
-                symbol: "chart.pie.fill",
-                tint: Theme.statusColor(.completed, scheme: colorScheme),
-                title: "圆环段数上限",
-                subtitle: settings.segmentCap == .unlimited ? "不限" : "最多 \(settings.segmentCap.label) 段",
+            SettingsToggleRow(
+                symbol: "arrow.triangle.2.circlepath",
+                tint: Theme.statusColor(.running, scheme: colorScheme),
+                title: "运行中动画",
+                subtitle: "有任务运行时，内层弧缓慢旋转（减弱动态效果时自动停止）",
+                isOn: $settings.runAnimation,
                 showDivider: false
-            ) {
-                Picker("", selection: $settings.segmentCap) {
-                    ForEach(SegmentCap.allCases) { cap in
-                        Text(cap.label).tag(cap)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 90)
-            }
+            )
         }
     }
 

@@ -1,42 +1,43 @@
 import AppKit
 import CoreText
 
-// MARK: - 菜单栏图标 v3：鲸鱼 + 分段圆环
+// MARK: - 菜单栏图标 v4：双层环
 //
-//  · 空闲（没有任何非空闲任务）：纯白 DeepSeek 鲸鱼 Logo，无圆环
-//  · 非空闲：圆环按任务数等分，每段一个任务，颜色 = 该任务状态
-//      待回答=黄 / 运行中=蓝 / 已完成=绿 / 已停止=红
-//    N=1 时是完整圆环；N=2 对半分；N=3 三等分……
-//  · 圆环中心：待回答+已完成+已停止 的数量（即需要关注的数量）；
-//    只有运行中时按需求不显示数字，只留蓝色分段环。
-//  · 未连接：灰色虚线环 + 短横。
+//  · 空闲（没有任何非空闲任务）：纯白（浅色菜单栏为近黑）DeepSeek 鲸鱼 Logo
+//  · 只有「运行中」：整个圆环是一段**动态旋转弧**（菜单栏前景色），中心显示运行中数量
+//  · 只有「需要介入」（待回答 / 已停止 / 已完成）：圆环按数量比例合并同色，
+//    相邻颜色**渐变过渡**，中心显示关注数
+//  · 「运行中」+「需要介入」同时存在：外层 = 彩色渐变环，内层 = 动态旋转弧（不放数字）
+//  · 未连接：灰色虚线环 + 短横
+//
+//  颜色只代表「需要你介入」：黄 = 待回答、红 = 已停止、绿 = 已完成。
+//  运行中改用中性色动态弧，因此不再与蓝色壁纸撞色。
 
 struct IconModel: Equatable {
-    /// 非空闲任务（会话）状态，已按优先级排序、已按设置过滤。空数组 = 空闲。
+    /// 非空闲任务（会话）状态，已按设置过滤。
     var statuses: [SessionStatus] = []
     var connected = true
-    /// 0 = 不限；>0 时圆环最多画这么多段。
-    var segmentCap: Int = 0
     var numberMode: CenterNumberMode = .attention
+    /// 运行中动态弧的相位（角度）；由 StatusItemController 定时推进。
+    var animationPhase: CGFloat = 0
 
-    var attention: Int { statuses.filter { $0 != .running }.count }
+    var waitingCount: Int { statuses.filter { $0 == .waiting }.count }
     var runningCount: Int { statuses.filter { $0 == .running }.count }
+    var completedCount: Int { statuses.filter { $0 == .completed }.count }
+    var stoppedCount: Int { statuses.filter { $0 == .stopped }.count }
+    /// 需要介入的数量。
+    var attentionCount: Int { waitingCount + stoppedCount + completedCount }
     var isEmpty: Bool { statuses.isEmpty }
 
-    /// 圆环实际绘制的段（受上限约束）。
-    var drawnSegments: [SessionStatus] {
-        guard segmentCap > 0 else { return statuses }
-        return Array(statuses.prefix(segmentCap))
-    }
-
     /// 中心数字（nil = 不显示）。
+    /// 有需要介入的任务 → 关注数；只有运行中 → 运行数；双层时由渲染层省略。
     var centerNumber: Int? {
         switch numberMode {
         case .hidden:
             return nil
         case .attention:
-            let value = attention
-            return value > 0 ? value : nil
+            if attentionCount > 0 { return attentionCount }
+            return runningCount > 0 ? runningCount : nil
         case .nonIdle:
             return statuses.isEmpty ? nil : statuses.count
         }
@@ -46,10 +47,14 @@ struct IconModel: Equatable {
 enum MenuBarIconRenderer {
     static let canvas: CGFloat = 22
     private static let center = NSPoint(x: 11, y: 11)
-    private static let ringRadius: CGFloat = 8.05
-    private static let ringWidth: CGFloat = 2.3
-    /// 圆环外侧的白色包边（每侧）。彩色壁纸/浅色菜单栏下也能看清边界。
-    private static let ringBorderWidth: CGFloat = 0.8
+    private static let outerRadius: CGFloat = 7.9
+    private static let outerWidth: CGFloat = 2.1
+    private static let innerRadius: CGFloat = 4.95
+    private static let innerWidth: CGFloat = 1.4
+    /// 动态弧跨度。
+    private static let spinnerSweep: CGFloat = 250
+    /// 颜色交界处的渐变过渡角度。
+    private static let blendAngle: CGFloat = 34
 
     // MARK: 对外入口
 
@@ -63,14 +68,10 @@ enum MenuBarIconRenderer {
         guard model.connected else { return "DSH 未连接" }
         guard !model.isEmpty else { return "DSH：全部空闲" }
         var parts: [String] = []
-        let waiting = model.statuses.filter { $0 == .waiting }.count
-        let running = model.runningCount
-        let completed = model.statuses.filter { $0 == .completed }.count
-        let stopped = model.statuses.filter { $0 == .stopped }.count
-        if waiting > 0 { parts.append("\(waiting) 待回答") }
-        if running > 0 { parts.append("\(running) 运行中") }
-        if completed > 0 { parts.append("\(completed) 已完成") }
-        if stopped > 0 { parts.append("\(stopped) 已停止") }
+        if model.waitingCount > 0 { parts.append("\(model.waitingCount) 待回答") }
+        if model.runningCount > 0 { parts.append("\(model.runningCount) 运行中") }
+        if model.completedCount > 0 { parts.append("\(model.completedCount) 已完成") }
+        if model.stoppedCount > 0 { parts.append("\(model.stoppedCount) 已停止") }
         return "DSH：" + parts.joined(separator: " · ")
     }
 
@@ -89,14 +90,30 @@ enum MenuBarIconRenderer {
             return
         }
 
-        drawSegmentRing(statuses: model.drawnSegments, dark: dark)
+        let segments = gradientSegments(for: model, dark: dark)
+        let hasOuter = !segments.isEmpty
 
-        if let number = model.centerNumber {
+        if hasOuter {
+            drawGradientRing(segments)
+        }
+
+        if model.runningCount > 0 {
+            if hasOuter {
+                drawSpinner(dark: dark, radius: innerRadius, width: innerWidth, sweep: spinnerSweep,
+                            phase: model.animationPhase)
+            } else {
+                drawSpinner(dark: dark, radius: outerRadius, width: outerWidth, sweep: 300,
+                            phase: model.animationPhase)
+            }
+        }
+
+        // 双层时不放数字：22pt 里三层会挤，且关注数已由外环颜色表达。
+        if !(hasOuter && model.runningCount > 0), let number = model.centerNumber {
             drawCount(number, dark: dark)
         }
     }
 
-    // MARK: 空闲：纯白鲸鱼
+    // MARK: 空闲：鲸鱼
 
     private static func drawWhale(dark: Bool) {
         let logoRect = NSRect(
@@ -106,67 +123,171 @@ enum MenuBarIconRenderer {
             height: 18.8 * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth
         )
         let path = WhaleLogo.path(fitting: logoRect)
-        // 深色菜单栏 = 纯白；浅色菜单栏自动用近黑，保证可见
         (dark ? NSColor.white : NSColor(hex: 0x1F1F23)).setFill()
         path.fill()
     }
 
-    // MARK: 分段圆环
+    // MARK: 外层渐变环
 
-    private static func drawSegmentRing(statuses: [SessionStatus], dark: Bool) {
-        let count = statuses.count
-        guard count > 0 else { return }
+    /// 按紧急度合并同色：黄(待回答) → 红(已停止) → 绿(已完成)。
+    private static func gradientSegments(for model: IconModel, dark: Bool) -> [(NSColor, CGFloat)] {
+        var segments: [(NSColor, CGFloat)] = []
+        if model.waitingCount > 0 {
+            segments.append((Theme.statusNSColor(.waiting, dark: dark), CGFloat(model.waitingCount)))
+        }
+        if model.stoppedCount > 0 {
+            segments.append((Theme.statusNSColor(.stopped, dark: dark), CGFloat(model.stoppedCount)))
+        }
+        if model.completedCount > 0 {
+            segments.append((Theme.statusNSColor(.completed, dark: dark), CGFloat(model.completedCount)))
+        }
+        return segments
+    }
 
-        let colors = statuses.map { statusColor($0, dark: dark) }
+    private struct RingSegment {
+        let color: NSColor
+        let start: CGFloat   // 从 12 点顺时针的角度
+        let length: CGFloat
+    }
 
-        if count == 1 {
-            strokeRing(colors[0], arcFrom: 0, to: 360)
+    /// 归一化成整环区间，并保证每种颜色至少占 9%（否则小比例颜色会被渐变吃掉）。
+    private static func angledSegments(_ weighted: [(NSColor, CGFloat)]) -> [RingSegment] {
+        guard !weighted.isEmpty else { return [] }
+        let total = weighted.reduce(0) { $0 + $1.1 }
+        guard total > 0 else { return [] }
+        var shares = weighted.map { $0.1 / total }
+        let minShare: CGFloat = 0.09
+
+        for _ in 0..<4 {
+            var deficit: CGFloat = 0
+            for i in shares.indices where shares[i] < minShare {
+                deficit += minShare - shares[i]
+                shares[i] = minShare
+            }
+            guard deficit > 0 else { break }
+            let flexible = shares.indices
+                .filter { shares[$0] > minShare }
+                .reduce(CGFloat(0)) { $0 + (shares[$1] - minShare) }
+            guard flexible > 0 else { break }
+            for i in shares.indices where shares[i] > minShare {
+                shares[i] -= deficit * ((shares[i] - minShare) / flexible)
+            }
+        }
+
+        let sum = shares.reduce(0, +)
+        var result: [RingSegment] = []
+        var start: CGFloat = 0
+        for (index, item) in weighted.enumerated() {
+            let length = shares[index] / sum * 360
+            result.append(RingSegment(color: item.0, start: start, length: length))
+            start += length
+        }
+        return result
+    }
+
+    private static func drawGradientRing(_ weighted: [(NSColor, CGFloat)]) {
+        let segments = angledSegments(weighted)
+        guard !segments.isEmpty else { return }
+
+        // 单色：直接一个整环，不留接缝
+        if segments.count == 1 {
+            let ring = NSBezierPath(ovalIn: NSRect(
+                x: center.x - outerRadius,
+                y: center.y - outerRadius,
+                width: outerRadius * 2,
+                height: outerRadius * 2
+            ))
+            ring.lineWidth = outerWidth
+            segments[0].color.setStroke()
+            ring.stroke()
             return
         }
 
-        let step = 360.0 / CGFloat(count)
-        // 圆头端点会「吃掉」一部分视觉间隔：按「含白边」的有效线宽换算角度，保证约 4°–8° 的可见缝隙
-        let effectiveWidth = ringWidth + ringBorderWidth * 2
-        let capAngle = (effectiveWidth / 2) / ringRadius * 180 / .pi
-        let desired = max(capAngle * 2 + 8, min(30, step * 0.40))
-        let gap = min(desired, step * 0.55)
-        let sweep = step - gap
-
-        for (index, color) in colors.enumerated() {
-            let start = 90.0 - CGFloat(index) * step - gap / 2
-            strokeRing(color, arcFrom: start, to: start - sweep)
+        // 多色：按 0.8° 采样逐个描小弧，交界处做渐变
+        var angle: CGFloat = 0
+        while angle < 360 {
+            let sample = angle + 0.4
+            let color = colorAt(sample, segments: segments)
+            color.setStroke()
+            let arc = NSBezierPath()
+            arc.appendArc(withCenter: center, radius: outerRadius,
+                          startAngle: 90 - angle, endAngle: 90 - angle - 1.0, clockwise: true)
+            arc.lineWidth = outerWidth
+            arc.lineCapStyle = .butt
+            arc.stroke()
+            angle += 0.8
         }
     }
 
-    /// 画一段圆环：先用白色描出更宽的一圈做包边，再叠彩色本体。
-    /// `arcFrom == arcTo`（整环）用椭圆路径，避免 appendArc 0→360 画不出东西。
-    private static func strokeRing(_ color: NSColor, arcFrom start: CGFloat, to end: CGFloat) {
-        let isFullCircle = abs(end - start) >= 359.5
-
-        func outlinedPath(width: CGFloat) -> NSBezierPath {
-            let path: NSBezierPath
-            if isFullCircle {
-                path = NSBezierPath(ovalIn: NSRect(
-                    x: center.x - ringRadius,
-                    y: center.y - ringRadius,
-                    width: ringRadius * 2,
-                    height: ringRadius * 2
-                ))
-            } else {
-                path = NSBezierPath()
-                path.appendArc(withCenter: center, radius: ringRadius,
-                               startAngle: start, endAngle: end, clockwise: true)
+    private static func colorAt(_ angle: CGFloat, segments: [RingSegment]) -> NSColor {
+        let half = blendAngle / 2
+        // 交界处渐变（含首尾环绕）
+        for (index, segment) in segments.enumerated() {
+            let boundary = segment.start
+            var delta = angle - boundary
+            if delta > 180 { delta -= 360 }
+            if delta < -180 { delta += 360 }
+            if abs(delta) <= half {
+                let previous = segments[(index - 1 + segments.count) % segments.count]
+                let t = smoothstep((delta + half) / blendAngle)
+                return blend(previous.color, segment.color, t)
             }
-            path.lineWidth = width
-            path.lineCapStyle = .round
-            return path
         }
+        for segment in segments {
+            var local = angle - segment.start
+            if local < 0 { local += 360 }
+            if local < segment.length { return segment.color }
+        }
+        return segments[0].color
+    }
 
-        NSColor.white.withAlphaComponent(0.92).setStroke()
-        outlinedPath(width: ringWidth + ringBorderWidth * 2).stroke()
+    private static func smoothstep(_ t: CGFloat) -> CGFloat {
+        let x = min(max(t, 0), 1)
+        return x * x * (3 - 2 * x)
+    }
 
+    private static func blend(_ a: NSColor, _ b: NSColor, _ t: CGFloat) -> NSColor {
+        let ca = a.usingColorSpace(.sRGB) ?? a
+        let cb = b.usingColorSpace(.sRGB) ?? b
+        return NSColor(srgbRed: ca.redComponent + (cb.redComponent - ca.redComponent) * t,
+                       green: ca.greenComponent + (cb.greenComponent - ca.greenComponent) * t,
+                       blue: ca.blueComponent + (cb.blueComponent - ca.blueComponent) * t,
+                       alpha: ca.alphaComponent + (cb.alphaComponent - ca.alphaComponent) * t)
+    }
+
+    // MARK: 运行中动态弧
+
+    private static func drawSpinner(dark: Bool, radius: CGFloat, width: CGFloat,
+                                    sweep: CGFloat, phase: CGFloat) {
+        let color = (dark ? NSColor.white : NSColor(hex: 0x1F1F23)).withAlphaComponent(0.92)
         color.setStroke()
-        outlinedPath(width: ringWidth).stroke()
+        let arc = NSBezierPath()
+        arc.appendArc(withCenter: center, radius: radius,
+                      startAngle: 90 - phase, endAngle: 90 - phase - sweep, clockwise: true)
+        arc.lineWidth = width
+        arc.lineCapStyle = .round
+        arc.stroke()
+    }
+
+    // MARK: 未连接
+
+    private static func drawDisconnected(dark: Bool) {
+        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.42 : 0.36)
+        color.setStroke()
+        let ring = NSBezierPath(ovalIn: NSRect(
+            x: center.x - outerRadius,
+            y: center.y - outerRadius,
+            width: outerRadius * 2,
+            height: outerRadius * 2
+        ))
+        ring.lineWidth = 1.6
+        ring.lineCapStyle = .round
+        ring.setLineDash([2.2, 3.2], count: 2, phase: 0)
+        ring.stroke()
+
+        color.setFill()
+        let minus = NSRect(x: center.x - 3.0, y: center.y - 0.7, width: 6.0, height: 1.4)
+        NSBezierPath(roundedRect: minus, xRadius: 0.7, yRadius: 0.7).fill()
     }
 
     // MARK: 中心数字
@@ -175,8 +296,8 @@ enum MenuBarIconRenderer {
         let text = count > 99 ? "99+" : "\(count)"
         let size: CGFloat
         switch text.count {
-        case 1: size = 10.6
-        case 2: size = 9.2
+        case 1: size = 10.4
+        case 2: size = 9.0
         default: size = 7.6
         }
         let font = roundedFont(size: size, weight: .bold)
@@ -187,75 +308,23 @@ enum MenuBarIconRenderer {
         ]
         let attributed = NSAttributedString(string: text, attributes: attrs)
         let line = CTLineCreateWithAttributedString(attributed)
-        // 用字形墨迹（ink bounds）而不是行高来居中，避免数字因上下留白看起来偏上；
-        // 水平方向用字形面积质心，修正「1」这类重心偏右的窄数字的视觉偏移。
         let ink = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
         let centroidX = lineAreaCentroidX(line)
         guard let context = NSGraphicsContext.current?.cgContext else {
             let textSize = attributed.size()
-            attributed.draw(at: NSPoint(
-                x: center.x - textSize.width / 2,
-                y: center.y - textSize.height / 2 + 0.3
-            ))
+            attributed.draw(at: NSPoint(x: center.x - textSize.width / 2,
+                                        y: center.y - textSize.height / 2 + 0.3))
             return
         }
         context.saveGState()
-        context.setShadow(
-            offset: CGSize(width: 0, height: -0.3),
-            blur: 1.0,
-            color: (dark ? NSColor.black.withAlphaComponent(0.30)
-                         : NSColor.black.withAlphaComponent(0.16)).cgColor
-        )
-        context.textPosition = CGPoint(
-            x: center.x - (centroidX ?? ink.midX),
-            y: center.y - ink.midY
-        )
+        context.setShadow(offset: CGSize(width: 0, height: -0.3), blur: 1.0,
+                          color: (dark ? NSColor.black.withAlphaComponent(0.35)
+                                       : NSColor.black.withAlphaComponent(0.16)).cgColor)
+        context.textPosition = CGPoint(x: center.x - (centroidX ?? ink.midX),
+                                       y: center.y - ink.midY)
         CTLineDraw(line, context)
         context.restoreGState()
     }
-
-    // MARK: 未连接
-
-    private static func drawDisconnected(dark: Bool) {
-        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.40 : 0.34)
-
-        // 白色包边（虚线，相位与本体一致）
-        let borderRing = NSBezierPath(ovalIn: NSRect(
-            x: center.x - ringRadius,
-            y: center.y - ringRadius,
-            width: ringRadius * 2,
-            height: ringRadius * 2
-        ))
-        borderRing.lineWidth = 1.6 + ringBorderWidth * 2
-        borderRing.lineCapStyle = .round
-        borderRing.setLineDash([2.0, 3.0], count: 2, phase: 0)
-        NSColor.white.withAlphaComponent(0.92).setStroke()
-        borderRing.stroke()
-
-        color.setStroke()
-        let ring = NSBezierPath(ovalIn: NSRect(
-            x: center.x - ringRadius,
-            y: center.y - ringRadius,
-            width: ringRadius * 2,
-            height: ringRadius * 2
-        ))
-        ring.lineWidth = 1.6
-        ring.lineCapStyle = .round
-        ring.setLineDash([2.0, 3.0], count: 2, phase: 0)
-        ring.stroke()
-
-        color.setFill()
-        let minus = NSRect(x: center.x - 3.0, y: center.y - 0.7, width: 6.0, height: 1.4)
-        NSBezierPath(roundedRect: minus, xRadius: 0.7, yRadius: 0.7).fill()
-    }
-
-    // MARK: 状态色
-
-    private static func statusColor(_ status: SessionStatus, dark: Bool) -> NSColor {
-        Theme.statusNSColor(status, dark: dark)
-    }
-
-    // MARK: 工具
 
     private static func isDark(_ appearance: NSAppearance) -> Bool {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua

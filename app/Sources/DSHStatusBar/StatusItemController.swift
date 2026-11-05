@@ -12,6 +12,11 @@ final class StatusItemController: NSObject {
 
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
+    private var animationTimer: Timer?
+    private var animationPhase: CGFloat = 0
+    private var lastTick = Date()
+    /// 动画一圈的时长。
+    private let animationPeriod: TimeInterval = 1.8
 
     init(model: AppModel) {
         self.model = model
@@ -38,6 +43,7 @@ final class StatusItemController: NSObject {
     }
 
     deinit {
+        animationTimer?.invalidate()
         if let appearanceObserver { NotificationCenter.default.removeObserver(appearanceObserver) }
         if let themeObserver { DistributedNotificationCenter.default().removeObserver(themeObserver) }
     }
@@ -46,13 +52,54 @@ final class StatusItemController: NSObject {
 
     func refresh() {
         guard let button = statusItem.button else { return }
-        let model = self.model.iconModel
+        var iconModel = model.iconModel
+        iconModel.animationPhase = animationPhase
         let appearance = button.effectiveAppearance
-        let image = MenuBarIconRenderer.image(for: model, appearance: appearance)
+        let image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
         button.image = image
         button.imageScaling = .scaleNone
-        button.toolTip = MenuBarIconRenderer.tooltip(for: model)
-        button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: model))
+        button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
+        button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: iconModel))
+        updateAnimation(for: iconModel)
+    }
+
+    // MARK: 运行中动画
+
+    private var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    private func updateAnimation(for iconModel: IconModel) {
+        let shouldAnimate = iconModel.connected
+            && iconModel.runningCount > 0
+            && model.settings.runAnimation
+            && !reduceMotion
+        if shouldAnimate, animationTimer == nil {
+            lastTick = Date()
+            let timer = Timer(timeInterval: 1.0 / 18.0, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                let now = Date()
+                let delta = now.timeIntervalSince(self.lastTick)
+                self.lastTick = now
+                self.animationPhase = (self.animationPhase + CGFloat(delta / self.animationPeriod * 360))
+                    .truncatingRemainder(dividingBy: 360)
+                self.refreshIconOnly()
+            }
+            timer.tolerance = 1.0 / 90.0
+            RunLoop.main.add(timer, forMode: .common)
+            animationTimer = timer
+        } else if !shouldAnimate {
+            animationTimer?.invalidate()
+            animationTimer = nil
+        }
+    }
+
+    /// 只重画图标，避免每帧重复管理定时器。
+    private func refreshIconOnly() {
+        guard let button = statusItem.button else { return }
+        var iconModel = model.iconModel
+        iconModel.animationPhase = animationPhase
+        button.image = MenuBarIconRenderer.image(for: iconModel, appearance: button.effectiveAppearance)
     }
 
     // MARK: 点击

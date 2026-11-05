@@ -43,18 +43,23 @@ enum PreviewRenderer {
     // MARK: - 图标矩阵
 
     private static let states: [(String, String, IconModel)] = [
-        ("空闲", "没有任何非空闲任务 · 纯白鲸鱼", IconModel(statuses: [])),
-        ("1 个运行中", "整环 = 1 段 · 只有运行中不显示数字", IconModel(statuses: [.running])),
-        ("2 个运行中", "对半分 = 2 段 · 无数字", IconModel(statuses: [.running, .running])),
-        ("1 个待回答", "整环 = 待回答黄 · 中心 1", IconModel(statuses: [.waiting])),
-        ("1 个已完成", "整环 = 已完成绿 · 中心 1", IconModel(statuses: [.completed])),
-        ("1 个已停止", "整环 = 已停止红 · 中心 1", IconModel(statuses: [.stopped])),
-        ("1 待回答 + 2 运行中", "三等分 · 中心 1（只数非运行中）", IconModel(statuses: [.waiting, .running, .running])),
-        ("2 待回答 + 1 已完成 + 2 运行中", "五等分 · 中心 3", IconModel(statuses: [.waiting, .waiting, .completed, .running, .running])),
-        ("未连接", "灰色虚线环", IconModel(statuses: [], connected: false)),
-        ("数字 = 非空闲总数", "设置：中心数字改为「非空闲总数」", IconModel(statuses: [.waiting, .running, .running], numberMode: .nonIdle)),
-        ("段数上限 4（共 5 个任务）", "设置：最多画 4 段，中心数字仍完整", IconModel(statuses: [.waiting, .waiting, .completed, .running, .running], segmentCap: 4)),
-        ("隐藏「运行中」", "设置：状态过滤后只剩待回答+已完成", IconModel(statuses: [.waiting, .completed])),
+        ("空闲", "没有任何非空闲任务 · 鲸鱼 Logo", IconModel(statuses: [])),
+        ("1 个运行中", "整个圆环 = 动态弧 · 中心 1", IconModel(statuses: [.running], animationPhase: 0)),
+        ("3 个运行中", "整个圆环 = 动态弧 · 中心 3", IconModel(statuses: [.running, .running, .running], animationPhase: 40)),
+        ("1 个待回答", "整环 = 黄 · 中心 1", IconModel(statuses: [.waiting])),
+        ("1 个已完成", "整环 = 绿 · 中心 1", IconModel(statuses: [.completed])),
+        ("1 个已停止", "整环 = 红 · 中心 1", IconModel(statuses: [.stopped])),
+        ("2 待答 + 2 完成", "黄/绿各半 · 渐变过渡 · 中心 4", IconModel(statuses: [.waiting, .waiting, .completed, .completed])),
+        ("1 停止 + 1 待答", "红/黄渐变 · 中心 2", IconModel(statuses: [.stopped, .waiting])),
+        ("2 运行 + 1 待答", "外环黄 + 内环动态弧（不显示数字）",
+         IconModel(statuses: [.waiting, .running, .running], animationPhase: 0)),
+        ("2 运行 + 1 待答 + 1 完成", "外环黄/绿渐变 + 内环动态弧",
+         IconModel(statuses: [.waiting, .completed, .running, .running], animationPhase: 30)),
+        ("3 运行 + 1 停止", "外环红 + 内环动态弧",
+         IconModel(statuses: [.stopped, .running, .running, .running], animationPhase: 70)),
+        ("数字 = 非空闲总数", "设置：中心数字改为「非空闲总数」",
+         IconModel(statuses: [.waiting, .completed], numberMode: .nonIdle)),
+        ("未连接", "灰色虚线环 + 短横", IconModel(statuses: [], connected: false)),
     ]
 
     private static func renderIconSheet(appearance: NSAppearance,
@@ -79,7 +84,7 @@ enum PreviewRenderer {
 
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold), color: .labelColor,
                      at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("圆环段数 = 非空闲任务数 · 段色 = 状态 · 中心数字 = 待回答+已完成+已停止",
+            drawText("外层环 = 需要介入（黄待答/红停止/绿完成，按数量渐变色）· 内层动态弧 = 运行中 · 中心数字见说明",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

@@ -48,7 +48,6 @@ final class AppModel: ObservableObject {
         return IconModel(
             statuses: connected ? statuses : [],
             connected: connected,
-            segmentCap: settings.segmentCap.rawValue,
             numberMode: settings.centerNumberMode
         )
     }

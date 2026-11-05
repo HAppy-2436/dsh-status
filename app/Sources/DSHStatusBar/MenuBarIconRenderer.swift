@@ -47,7 +47,9 @@ enum MenuBarIconRenderer {
     static let canvas: CGFloat = 22
     private static let center = NSPoint(x: 11, y: 11)
     private static let ringRadius: CGFloat = 8.05
-    private static let ringWidth: CGFloat = 2.4
+    private static let ringWidth: CGFloat = 2.3
+    /// 圆环外侧的白色包边（每侧）。彩色壁纸/浅色菜单栏下也能看清边界。
+    private static let ringBorderWidth: CGFloat = 0.8
 
     // MARK: 对外入口
 
@@ -118,47 +120,53 @@ enum MenuBarIconRenderer {
         let colors = statuses.map { statusColor($0, dark: dark) }
 
         if count == 1 {
-            colors[0].setStroke()
-            let ring = NSBezierPath(ovalIn: NSRect(
-                x: center.x - ringRadius,
-                y: center.y - ringRadius,
-                width: ringRadius * 2,
-                height: ringRadius * 2
-            ))
-            ring.lineWidth = ringWidth
-            ring.stroke()
+            strokeRing(colors[0], arcFrom: 0, to: 360)
             return
         }
 
         let step = 360.0 / CGFloat(count)
-        // 圆头端点会「吃掉」一部分视觉间隔：按线宽换算成角度后，保证约 4°–8° 的可见缝隙
-        let capAngle = (ringWidth / 2) / ringRadius * 180 / .pi
+        // 圆头端点会「吃掉」一部分视觉间隔：按「含白边」的有效线宽换算角度，保证约 4°–8° 的可见缝隙
+        let effectiveWidth = ringWidth + ringBorderWidth * 2
+        let capAngle = (effectiveWidth / 2) / ringRadius * 180 / .pi
         let desired = max(capAngle * 2 + 8, min(30, step * 0.40))
         let gap = min(desired, step * 0.55)
         let sweep = step - gap
 
         for (index, color) in colors.enumerated() {
             let start = 90.0 - CGFloat(index) * step - gap / 2
-            let end = start - sweep
-
-            // 柔和外发光
-            color.withAlphaComponent(dark ? 0.10 : 0.08).setStroke()
-            let halo = NSBezierPath()
-            halo.appendArc(withCenter: center, radius: ringRadius,
-                           startAngle: start, endAngle: end, clockwise: true)
-            halo.lineWidth = ringWidth + 0.8
-            halo.lineCapStyle = .round
-            halo.stroke()
-
-            // 分段本体（圆头端点，更接近 macOS 的柔和风格）
-            color.setStroke()
-            let segment = NSBezierPath()
-            segment.appendArc(withCenter: center, radius: ringRadius,
-                              startAngle: start, endAngle: end, clockwise: true)
-            segment.lineWidth = ringWidth
-            segment.lineCapStyle = .round
-            segment.stroke()
+            strokeRing(color, arcFrom: start, to: start - sweep)
         }
+    }
+
+    /// 画一段圆环：先用白色描出更宽的一圈做包边，再叠彩色本体。
+    /// `arcFrom == arcTo`（整环）用椭圆路径，避免 appendArc 0→360 画不出东西。
+    private static func strokeRing(_ color: NSColor, arcFrom start: CGFloat, to end: CGFloat) {
+        let isFullCircle = abs(end - start) >= 359.5
+
+        func outlinedPath(width: CGFloat) -> NSBezierPath {
+            let path: NSBezierPath
+            if isFullCircle {
+                path = NSBezierPath(ovalIn: NSRect(
+                    x: center.x - ringRadius,
+                    y: center.y - ringRadius,
+                    width: ringRadius * 2,
+                    height: ringRadius * 2
+                ))
+            } else {
+                path = NSBezierPath()
+                path.appendArc(withCenter: center, radius: ringRadius,
+                               startAngle: start, endAngle: end, clockwise: true)
+            }
+            path.lineWidth = width
+            path.lineCapStyle = .round
+            return path
+        }
+
+        NSColor.white.withAlphaComponent(0.92).setStroke()
+        outlinedPath(width: ringWidth + ringBorderWidth * 2).stroke()
+
+        color.setStroke()
+        outlinedPath(width: ringWidth).stroke()
     }
 
     // MARK: 中心数字
@@ -209,7 +217,21 @@ enum MenuBarIconRenderer {
     // MARK: 未连接
 
     private static func drawDisconnected(dark: Bool) {
-        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.36 : 0.30)
+        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.40 : 0.34)
+
+        // 白色包边（虚线，相位与本体一致）
+        let borderRing = NSBezierPath(ovalIn: NSRect(
+            x: center.x - ringRadius,
+            y: center.y - ringRadius,
+            width: ringRadius * 2,
+            height: ringRadius * 2
+        ))
+        borderRing.lineWidth = 1.6 + ringBorderWidth * 2
+        borderRing.lineCapStyle = .round
+        borderRing.setLineDash([2.0, 3.0], count: 2, phase: 0)
+        NSColor.white.withAlphaComponent(0.92).setStroke()
+        borderRing.stroke()
+
         color.setStroke()
         let ring = NSBezierPath(ovalIn: NSRect(
             x: center.x - ringRadius,

@@ -130,10 +130,10 @@ enum MenuBarIconRenderer {
         }
 
         let step = 360.0 / CGFloat(count)
-        // 圆头端点会「吃掉」一部分视觉间隔：按线宽换算成角度后，保证至少 ~5° 的可见缝隙
+        // 圆头端点会「吃掉」一部分视觉间隔：按线宽换算成角度后，保证约 4°–8° 的可见缝隙
         let capAngle = (ringWidth / 2) / ringRadius * 180 / .pi
-        let desired = max(capAngle * 2 + 5, min(40, step * 0.45))
-        let gap = min(desired, step * 0.65)
+        let desired = max(capAngle * 2 + 8, min(30, step * 0.40))
+        let gap = min(desired, step * 0.55)
         let sweep = step - gap
 
         for (index, color) in colors.enumerated() {

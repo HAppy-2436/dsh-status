@@ -88,14 +88,6 @@ enum MenuBarIconRenderer {
         }
     }
 
-    /// 一次性过渡帧（用于无 CA 时的降级动效）。
-    static func transitionImage(for model: IconModel, appearance: NSAppearance, progress: CGFloat) -> NSImage {
-        render(width: canvas, height: canvas, appearance: appearance) { _ in
-            draw(model: model, appearance: appearance, includeComet: false,
-                 cometSweep: (start: 90 - (1 - progress) * 200, sweep: 120 * (0.35 + 0.65 * progress)))
-        }
-    }
-
     /// 彗星弧的几何参数（半径/线宽）与颜色。返回 nil 表示当前状态没有运行中动画。
     struct CometSpec {
         let radius: CGFloat

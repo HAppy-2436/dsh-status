@@ -435,7 +435,7 @@ struct SettingsView: View {
 
     private var iconSettings: some View {
         SettingsGroup("菜单栏图标",
-                      footnote: "外环单色 = 当前最高优先级待办（红停止 > 黄待答 > 绿完成）；内层动态弧 = 运行中。") {
+                      footnote: "外环单色 = 当前最高优先级待办（红停止 > 黄待答 > 绿完成）；彗星弧 = 运行中。流畅动画由 GPU 驱动（常驻 CPU≈0），静态则完全不耗电。") {
             SettingsMenuRow(
                 symbol: "number.circle.fill",
                 tint: Theme.statusColor(.running, scheme: colorScheme),
@@ -451,14 +451,21 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 150)
             }
-            SettingsToggleRow(
+            SettingsMenuRow(
                 symbol: "arrow.triangle.2.circlepath",
                 tint: Theme.statusColor(.running, scheme: colorScheme),
                 title: "运行中动画",
-                subtitle: "有任务运行时，彗星弧由 GPU 平滑旋转（减弱动态效果/低电量时自动停）",
-                isOn: $settings.runAnimation,
+                subtitle: settings.runAnimation ? "流畅（GPU，60fps）" : "静态（不耗电）",
                 showDivider: false
-            )
+            ) {
+                Picker("", selection: $settings.runAnimation) {
+                    Text("流畅").tag(true)
+                    Text("静态").tag(false)
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 110)
+            }
         }
     }
 

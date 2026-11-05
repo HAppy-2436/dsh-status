@@ -13,6 +13,7 @@ final class AnimatedIconView: NSView {
     private var currentModel: IconModel?
     private var currentAppearance: NSAppearance?
     private var cometSpec: MenuBarIconRenderer.CometSpec?
+    private var lastSignature: String?
 
     override var isFlipped: Bool { false }
 
@@ -52,7 +53,12 @@ final class AnimatedIconView: NSView {
 
     // MARK: 更新
 
-    func update(model: IconModel, appearance: NSAppearance, animate: Bool) {
+    func update(model: IconModel, appearance: NSAppearance, animate: Bool, force: Bool = false) {
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let signature = "\(model.statuses.map(\.rawValue).joined(separator: ","))|\(model.connected)|\(model.numberMode.rawValue)|\(dark)|\(animate)"
+        if !force, signature == lastSignature { return }
+        lastSignature = signature
+
         currentModel = model
         currentAppearance = appearance
 
@@ -71,7 +77,8 @@ final class AnimatedIconView: NSView {
     /// 主题变化时只更新颜色，不重置动画。
     func refreshAppearance(_ appearance: NSAppearance) {
         guard let model = currentModel else { return }
-        update(model: model, appearance: appearance, animate: cometLayer.animation(forKey: "spin") != nil)
+        update(model: model, appearance: appearance,
+               animate: cometLayer.animation(forKey: "spin") != nil, force: true)
     }
 
     // MARK: 彗星弧
@@ -103,18 +110,26 @@ final class AnimatedIconView: NSView {
         cometLayer.removeAllAnimations()
         guard animate else { return }
 
-        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
-        spin.fromValue = 0
-        spin.toValue = -2 * Double.pi     // 顺时针
-        spin.duration = 2.4
+        // 旋转：4 圈 / 7.2s，分段速度不同（伸长期快、收缩期慢）→ 每圈落点都不重复
+        let spin = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+        spin.values = [0, -2.2 * Double.pi, -4.4 * Double.pi, -6.6 * Double.pi, -8 * Double.pi]
+        spin.keyTimes = [0, 0.24, 0.50, 0.76, 1.0]
+        spin.duration = 7.2
         spin.repeatCount = .infinity
-        spin.timingFunction = CAMediaTimingFunction(name: .linear)
+        spin.calculationMode = .linear
+        spin.timingFunctions = [
+            CAMediaTimingFunction(name: .easeInEaseOut),
+            CAMediaTimingFunction(name: .easeInEaseOut),
+            CAMediaTimingFunction(name: .easeInEaseOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
+        ]
         cometLayer.add(spin, forKey: "spin")
 
+        // 呼吸：1.6s 单程（半周期），与旋转周期不整除 → 图案持续变化
         let breathe = CABasicAnimation(keyPath: "strokeEnd")
-        breathe.fromValue = 0.24
+        breathe.fromValue = 0.22
         breathe.toValue = 0.60
-        breathe.duration = 1.2
+        breathe.duration = 1.6
         breathe.autoreverses = true
         breathe.repeatCount = .infinity
         breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)

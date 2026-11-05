@@ -92,19 +92,19 @@ enum Theme {
 
     // MARK: - 设置窗口（原生实测色板，显式不透明色，避免跟随桌面/窗口激活态变色）
 
-    /// 设置窗口内容底（实测 System Settings 深色 #1F2024；浅色取系统浅灰白）。
+    /// 设置窗口内容底：深色用中性灰（#2B2C30），不用系统设置那种近黑 #1F2024。
     static var settingsContentBackground: Color {
-        Color(nsColor: dynamicColor(dark: (0.122, 0.125, 0.141), light: (0.949, 0.949, 0.965)))
+        Color(nsColor: dynamicColor(dark: (0.169, 0.173, 0.188), light: (0.949, 0.949, 0.965)))
     }
 
-    /// 设置分组卡片底（实测 System Settings 深色 #26272B；浅色为纯白）。
+    /// 设置分组卡片底：比内容底亮一档的中性灰（#333438），保持「灰卡片」而不是近黑。
     static var settingsCardBackground: Color {
-        Color(nsColor: dynamicColor(dark: (0.149, 0.153, 0.169), light: (1.0, 1.0, 1.0)))
+        Color(nsColor: dynamicColor(dark: (0.200, 0.204, 0.220), light: (1.0, 1.0, 1.0)))
     }
 
-    /// 设置行分隔线（实测 #303135 / 浅色 #E3E3E8）。
+    /// 设置行分隔线（深色 #3E3F44 / 浅色 #E3E3E8）。
     static var settingsSeparator: Color {
-        Color(nsColor: dynamicColor(dark: (0.188, 0.192, 0.208), light: (0.890, 0.890, 0.906)))
+        Color(nsColor: dynamicColor(dark: (0.243, 0.247, 0.267), light: (0.890, 0.890, 0.906)))
     }
 
     /// 显式深/浅两套色值（不参与 vibrancy/壁纸染色）。

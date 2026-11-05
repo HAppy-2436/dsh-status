@@ -215,16 +215,33 @@ enum MenuBarIconRenderer {
         let gap = min(desired, step * 0.55)
         let sweep = step - gap
 
+        // 段短到一定角度就直接画圆点（最小视觉单位 = 圆点），避免变成一串细碎短划
+        let dotThreshold: CGFloat = 26
         for (index, color) in colors.enumerated() {
             let start = 90.0 - CGFloat(index) * step - gap / 2
             let end = start - sweep
-            color.setStroke()
-            let arc = NSBezierPath()
-            arc.appendArc(withCenter: center, radius: outerRadius,
-                          startAngle: start, endAngle: end, clockwise: true)
-            arc.lineWidth = outerWidth
-            arc.lineCapStyle = .round
-            arc.stroke()
+            if sweep <= dotThreshold {
+                let midAngle = (start + end) / 2
+                let radians = midAngle * .pi / 180
+                let dotCenter = NSPoint(x: center.x + cos(radians) * outerRadius,
+                                        y: center.y + sin(radians) * outerRadius)
+                color.setFill()
+                let dot = NSBezierPath(ovalIn: NSRect(
+                    x: dotCenter.x - outerWidth / 2,
+                    y: dotCenter.y - outerWidth / 2,
+                    width: outerWidth,
+                    height: outerWidth
+                ))
+                dot.fill()
+            } else {
+                color.setStroke()
+                let arc = NSBezierPath()
+                arc.appendArc(withCenter: center, radius: outerRadius,
+                              startAngle: start, endAngle: end, clockwise: true)
+                arc.lineWidth = outerWidth
+                arc.lineCapStyle = .round
+                arc.stroke()
+            }
         }
     }
 

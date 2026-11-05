@@ -371,33 +371,32 @@ enum MenuBarIconRenderer {
     }
 }
 
-// MARK: - App 弹窗/关于页用的品牌图标
+// MARK: - App 图标 / 弹窗图标（菜单栏同款鲸鱼，无底色）
 
 enum AppIconRenderer {
-    /// 深色圆角方底 + 白色鲸鱼，用于 NSAlert 等系统弹窗。
+    /// 透明底 + 白色鲸鱼（带极细深色描边，浅色背景也可见）。
+    /// 与菜单栏空闲态同一 glyph，不放圆角方块，避免和 DeepSeek Harness 官方图标混淆。
     static func image(size: CGFloat) -> NSImage {
         NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            let inset = size * 0.06
-            let background = NSRect(x: rect.minX + inset, y: rect.minY + inset,
-                                    width: rect.width - inset * 2, height: rect.height - inset * 2)
-            let path = NSBezierPath(roundedRect: background,
-                                    xRadius: size * 0.23, yRadius: size * 0.23)
-            NSColor(hex: 0x1C1C1E).setFill()
-            path.fill()
-            // 细描边提升质感
-            NSColor.white.withAlphaComponent(0.08).setStroke()
-            path.lineWidth = max(1, size * 0.012)
-            path.stroke()
-
-            let whaleWidth = size * 0.64
+            let whaleWidth = size * 0.80
+            let whaleHeight = whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth
             let whaleRect = NSRect(
                 x: (size - whaleWidth) / 2,
-                y: (size - whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth) / 2,
+                y: (size - whaleHeight) / 2,
                 width: whaleWidth,
-                height: whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth
+                height: whaleHeight
             )
+            let path = WhaleLogo.path(fitting: whaleRect)
+
+            // 轻微投影：浅色背景上也能看清轮廓；不添加任何底色/描边
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.30)
+            shadow.shadowBlurRadius = size * 0.035
+            shadow.shadowOffset = NSSize(width: 0, height: -size * 0.010)
+            shadow.set()
+
             NSColor.white.setFill()
-            WhaleLogo.path(fitting: whaleRect).fill()
+            path.fill()
             return true
         }
     }

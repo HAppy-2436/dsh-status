@@ -20,31 +20,25 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/DSHStatusBar"
 
-# App 图标：优先使用 DeepSeek Harness 的官方图标（与宿主 App 一致）；
-# 找不到时回退到用鲸鱼设计生成的图标，避免通知/系统设置里出现系统占位图。
-DSH_ICON="/Applications/DeepSeek Harness.app/Contents/Resources/icon.icns"
-if [ -f "$DSH_ICON" ]; then
-  cp "$DSH_ICON" "$APP/Contents/Resources/DSHStatus.icns"
-else
-  ICON_WORK="$ROOT/dist/icon-work"
-  rm -rf "$ICON_WORK"; mkdir -p "$ICON_WORK"
-  ICON_PNG="$ICON_WORK/icon-1024.png"
-  "$APP/Contents/MacOS/DSHStatusBar" --render-app-icon "$ICON_PNG" >/dev/null 2>&1 || true
-  if [ -f "$ICON_PNG" ]; then
-    ICONSET="$ICON_WORK/AppIcon.iconset"
-    rm -rf "$ICONSET"; mkdir -p "$ICONSET"
-    sips -z 16 16       "$ICON_PNG" --out "$ICONSET/icon_16x16.png"      >/dev/null
-    sips -z 32 32       "$ICON_PNG" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
-    sips -z 32 32       "$ICON_PNG" --out "$ICONSET/icon_32x32.png"      >/dev/null
-    sips -z 64 64       "$ICON_PNG" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null
-    sips -z 128 128     "$ICON_PNG" --out "$ICONSET/icon_128x128.png"    >/dev/null
-    sips -z 256 256     "$ICON_PNG" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
-    sips -z 256 256     "$ICON_PNG" --out "$ICONSET/icon_256x256.png"    >/dev/null
-    sips -z 512 512     "$ICON_PNG" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
-    sips -z 512 512     "$ICON_PNG" --out "$ICONSET/icon_512x512.png"    >/dev/null
-    sips -z 1024 1024   "$ICON_PNG" --out "$ICONSET/icon_512x512@2x.png" >/dev/null
-    iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/DSHStatus.icns" 2>/dev/null || true
-  fi
+# App 图标：菜单栏同款鲸鱼 glyph（透明底，无圆角方块），避免与 DeepSeek Harness 官方图标混淆。
+ICON_WORK="$ROOT/dist/icon-work"
+rm -rf "$ICON_WORK"; mkdir -p "$ICON_WORK"
+ICON_PNG="$ICON_WORK/icon-1024.png"
+"$APP/Contents/MacOS/DSHStatusBar" --render-app-icon "$ICON_PNG" >/dev/null 2>&1 || true
+if [ -f "$ICON_PNG" ]; then
+  ICONSET="$ICON_WORK/AppIcon.iconset"
+  rm -rf "$ICONSET"; mkdir -p "$ICONSET"
+  sips -z 16 16       "$ICON_PNG" --out "$ICONSET/icon_16x16.png"      >/dev/null
+  sips -z 32 32       "$ICON_PNG" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
+  sips -z 32 32       "$ICON_PNG" --out "$ICONSET/icon_32x32.png"      >/dev/null
+  sips -z 64 64       "$ICON_PNG" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null
+  sips -z 128 128     "$ICON_PNG" --out "$ICONSET/icon_128x128.png"    >/dev/null
+  sips -z 256 256     "$ICON_PNG" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
+  sips -z 256 256     "$ICON_PNG" --out "$ICONSET/icon_256x256.png"    >/dev/null
+  sips -z 512 512     "$ICON_PNG" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
+  sips -z 512 512     "$ICON_PNG" --out "$ICONSET/icon_512x512.png"    >/dev/null
+  sips -z 1024 1024   "$ICON_PNG" --out "$ICONSET/icon_512x512@2x.png" >/dev/null
+  iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/DSHStatus.icns" 2>/dev/null || true
 fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'

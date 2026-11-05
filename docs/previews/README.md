@@ -14,6 +14,7 @@
 | `scene-preview-dark.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板） |
 | `settings-preview-dark.png` | 设置页（离屏渲染，深色）：显示状态 / 项目显示 / 菜单栏图标 / 通知 |
 | `settings-real-dark.png` | 设置页真机截图（深色） |
+| `quit-confirm-dark.png` | 退出二次确认弹窗（深色，默认焦点在「取消」） |
 | `p1-devhost-panel.png` / `p1-devhost-menubar.png` | P1 联调截图：`plugin/test/dev-host.mjs` 假 Host + 真实 App 走完整桥协议（SSE/状态合并）；数据为开发演示数据，非真实 DSH |
 
 图标语义：空闲 = 纯白鲸鱼；非空闲 = 按任务数等分的彩色圆环（段色 = 任务状态）；

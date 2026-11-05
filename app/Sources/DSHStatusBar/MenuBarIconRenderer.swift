@@ -262,6 +262,38 @@ enum MenuBarIconRenderer {
     }
 }
 
+// MARK: - App 弹窗/关于页用的品牌图标
+
+enum AppIconRenderer {
+    /// 深色圆角方底 + 白色鲸鱼，用于 NSAlert 等系统弹窗。
+    static func image(size: CGFloat) -> NSImage {
+        NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            let inset = size * 0.06
+            let background = NSRect(x: rect.minX + inset, y: rect.minY + inset,
+                                    width: rect.width - inset * 2, height: rect.height - inset * 2)
+            let path = NSBezierPath(roundedRect: background,
+                                    xRadius: size * 0.23, yRadius: size * 0.23)
+            NSColor(hex: 0x1C1C1E).setFill()
+            path.fill()
+            // 细描边提升质感
+            NSColor.white.withAlphaComponent(0.08).setStroke()
+            path.lineWidth = max(1, size * 0.012)
+            path.stroke()
+
+            let whaleWidth = size * 0.64
+            let whaleRect = NSRect(
+                x: (size - whaleWidth) / 2,
+                y: (size - whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth) / 2,
+                width: whaleWidth,
+                height: whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth
+            )
+            NSColor.white.setFill()
+            WhaleLogo.path(fitting: whaleRect).fill()
+            return true
+        }
+    }
+}
+
 // MARK: - 颜色工具
 
 extension NSColor {

@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model = AppModel(settings: settings)
         model.onOpenSession = { [weak self] sessionId in self?.openSession(sessionId) }
         model.onOpenDSH = { [weak self] in self?.openDSH() }
-        model.onQuit = { NSApp.terminate(nil) }
+        model.onQuit = { [weak self] in self?.confirmQuit() }
         model.onStatusTransition = { [weak self] row, status in
             guard let self else { return }
             switch status {
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController = StatusItemController(model: model)
         statusItemController.onTogglePopover = { [weak self] in self?.popoverController.toggle() }
         statusItemController.onOpenDSH = { [weak self] in self?.openDSH() }
-        statusItemController.onQuit = { NSApp.terminate(nil) }
+        statusItemController.onQuit = { [weak self] in self?.confirmQuit() }
         statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
 
         popoverController = PopoverController(model: model, statusItem: statusItemController.statusItem)
@@ -79,6 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.popoverController.show()
             }
         }
+        if CommandLine.arguments.contains("--preview-quit-confirm") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.confirmQuit()
+            }
+        }
         if CommandLine.arguments.contains("--open-settings") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
                 self?.settingsWindow.show()
@@ -96,6 +101,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // MARK: - 退出确认
+
+    private func confirmQuit() {
+        guard settings.confirmBeforeQuit else {
+            NSApp.terminate(nil)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "退出 DSH Status？"
+        alert.informativeText = "菜单栏图标会消失；DeepSeek Harness 本身不受影响，之后可随时重新打开。"
+        alert.alertStyle = .warning
+        alert.icon = AppIconRenderer.image(size: 72)
+        let cancel = alert.addButton(withTitle: "取消")
+        cancel.keyEquivalent = "\r"      // 默认按钮 = 取消，避免误触
+        let quit = alert.addButton(withTitle: "退出")
+        quit.keyEquivalent = ""
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertSecondButtonReturn {
+            NSApp.terminate(nil)
+        }
+    }
 
     // MARK: - 动作
 

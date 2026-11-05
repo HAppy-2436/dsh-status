@@ -69,6 +69,7 @@ final class AppSettings: ObservableObject {
     @Published var notifyWaiting: Bool { didSet { save("notifyWaiting", notifyWaiting) } }
     @Published var notifyCompleted: Bool { didSet { save("notifyCompleted", notifyCompleted) } }
     @Published var notifyStopped: Bool { didSet { save("notifyStopped", notifyStopped) } }
+    @Published var confirmBeforeQuit: Bool { didSet { save("confirmBeforeQuit", confirmBeforeQuit) } }
 
     init(persist: Bool = true, defaults: UserDefaults = .standard) {
         self.persist = persist
@@ -82,6 +83,7 @@ final class AppSettings: ObservableObject {
         notifyWaiting = defaults.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
         notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
         notifyStopped = defaults.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
+        confirmBeforeQuit = defaults.object(forKey: "dshStatus.confirmBeforeQuit") as? Bool ?? true
     }
 
     /// 预览/演示用：不落盘。
@@ -97,6 +99,7 @@ final class AppSettings: ObservableObject {
         notifyWaiting = true
         notifyCompleted = false
         notifyStopped = false
+        confirmBeforeQuit = true
     }
 
     /// 某状态是否在面板/图标中显示。
@@ -257,6 +260,11 @@ struct SettingsView: View {
         HStack {
             Button("恢复默认") { settings.reset() }
                 .controlSize(.small)
+            Toggle("退出前确认", isOn: $settings.confirmBeforeQuit)
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .font(.system(size: 10.5))
+                .help("点面板电源键或右键菜单「退出」时先弹确认框")
             Spacer()
             Text("v\(AppConfig.appVersion) · \(model.connected ? "已连接" : "未连接")")
                 .font(.system(size: 10.5))

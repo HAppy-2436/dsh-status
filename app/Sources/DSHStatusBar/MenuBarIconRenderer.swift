@@ -74,13 +74,46 @@ enum MenuBarIconRenderer {
 
     // MARK: 对外入口
 
-    /// 渲染图标。`transition` 0…1 用于「状态变化时一次性动效」：
-    /// 0 = 起始帧，1 = 稳定帧（默认）。
-    static func image(for model: IconModel, appearance: NSAppearance, transition: CGFloat = 1) -> NSImage {
+    /// 渲染完整图标（含彗星弧的静态帧），用于预览/截图/降级。
+    static func image(for model: IconModel, appearance: NSAppearance) -> NSImage {
         render(width: canvas, height: canvas, appearance: appearance) { _ in
-            draw(model: model, appearance: appearance, transition: transition)
+            draw(model: model, appearance: appearance, includeComet: true, cometSweep: nil)
         }
     }
+
+    /// 只渲染静态层（外环/轨道/数字/鲸鱼/虚线），供 Core Animation 图层复用。
+    static func staticImage(for model: IconModel, appearance: NSAppearance) -> NSImage {
+        render(width: canvas, height: canvas, appearance: appearance) { _ in
+            draw(model: model, appearance: appearance, includeComet: false, cometSweep: nil)
+        }
+    }
+
+    /// 一次性过渡帧（用于无 CA 时的降级动效）。
+    static func transitionImage(for model: IconModel, appearance: NSAppearance, progress: CGFloat) -> NSImage {
+        render(width: canvas, height: canvas, appearance: appearance) { _ in
+            draw(model: model, appearance: appearance, includeComet: false,
+                 cometSweep: (start: 90 - (1 - progress) * 200, sweep: 120 * (0.35 + 0.65 * progress)))
+        }
+    }
+
+    /// 彗星弧的几何参数（半径/线宽）与颜色。返回 nil 表示当前状态没有运行中动画。
+    struct CometSpec {
+        let radius: CGFloat
+        let width: CGFloat
+        let color: NSColor
+    }
+
+    static func cometSpec(for model: IconModel, appearance: NSAppearance) -> CometSpec? {
+        guard model.connected, !model.isEmpty, model.runningCount > 0 else { return nil }
+        let dark = isDark(appearance)
+        let hasOuter = model.topPriorityStatus != nil
+        let color = (dark ? NSColor.white : NSColor(hex: 0x1F1F23)).withAlphaComponent(0.92)
+        return CometSpec(radius: hasOuter ? innerRadius : outerRadius,
+                         width: hasOuter ? innerWidth : outerWidth,
+                         color: color)
+    }
+
+    static var canvasCenter: CGPoint { center }
 
     static func tooltip(for model: IconModel) -> String {
         guard model.connected else { return "DSH 未连接" }
@@ -95,9 +128,10 @@ enum MenuBarIconRenderer {
 
     // MARK: 绘制
 
-    private static func draw(model: IconModel, appearance: NSAppearance, transition: CGFloat) {
+    private static func draw(model: IconModel, appearance: NSAppearance,
+                             includeComet: Bool,
+                             cometSweep: (start: CGFloat, sweep: CGFloat)?) {
         let dark = isDark(appearance)
-        let t = min(max(transition, 0), 1)
 
         guard model.connected else {
             drawDisconnected(dark: dark)
@@ -127,16 +161,18 @@ enum MenuBarIconRenderer {
 
         if model.runningCount > 0 {
             if hasOuter {
-                // 双层：内层一条细中性环，静态（过渡时淡入）
-                drawInnerActivityRing(dark: dark, alpha: 0.55 * t)
+                // 双层：内层细轨道；CA 模式下彗星弧由图层绘制
+                drawSpinnerTrack(dark: dark, radius: innerRadius, width: innerWidth)
             } else {
-                // 只有运行中：轨道 + 一段固定角度的活动弧（过渡时扫过 ~200°）
+                // 只有运行中：轨道 + （可选）静态彗星弧
                 drawSpinnerTrack(dark: dark, radius: outerRadius, width: outerWidth)
-                let sweep: CGFloat = 120
-                let sweepProgress = 0.35 + 0.65 * t     // 弧长也随过渡轻微生长
-                let angle = 90 - (1 - t) * 200          // 从 200° 外扫入
-                drawActivityArc(dark: dark, radius: outerRadius, width: outerWidth,
-                                startAngle: angle, sweep: sweep * sweepProgress, alpha: t)
+            }
+            if includeComet {
+                let radius = hasOuter ? innerRadius : outerRadius
+                let width = hasOuter ? innerWidth : outerWidth
+                let sweep = cometSweep ?? (start: 90, sweep: 120)
+                drawActivityArc(dark: dark, radius: radius, width: width,
+                                startAngle: sweep.start, sweep: sweep.sweep, alpha: 1)
             }
         }
 
@@ -144,16 +180,6 @@ enum MenuBarIconRenderer {
         if !(hasOuter && model.runningCount > 0), let number = model.centerNumber {
             drawCount(number, dark: dark)
         }
-    }
-
-    /// 双层环的内层：细中性环（静态，表示「还有任务在跑」）。
-    private static func drawInnerActivityRing(dark: Bool, alpha: CGFloat) {
-        let base = dark ? NSColor.white : NSColor(hex: 0x1F1F23)
-        base.withAlphaComponent(alpha).setStroke()
-        let ring = NSBezierPath(ovalIn: NSRect(x: center.x - innerRadius, y: center.y - innerRadius,
-                                               width: innerRadius * 2, height: innerRadius * 2))
-        ring.lineWidth = innerWidth
-        ring.stroke()
     }
 
     /// 只有运行中时的活动弧（静止时固定在右上，过渡时扫入）。

@@ -12,31 +12,23 @@ final class StatusItemController: NSObject {
 
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
-    /// Core Animation 版本的图标视图（静态层 + 彗星弧图层）。
-    private var iconView: AnimatedIconView?
+    /// 运行中彗星弧的图层动画。
+    private let cometAnimator = CometAnimator()
+    private var lastImageSignature: String = ""
 
     init(model: AppModel) {
         self.model = model
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        statusItem.length = 26
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(handleClick(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.imagePosition = .imageOnly
             button.toolTip = "DSH 状态"
-
-            // 用自定义视图承载图层动画；视图不拦截点击
-            let view = AnimatedIconView(frame: NSRect(x: 0, y: 0,
-                                                      width: AnimatedIconView.pointSize,
-                                                      height: AnimatedIconView.pointSize))
-            view.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
-            button.addSubview(view)
-            iconView = view
+            cometAnimator.attach(to: button)
         }
-        layoutIconView()
         refresh()
 
         appearanceObserver = NotificationCenter.default.addObserver(
@@ -57,23 +49,32 @@ final class StatusItemController: NSObject {
     // MARK: 图标刷新
 
     func refresh() {
+        guard let button = statusItem.button else { return }
         let iconModel = model.iconModel
-        layoutIconView()
-        if let button = statusItem.button, let iconView {
-            iconView.update(model: iconModel, appearance: button.effectiveAppearance,
-                            animate: shouldAnimate(iconModel))
-            button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
-            button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: iconModel))
-        }
-    }
+        // 用 NSApp.effectiveAppearance（比按钮的 effectiveAppearance 稳定）：
+        // 切换桌面/全屏时后者可能瞬时解析成另一种外观，导致图标闪一下深色版。
+        let appearance = NSApp.effectiveAppearance
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let animate = shouldAnimate(iconModel)
 
-    /// 图标视图保持 22pt 并居中在状态栏按钮内。
-    private func layoutIconView() {
-        guard let button = statusItem.button, let iconView else { return }
-        let size = AnimatedIconView.pointSize
-        iconView.frame = NSRect(x: (button.bounds.width - size) / 2,
-                                y: (button.bounds.height - size) / 2,
-                                width: size, height: size)
+        let imageSignature = "\(iconModel.statuses.map(\.rawValue).joined(separator: ","))|\(iconModel.connected)|\(iconModel.numberMode.rawValue)|\(dark)|\(animate)"
+        if imageSignature != lastImageSignature {
+            lastImageSignature = imageSignature
+            let image: NSImage
+            if animate {
+                // 静态层不含彗星弧（彗星由图层动画绘制）
+                image = MenuBarIconRenderer.staticImage(for: iconModel, appearance: appearance)
+            } else {
+                // 静态模式：整张图（含固定角度的彗星弧）
+                image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
+            }
+            button.image = image
+            button.imageScaling = .scaleNone
+        }
+
+        cometAnimator.update(model: iconModel, appearance: appearance, animate: animate)
+        button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
+        button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: iconModel))
     }
 
     // MARK: 动画开关

@@ -243,7 +243,7 @@ enum PreviewRenderer {
             .environment(\.colorScheme, .dark)
         let hosting = NSHostingView(rootView: root)
         hosting.appearance = appearance
-        hosting.frame = NSRect(x: 0, y: 0, width: 470, height: 760)
+        hosting.frame = NSRect(x: 0, y: 0, width: 470, height: 780)
         hosting.layoutSubtreeIfNeeded()
 
         guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
@@ -251,13 +251,13 @@ enum PreviewRenderer {
         }
         rep.size = hosting.bounds.size
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
-        let image = NSImage(size: NSSize(width: 470, height: 760))
+        let image = NSImage(size: NSSize(width: 470, height: 780))
         image.addRepresentation(rep)
 
         let margin: CGFloat = 34
         let titleHeight: CGFloat = 86
         let width = 470 + margin * 2
-        let height = 760 + margin + titleHeight
+        let height = 780 + margin + titleHeight
 
         try savePNG(width: width, height: height, appearance: appearance, to: url) { rect in
             NSColor(hex: 0x0E0E10).setFill()
@@ -271,12 +271,12 @@ enum PreviewRenderer {
             let x = margin
             let y = margin
             NSColor.labelColor.withAlphaComponent(0.14).setFill()
-            NSBezierPath(roundedRect: NSRect(x: x - 1, y: y - 1, width: 472, height: 762),
+            NSBezierPath(roundedRect: NSRect(x: x - 1, y: y - 1, width: 472, height: 782),
                          xRadius: 13, yRadius: 13).fill()
             NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: 470, height: 760),
+            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: 470, height: 780),
                          xRadius: 12, yRadius: 12).addClip()
-            image.draw(in: NSRect(x: x, y: y, width: 470, height: 760))
+            image.draw(in: NSRect(x: x, y: y, width: 470, height: 780))
             NSGraphicsContext.restoreGraphicsState()
         }
     }

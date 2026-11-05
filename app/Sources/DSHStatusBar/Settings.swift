@@ -139,13 +139,158 @@ final class SettingsWindowController {
             let window = NSWindow(contentViewController: hosting)
             window.title = "DSH Status 设置"
             window.styleMask = [.titled, .closable]
-            window.setContentSize(NSSize(width: 470, height: 760))
+            window.setContentSize(NSSize(width: 470, height: 780))
             window.isReleasedWhenClosed = false
             window.center()
             self.window = window
         }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+}
+
+// MARK: - 设置页视觉组件（参考 Status Trio / macOS 系统设置）
+
+private enum SettingsMetrics {
+    static let pageMargin: CGFloat = 14
+    static let groupSpacing: CGFloat = 12
+    static let cardCorner: CGFloat = 10
+    static let rowPaddingH: CGFloat = 14
+    static let rowPaddingV: CGFloat = 6
+    static let iconSize: CGFloat = 26
+    static let iconCorner: CGFloat = 6.5
+    static let dividerInset: CGFloat = rowPaddingH + iconSize + 12
+}
+
+private struct SettingsGroup<Content: View>: View {
+    var title: String
+    var footnote: String? = nil
+    @ViewBuilder let content: Content
+
+    init(_ title: String, footnote: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.footnote = footnote
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
+
+            VStack(spacing: 0) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+            )
+
+            if let footnote {
+                Text(footnote)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 2)
+                    .padding(.top, 1)
+            }
+        }
+    }
+}
+
+private struct SettingsIcon: View {
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: SettingsMetrics.iconCorner, style: .continuous)
+            .fill(LinearGradient(colors: [tint.opacity(0.98), tint.opacity(0.72)],
+                                 startPoint: .top, endPoint: .bottom))
+            .frame(width: SettingsMetrics.iconSize, height: SettingsMetrics.iconSize)
+            .overlay(
+                Image(systemName: symbol)
+                    .font(.system(size: SettingsMetrics.iconSize * 0.52, weight: .semibold))
+                    .foregroundStyle(.white)
+            )
+    }
+}
+
+private struct SettingsRowChrome<Content: View>: View {
+    var showDivider: Bool = true
+    @ViewBuilder let content: Content
+
+    init(showDivider: Bool = true, @ViewBuilder content: () -> Content) {
+        self.showDivider = showDivider
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(.horizontal, SettingsMetrics.rowPaddingH)
+            .padding(.vertical, SettingsMetrics.rowPaddingV)
+            .overlay(alignment: .bottom) {
+                if showDivider {
+                    Divider().padding(.leading, SettingsMetrics.dividerInset)
+                }
+            }
+    }
+}
+
+private struct SettingsToggleRow: View {
+    let symbol: String
+    let tint: Color
+    let title: String
+    var subtitle: String? = nil
+    @Binding var isOn: Bool
+    var showDivider: Bool = true
+
+    var body: some View {
+        SettingsRowChrome(showDivider: showDivider) {
+            HStack(spacing: 10) {
+                SettingsIcon(symbol: symbol, tint: tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 13))
+                    if let subtitle {
+                        Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Toggle("", isOn: $isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+        }
+    }
+}
+
+private struct SettingsMenuRow<Trailing: View>: View {
+    let symbol: String
+    let tint: Color
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder let trailing: Trailing
+    var showDivider: Bool = true
+
+    var body: some View {
+        SettingsRowChrome(showDivider: showDivider) {
+            HStack(spacing: 10) {
+                SettingsIcon(symbol: symbol, tint: tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 13))
+                    if let subtitle {
+                        Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                trailing
+            }
+        }
     }
 }
 
@@ -156,105 +301,133 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
 
+    private let statuses: [SessionStatus] = [.waiting, .running, .completed, .stopped]
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    header
-
-                card(title: "显示状态") {
-                    ForEach([SessionStatus.waiting, .running, .completed, .stopped], id: \.self) { status in
-                        Toggle(isOn: binding(for: status)) {
-                            HStack(spacing: 8) {
-                                Circle().fill(color(status)).frame(width: 8, height: 8)
-                                Text(status.label).font(.system(size: 12.5))
-                                Text("\(count(status)) 个")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                    }
-                    Text("隐藏的状态既不在面板里出现，也不计入菜单栏圆环与数字。")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: SettingsMetrics.groupSpacing) {
+                    displaySettings
+                    projectSettings
+                    iconSettings
+                    notificationSettings
                 }
-
-                card(title: "项目显示") {
-                    let workspaces = workspaceRows()
-                    if workspaces.isEmpty {
-                        Text("暂无已知项目（连接 DSH 后出现）")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(workspaces, id: \.id) { workspace in
-                            Toggle(isOn: binding(workspaceId: workspace.id)) {
-                                HStack(spacing: 8) {
-                                    Text(workspace.title).font(.system(size: 12.5))
-                                    Text("\(workspace.count) 个会话")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                            .toggleStyle(.switch)
-                            .controlSize(.small)
-                        }
-                        Text("关闭开关即隐藏该项目；会话本身不受影响。")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                card(title: "菜单栏图标") {
-                    Text("中心数字")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Picker("", selection: $settings.centerNumberMode) {
-                        ForEach(CenterNumberMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.radioGroup)
-                    .labelsHidden()
-
-                    Text("圆环段数上限")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
-                    Picker("", selection: $settings.segmentCap) {
-                        ForEach(SegmentCap.allCases) { cap in
-                            Text(cap.label).tag(cap)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    Text("任务数超过上限时，按优先级只画前 N 段；中心数字仍表示完整数量。")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                }
-
-                card(title: "通知") {
-                    Toggle("待回答（推荐）", isOn: $settings.notifyWaiting)
-                        .toggleStyle(.switch).controlSize(.small)
-                    Toggle("已完成", isOn: $settings.notifyCompleted)
-                        .toggleStyle(.switch).controlSize(.small)
-                    Toggle("已停止", isOn: $settings.notifyStopped)
-                        .toggleStyle(.switch).controlSize(.small)
-                    Text("点击通知会打开 DSH 主页面；同会话 30 秒内不重复。")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                }
-
-                }
-                .padding(18)
+                .padding(SettingsMetrics.pageMargin)
             }
             Divider()
             footerBar
         }
-        .frame(width: 470, height: 760)
+        .frame(width: 470, height: 780)
         .background(Color(nsColor: .windowBackgroundColor))
     }
+
+    // MARK: 分组
+
+    private var displaySettings: some View {
+        SettingsGroup("显示状态",
+                      footnote: "隐藏的状态既不在面板里出现，也不计入菜单栏圆环与数字。") {
+            ForEach(Array(statuses.enumerated()), id: \.element) { index, status in
+                SettingsToggleRow(
+                    symbol: statusSymbol(status),
+                    tint: Theme.statusColor(status, scheme: colorScheme),
+                    title: status.label,
+                    subtitle: "\(count(status)) 个",
+                    isOn: binding(for: status),
+                    showDivider: index < statuses.count - 1
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var projectSettings: some View {
+        let workspaces = workspaceRows()
+        SettingsGroup("项目显示",
+                      footnote: workspaces.isEmpty ? nil : "关闭开关即隐藏该项目；会话本身不受影响。") {
+            if workspaces.isEmpty {
+                SettingsRowChrome(showDivider: false) {
+                    Text("暂无已知项目（连接 DSH 后出现）")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(Array(workspaces.enumerated()), id: \.element.id) { index, workspace in
+                    SettingsToggleRow(
+                        symbol: "folder.fill",
+                        tint: Color(red: 0.36, green: 0.56, blue: 0.88),
+                        title: workspace.title,
+                        subtitle: "\(workspace.count) 个会话",
+                        isOn: binding(workspaceId: workspace.id),
+                        showDivider: index < workspaces.count - 1
+                    )
+                }
+            }
+        }
+    }
+
+    private var iconSettings: some View {
+        SettingsGroup("菜单栏图标",
+                      footnote: "任务数超过上限时，按优先级只画前 N 段；中心数字仍表示完整数量。") {
+            SettingsMenuRow(
+                symbol: "number.circle.fill",
+                tint: Theme.statusColor(.running, scheme: colorScheme),
+                title: "中心数字",
+                subtitle: settings.centerNumberMode.shortLabel
+            ) {
+                Picker("", selection: $settings.centerNumberMode) {
+                    ForEach(CenterNumberMode.allCases) { mode in
+                        Text(mode.shortLabel).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 150)
+            }
+            SettingsMenuRow(
+                symbol: "chart.pie.fill",
+                tint: Theme.statusColor(.completed, scheme: colorScheme),
+                title: "圆环段数上限",
+                subtitle: settings.segmentCap == .unlimited ? "不限" : "最多 \(settings.segmentCap.label) 段",
+                showDivider: false
+            ) {
+                Picker("", selection: $settings.segmentCap) {
+                    ForEach(SegmentCap.allCases) { cap in
+                        Text(cap.label).tag(cap)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 90)
+            }
+        }
+    }
+
+    private var notificationSettings: some View {
+        SettingsGroup("通知",
+                      footnote: "点击通知会打开 DSH 主页面；同会话 30 秒内不重复。") {
+            SettingsToggleRow(
+                symbol: "bell.badge.fill",
+                tint: Theme.statusColor(.waiting, scheme: colorScheme),
+                title: "待回答（推荐）",
+                isOn: $settings.notifyWaiting
+            )
+            SettingsToggleRow(
+                symbol: "checkmark.circle.fill",
+                tint: Theme.statusColor(.completed, scheme: colorScheme),
+                title: "已完成",
+                isOn: $settings.notifyCompleted
+            )
+            SettingsToggleRow(
+                symbol: "stop.circle.fill",
+                tint: Theme.statusColor(.stopped, scheme: colorScheme),
+                title: "已停止",
+                isOn: $settings.notifyStopped,
+                showDivider: false
+            )
+        }
+    }
+
+    // MARK: 底栏
 
     private var footerBar: some View {
         HStack {
@@ -274,41 +447,15 @@ struct SettingsView: View {
         .frame(height: 44)
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(Theme.subtleFill(colorScheme)).frame(width: 34, height: 34)
-                Image(nsImage: WhaleLogo.templateImage(height: 13))
-                    .renderingMode(.template)
-                    .foregroundStyle(.secondary)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("DSH Status 设置").font(.system(size: 14, weight: .semibold))
-                Text("菜单栏图标与面板的显示规则").font(.system(size: 10.5)).foregroundStyle(.tertiary)
-            }
-            Spacer()
-        }
-    }
+    // MARK: 数据与绑定
 
-    @ViewBuilder
-    private func card<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 7) {
-                content()
-            }
-            .padding(9)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.card)
-                    .fill(Theme.cardFill(colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.card)
-                    .stroke(Theme.cardStroke(colorScheme), lineWidth: 1)
-            )
+    private func statusSymbol(_ status: SessionStatus) -> String {
+        switch status {
+        case .waiting: return "questionmark.circle.fill"
+        case .running: return "play.circle.fill"
+        case .completed: return "checkmark.circle.fill"
+        case .stopped: return "stop.circle.fill"
+        case .idle: return "circle"
         }
     }
 
@@ -353,9 +500,5 @@ struct SettingsView: View {
 
     private func count(_ status: SessionStatus) -> Int {
         model.state.sessions.filter { $0.statusKind == status }.count
-    }
-
-    private func color(_ status: SessionStatus) -> Color {
-        Theme.statusColor(status, scheme: colorScheme)
     }
 }

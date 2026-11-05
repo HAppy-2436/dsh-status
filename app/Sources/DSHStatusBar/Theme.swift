@@ -30,25 +30,27 @@ enum Theme {
     private static func statusRGB(_ status: SessionStatus, dark: Bool) -> (Double, Double, Double) {
         switch status {
         case .waiting:
-            // 待回答 = 黄色（暖沙色，低饱和）
-            return dark ? (0.878, 0.741, 0.427) : (0.678, 0.529, 0.216)
+            // 待回答 = 黄色（参考 Status Trio 的 Low Power Mode 黄 #F2B900）
+            return dark ? (0.949, 0.725, 0.000) : (0.780, 0.600, 0.000)
         case .running:
-            return dark ? (0.478, 0.663, 0.843) : (0.353, 0.522, 0.741)
+            // 运行中 = 蓝色（参考 Status Trio 的蓝牙播放蓝 #0A84FF）
+            return dark ? (0.039, 0.518, 1.000) : (0.000, 0.478, 1.000)
         case .completed:
-            return dark ? (0.494, 0.753, 0.616) : (0.353, 0.604, 0.475)
+            // 已完成 = 绿色（参考 Status Trio 的充电绿 #34C759）
+            return dark ? (0.204, 0.780, 0.349) : (0.141, 0.541, 0.239)
         case .stopped:
-            // 已停止 = 红色（柔和珊瑚）
-            return dark ? (0.914, 0.498, 0.463) : (0.816, 0.396, 0.365)
+            // 已停止 = 红色（系统红）
+            return dark ? (1.000, 0.271, 0.227) : (0.843, 0.000, 0.082)
         case .idle:
             return dark ? (0.58, 0.58, 0.60) : (0.46, 0.46, 0.48)
         }
     }
 
-    /// 未连接用独立的中性橙色，避免与「已停止=红」「待回答=黄」混淆。
+    /// 未连接用中性灰（参考 Status Trio 用 30% 前景色表示不可用状态）。
     static func disconnectedColor(_ scheme: ColorScheme) -> Color {
         scheme == .dark
-            ? Color(red: 0.851, green: 0.627, blue: 0.353)
-            : Color(red: 0.690, green: 0.498, blue: 0.251)
+            ? Color(red: 0.557, green: 0.557, blue: 0.576)
+            : Color(red: 0.420, green: 0.420, blue: 0.447)
     }
 
     // MARK: 表面与描边

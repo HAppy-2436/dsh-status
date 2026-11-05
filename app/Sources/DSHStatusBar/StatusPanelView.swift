@@ -1,81 +1,56 @@
 import SwiftUI
 
-/// 面板主视图（深色优先）。
+/// 面板：参考 Status Trio 的 popover 设计——
+/// 330pt 宽、14pt 边距、单色文字 + 小面积状态色 SF Symbol、
+/// 细分隔线、chevron 指示、底部「设置…」+ 电源操作。
 struct StatusPanelView: View {
     @ObservedObject var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.panelUsesMaterial) private var usesMaterial
 
-    private let width: CGFloat = 344
+    private let width: CGFloat = 330
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            hairline
+            Divider().opacity(0.6)
             content
-            hairline
+            Divider().opacity(0.6)
             footer
         }
         .frame(width: width)
-        .background(Group {
-            if usesMaterial {
-                VisualEffectBackground()
-            } else {
-                Color(nsColor: .windowBackgroundColor)
+        .background(
+            Group {
+                if usesMaterial {
+                    VisualEffectBackground()
+                } else {
+                    Color(nsColor: .windowBackgroundColor)
+                }
             }
-        })
-    }
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(Theme.hairline(colorScheme))
-            .frame(height: 1)
+        )
     }
 
     // MARK: 头部
 
     private var header: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(Theme.subtleFill(colorScheme))
-                    .frame(width: 26, height: 26)
-                Image(nsImage: WhaleLogo.templateImage(height: 11))
-                    .renderingMode(.template)
-                    .foregroundStyle(.secondary)
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text("DSH 会话")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("DeepSeek Harness")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
+        HStack(spacing: 8) {
+            Image(nsImage: WhaleLogo.templateImage(height: 12))
+                .renderingMode(.template)
+                .foregroundStyle(.secondary)
+            Text("DSH 会话")
+                .font(.headline)
             Spacer()
-            statusPill
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 46)
-    }
-
-    private var statusPill: some View {
-        HStack(spacing: 5) {
             Circle()
                 .fill(model.connected
                       ? Theme.statusColor(.completed, scheme: colorScheme)
                       : Theme.disconnectedColor(colorScheme))
-                .frame(width: 6, height: 6)
+                .frame(width: 5, height: 5)
             Text(model.connected ? "实时" : "未连接")
-                .font(.system(size: 10.5, weight: .medium))
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            Capsule().fill((model.connected
-                            ? Theme.statusColor(.completed, scheme: colorScheme)
-                            : Theme.disconnectedColor(colorScheme)).opacity(0.12))
-        )
+        .padding(.horizontal, 14)
+        .frame(height: 40)
     }
 
     // MARK: 内容
@@ -88,84 +63,95 @@ struct StatusPanelView: View {
             empty
         } else {
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 2) {
-                    ForEach(model.sections, id: \.status) { section in
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(model.sections.enumerated()), id: \.element.status) { index, section in
+                        if index > 0 {
+                            Divider().opacity(0.6).padding(.vertical, 6)
+                        }
                         sectionView(status: section.status, rows: section.rows)
                     }
+                    Divider().opacity(0.6).padding(.vertical, 6)
+                    openDSHRow
                 }
-                .padding(.vertical, 6)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
             }
             .frame(height: contentHeight)
         }
     }
 
     private func sectionView(status: SessionStatus, rows: [SessionRow]) -> some View {
-        VStack(spacing: 1) {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(statusColor(status))
-                    .frame(width: 6, height: 6)
-                Text(status.label)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(rows.count)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Theme.subtleFill(colorScheme)))
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
-
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(status.label) · \(rows.count)")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 6)
+                .padding(.bottom, 2)
             ForEach(rows) { row in
                 SessionRowView(row: row,
-                               emphasized: status == .waiting,
                                onOpen: { model.onOpenSession?(row.id) })
             }
         }
     }
 
+    private var openDSHRow: some View {
+        Button {
+            model.onOpenDSH?()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                Text("打开 DSH")
+                    .font(.headline)
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var contentHeight: CGFloat {
         let rows = model.sections.reduce(0) { $0 + $1.rows.count }
         let sections = model.sections.count
-        let height = CGFloat(sections) * 34 + CGFloat(rows) * 48 + 12
-        return min(max(height, 90), 470)
+        let height = CGFloat(rows) * 44 + CGFloat(sections) * 30 + 52
+        return min(max(height, 96), 480)
     }
 
     // MARK: 空 / 未连接
 
     private var empty: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(Theme.subtleFill(colorScheme))
-                    .frame(width: 44, height: 44)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.tertiary)
-            }
+        VStack(spacing: 6) {
+            Image(nsImage: WhaleLogo.templateImage(height: 22))
+                .renderingMode(.template)
+                .foregroundStyle(.tertiary)
             Text("全部空闲")
-                .font(.system(size: 13, weight: .medium))
+                .font(.headline)
             Text("没有需要关注的会话")
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 136)
+        .frame(height: 132)
     }
 
     private var disconnected: some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 6) {
-                Circle().fill(Theme.disconnectedColor(colorScheme)).frame(width: 7, height: 7)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
                 Text("DSH 未连接")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.headline)
             }
             Text("等待 DeepSeek Harness 启动…")
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(.secondary)
             Button("打开 DSH") { model.onOpenDSH?() }
                 .buttonStyle(.bordered)
@@ -173,7 +159,7 @@ struct StatusPanelView: View {
                 .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 150)
+        .frame(height: 148)
     }
 
     // MARK: 底部
@@ -181,90 +167,79 @@ struct StatusPanelView: View {
     private var footer: some View {
         HStack(spacing: 10) {
             Button {
-                model.onOpenDSH?()
+                model.onOpenSettings?()
             } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.up.forward.app").font(.system(size: 11))
-                    Text("打开 DSH").font(.system(size: 11.5, weight: .medium))
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Theme.subtleFill(colorScheme)))
+                Label("设置…", systemImage: "gearshape")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             Spacer()
 
             iconButton(systemName: model.settings.notifyWaiting ? "bell" : "bell.slash",
-                       help: "待回答通知（更多通知设置见设置页）") {
+                       help: "待回答通知（更多设置见设置页）") {
                 model.settings.notifyWaiting.toggle()
-            }
-            iconButton(systemName: "gearshape", help: "设置") {
-                model.onOpenSettings?()
             }
             iconButton(systemName: "power", help: "退出") {
                 model.onQuit?()
             }
         }
         .padding(.horizontal, 14)
-        .frame(height: 44)
+        .frame(height: 40)
     }
 
     private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
-                .frame(width: 26, height: 26)
-                .background(Circle().fill(Theme.subtleFill(colorScheme)))
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(help)
     }
-
-    private func statusColor(_ status: SessionStatus) -> Color {
-        Theme.statusColor(status, scheme: colorScheme)
-    }
 }
 
-// MARK: - 单行
+// MARK: - 会话行
 
 private struct SessionRowView: View {
     let row: SessionRow
-    let emphasized: Bool
     let onOpen: () -> Void
     @State private var hovering = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(Theme.statusColor(row.statusKind, scheme: colorScheme).opacity(0.95))
+                    .frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.displayTitle)
-                        .font(.system(size: 12.5, weight: emphasized ? .semibold : .medium))
+                        .font(.headline)
                         .lineLimit(1)
-                        .foregroundStyle(.primary)
+                        .truncationMode(.tail)
                     Text(subtitle)
-                        .font(.system(size: 10.5))
-                        .lineLimit(1)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-                Spacer(minLength: 4)
-                if hovering {
-                    Image(systemName: "arrow.up.forward")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 10)
-            .padding(.leading, 13)
-            .frame(height: 46)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.row)
-                    .fill(background)
-            )
             .padding(.horizontal, 6)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -272,8 +247,14 @@ private struct SessionRowView: View {
         .help(row.pendingSummary ?? row.displayTitle)
     }
 
-    private var background: Color {
-        hovering ? Theme.hoverFill(colorScheme) : .clear
+    private var symbol: String {
+        switch row.statusKind {
+        case .waiting: return "questionmark.circle"
+        case .running: return "play.circle"
+        case .completed: return "checkmark.circle"
+        case .stopped: return "stop.circle"
+        case .idle: return "circle"
+        }
     }
 
     private var subtitle: String {

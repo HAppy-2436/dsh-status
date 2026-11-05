@@ -71,8 +71,6 @@ enum MenuBarIconRenderer {
     private static let outerWidth: CGFloat = 2.1
     private static let innerRadius: CGFloat = 4.95
     private static let innerWidth: CGFloat = 1.4
-    /// 动态弧跨度。
-    private static let spinnerSweep: CGFloat = 250
 
     // MARK: 对外入口
 
@@ -128,12 +126,10 @@ enum MenuBarIconRenderer {
         if model.runningCount > 0 {
             if hasOuter {
                 drawSpinner(dark: dark, radius: innerRadius, width: innerWidth,
-                            sweep: spinnerSweep, phase: model.animationPhase,
-                            time: model.animationTime)
+                            phase: model.animationPhase, time: model.animationTime, useTrack: true)
             } else {
                 drawSpinner(dark: dark, radius: outerRadius, width: outerWidth,
-                            sweep: 300, phase: model.animationPhase,
-                            time: model.animationTime)
+                            phase: model.animationPhase, time: model.animationTime, useTrack: false)
             }
         }
 
@@ -159,21 +155,30 @@ enum MenuBarIconRenderer {
 
     // MARK: 运行中动态弧
 
+    /// 运行中动画：**淡色整环（轨道）+ 亮弧**。
+    /// 整环始终同心，亮弧在轨道上旋转并做长度呼吸 —— 既解决「单段弧看起来不居中」，
+    /// 又能表达「在跑」与节奏感。
     private static func drawSpinner(dark: Bool, radius: CGFloat, width: CGFloat,
-                                    sweep baseSweep: CGFloat, phase: CGFloat,
-                                    time: TimeInterval) {
-        let color = (dark ? NSColor.white : NSColor(hex: 0x1F1F23)).withAlphaComponent(0.92)
+                                    phase: CGFloat, time: TimeInterval, useTrack: Bool) {
+        let base = dark ? NSColor.white : NSColor(hex: 0x1F1F23)
 
-        // 弧长做呼吸变化：80° ⇄ 270°，周期 2.4s（与旋转解耦，形成节奏）
+        // 淡轨道：整圈、低对比，作为同心参考（只在有外环、需要「内圈居中」时用）
+        if useTrack {
+            base.withAlphaComponent(0.22).setStroke()
+            let track = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius,
+                                                    width: radius * 2, height: radius * 2))
+            track.lineWidth = width
+            track.stroke()
+        }
+
+        // 亮弧：弧长呼吸 + 旋转
         let cycle: TimeInterval = 2.4
         let t = (time.truncatingRemainder(dividingBy: cycle)) / cycle
         let eased = 0.5 - 0.5 * cos(t * 2 * .pi)          // 0 → 1 → 0
-        let scale = baseSweep / 300                        // 外环 300°、内环 250° → 按比例缩放
-        let sweep = (80 + 190 * CGFloat(eased)) * scale
+        let sweep = 85 + 130 * CGFloat(eased)             // 85° ⇄ 215°
 
-        color.setStroke()
+        base.withAlphaComponent(0.92).setStroke()
         let arc = NSBezierPath()
-        // 头部按 phase 旋转，尾部随弧长伸缩 → 拉伸感而不是整圈平移
         arc.appendArc(withCenter: center, radius: radius,
                       startAngle: 90 - phase, endAngle: 90 - phase - sweep, clockwise: true)
         arc.lineWidth = width

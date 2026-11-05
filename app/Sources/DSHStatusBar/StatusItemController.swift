@@ -14,6 +14,7 @@ final class StatusItemController: NSObject {
     private var themeObserver: NSObjectProtocol?
     private var animationTimer: Timer?
     private var animationPhase: CGFloat = 0
+    private var animationTime: TimeInterval = 0
     private var lastTick = Date()
     /// 动画一圈的时长。
     private let animationPeriod: TimeInterval = 1.8
@@ -54,6 +55,7 @@ final class StatusItemController: NSObject {
         guard let button = statusItem.button else { return }
         var iconModel = model.iconModel
         iconModel.animationPhase = animationPhase
+        iconModel.animationTime = animationTime
         let appearance = button.effectiveAppearance
         let image = MenuBarIconRenderer.image(for: iconModel, appearance: appearance)
         button.image = image
@@ -81,7 +83,14 @@ final class StatusItemController: NSObject {
                 let now = Date()
                 let delta = now.timeIntervalSince(self.lastTick)
                 self.lastTick = now
-                self.animationPhase = (self.animationPhase + CGFloat(delta / self.animationPeriod * 360))
+                self.animationTime += delta
+                // 转速做轻微节奏：伸长期略快、收缩期略慢
+                let cycle: TimeInterval = 2.4
+                let t = (self.animationTime.truncatingRemainder(dividingBy: cycle)) / cycle
+                let eased = 0.5 - 0.5 * cos(t * 2 * .pi)
+                let speed = 0.82 + 0.36 * eased
+                self.animationPhase = (self.animationPhase
+                    + CGFloat(delta / self.animationPeriod * 360 * speed))
                     .truncatingRemainder(dividingBy: 360)
                 self.refreshIconOnly()
             }
@@ -99,6 +108,7 @@ final class StatusItemController: NSObject {
         guard let button = statusItem.button else { return }
         var iconModel = model.iconModel
         iconModel.animationPhase = animationPhase
+        iconModel.animationTime = animationTime
         button.image = MenuBarIconRenderer.image(for: iconModel, appearance: button.effectiveAppearance)
     }
 

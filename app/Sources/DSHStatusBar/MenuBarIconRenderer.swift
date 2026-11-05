@@ -20,6 +20,8 @@ struct IconModel: Equatable {
     var numberMode: CenterNumberMode = .attention
     /// 运行中动态弧的相位（角度）；由 StatusItemController 定时推进。
     var animationPhase: CGFloat = 0
+    /// 动画累计时间（秒），用于让弧长做呼吸变化。
+    var animationTime: TimeInterval = 0
 
     var waitingCount: Int { statuses.filter { $0 == .waiting }.count }
     var runningCount: Int { statuses.filter { $0 == .running }.count }
@@ -126,10 +128,12 @@ enum MenuBarIconRenderer {
         if model.runningCount > 0 {
             if hasOuter {
                 drawSpinner(dark: dark, radius: innerRadius, width: innerWidth,
-                            sweep: spinnerSweep, phase: model.animationPhase)
+                            sweep: spinnerSweep, phase: model.animationPhase,
+                            time: model.animationTime)
             } else {
                 drawSpinner(dark: dark, radius: outerRadius, width: outerWidth,
-                            sweep: 300, phase: model.animationPhase)
+                            sweep: 300, phase: model.animationPhase,
+                            time: model.animationTime)
             }
         }
 
@@ -156,10 +160,20 @@ enum MenuBarIconRenderer {
     // MARK: 运行中动态弧
 
     private static func drawSpinner(dark: Bool, radius: CGFloat, width: CGFloat,
-                                    sweep: CGFloat, phase: CGFloat) {
+                                    sweep baseSweep: CGFloat, phase: CGFloat,
+                                    time: TimeInterval) {
         let color = (dark ? NSColor.white : NSColor(hex: 0x1F1F23)).withAlphaComponent(0.92)
+
+        // 弧长做呼吸变化：80° ⇄ 270°，周期 2.4s（与旋转解耦，形成节奏）
+        let cycle: TimeInterval = 2.4
+        let t = (time.truncatingRemainder(dividingBy: cycle)) / cycle
+        let eased = 0.5 - 0.5 * cos(t * 2 * .pi)          // 0 → 1 → 0
+        let scale = baseSweep / 300                        // 外环 300°、内环 250° → 按比例缩放
+        let sweep = (80 + 190 * CGFloat(eased)) * scale
+
         color.setStroke()
         let arc = NSBezierPath()
+        // 头部按 phase 旋转，尾部随弧长伸缩 → 拉伸感而不是整圈平移
         arc.appendArc(withCenter: center, radius: radius,
                       startAngle: 90 - phase, endAngle: 90 - phase - sweep, clockwise: true)
         arc.lineWidth = width

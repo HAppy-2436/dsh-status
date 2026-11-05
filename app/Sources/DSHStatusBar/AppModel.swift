@@ -15,8 +15,6 @@ final class AppModel: ObservableObject {
     var onOpenSession: ((String) -> Void)?
     var onOpenDSH: (() -> Void)?
     var onQuit: (() -> Void)?
-    var onToggleNotifications: (() -> Void)?
-    var notificationsEnabled: Bool = true
 
     private var previousStatus: [String: String] = [:]
     private var hasBaseline = false

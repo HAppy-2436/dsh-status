@@ -196,10 +196,9 @@ struct StatusPanelView: View {
 
             Spacer()
 
-            iconButton(systemName: model.notificationsEnabled ? "bell" : "bell.slash",
-                       help: "待回答通知") {
-                model.notificationsEnabled.toggle()
-                model.onToggleNotifications?()
+            iconButton(systemName: model.settings.notifyWaiting ? "bell" : "bell.slash",
+                       help: "待回答通知（更多通知设置见设置页）") {
+                model.settings.notifyWaiting.toggle()
             }
             iconButton(systemName: "gearshape", help: "设置") {
                 model.onOpenSettings?()

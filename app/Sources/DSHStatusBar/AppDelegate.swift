@@ -15,14 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         model = AppModel(settings: settings)
-        model.notificationsEnabled = UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true
         model.onOpenSession = { [weak self] sessionId in self?.openSession(sessionId) }
         model.onOpenDSH = { [weak self] in self?.openDSH() }
         model.onQuit = { NSApp.terminate(nil) }
-        model.onToggleNotifications = { [weak self] in
-            guard let self else { return }
-            UserDefaults.standard.set(self.model.notificationsEnabled, forKey: "notificationsEnabled")
-        }
         model.onStatusTransition = { [weak self] row, status in
             guard let self else { return }
             switch status {

@@ -25,7 +25,7 @@ struct StatusPanelView: View {
             footer
         }
         .frame(width: width)
-        .background(usesMaterial ? Color.clear : Color(nsColor: .windowBackgroundColor))
+        .background(usesMaterial ? Color.clear : Theme.panelFallbackBackground)
     }
 
     // MARK: - 头部

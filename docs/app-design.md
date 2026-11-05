@@ -71,8 +71,9 @@
   `.statusBar` 层级、跨 Space、不抢焦点；**20pt continuous 圆角**、系统窗口阴影。
 - 材质（设置页「面板背景」可切，默认液态玻璃）：
   - macOS 26+：`NSGlassEffectView(style: .regular)`，`cornerRadius = 20`；
-    **`tintColor = .windowBackgroundColor`**——默认玻璃会随高饱和壁纸过曝（深色模式白字压不住），
-    用系统窗口背景色做 tint 后得到原生 Control Center 那种深色玻璃，浅色模式自动变浅色磨砂；
+    **`tintColor = Theme.panelGlassTint`**——深色用中性灰（约 `#333338`），得到「灰色玻璃卡片」而不是近黑，
+    同时保留壁纸的模糊/折射；浅色用浅灰白磨砂。不要用 `.windowBackgroundColor`：它会把面板压成近黑；
+    也不要不设 tint：玻璃会随高饱和壁纸过曝、白字压不住。
   - 旧系统：`NSVisualEffectView(.popover)` 经典磨砂；
   - 显式选「实色」或系统开启「降低透明度」时用不透明填充。
 - 定位：状态项下方 **6pt**，按屏幕可见区域夹取（左右/底部 8pt）；宽度固定 **320pt**。
@@ -112,8 +113,8 @@
 - 默认内容尺寸 **540 × 640**，最小 **500 × 480**，可缩放；`setFrameAutosaveName("DSHStatusSettings")`
   记住大小/位置；首次打开居中；关闭不退出 App，再次打开复用同一窗口。
 - 打开时 `NSApp.activate` + `makeKeyAndOrderFront`。
-- **背景色为显式中性灰板**（不透明度 100%）：深色内容 `#2B2C30` / 卡片 `#333438`、浅色内容 `#F2F2F6` / 卡片白，
-  分隔线 `#3E3F44` / `#E3E3E8`（深色不用系统设置那种近黑 `#1F2024`，按用户反馈取灰底）。原因：直接用 `windowBackgroundColor` + SwiftUI grouped Form 的玻璃底会被
+- **背景色为显式中性色板**（不透明度 100%）：深色内容 `#1F2024` / 卡片 `#26272B`、浅色内容 `#F2F2F6` / 卡片白，
+  分隔线 `#303135` / `#E3E3E8`（取自 System Settings 实测值）。原因：直接用 `windowBackgroundColor` + SwiftUI grouped Form 的玻璃底会被
   Liquid Glass 环境（桌面壁纸/窗口激活态）染色——聚焦时卡片偏蓝、失焦时变中性，同一窗口两副面孔；
   固定为原生实测中性色后，**常态与失焦态一致**，与系统设置观感对齐。
 

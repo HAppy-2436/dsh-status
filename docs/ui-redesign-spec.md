@@ -74,8 +74,8 @@
 - 保持自定义 `NSPanel`（无箭头、`.statusBar` 层级、跨 Space、非激活面板但 `makeKey` 保证 active 渲染），
   圆角 20pt；材质三档保持：Liquid Glass（`NSGlassEffectView`，macOS 26+）/ 经典磨砂（`.popover`）/ 实色；
   「降低透明度」→ 实色。
-- Liquid Glass 必须设 `tintColor = .windowBackgroundColor`：否则玻璃随高饱和壁纸过曝，
-  深色模式白字对比不足；tint 后得到原生 Control Center 同代深色玻璃（浅色模式自动变浅色磨砂）。
+- Liquid Glass 必须设 `tintColor = Theme.panelGlassTint`（深色中性灰 ≈ `#333338`、浅色浅灰白）：
+  不设 tint 会被高饱和壁纸过曝；用 `.windowBackgroundColor` 会压成近黑。目标是「灰色玻璃卡片」。
 - 定位：锚定状态项下方 6pt；屏幕可见区域夹取（左右 8pt、底部 8pt）；高度随内容，最大 480。
 - 阴影用系统窗口阴影，不额外自绘。
 
@@ -114,7 +114,7 @@
 - 删除旧底部固定栏（「恢复默认」按钮 + checkbox + 版本）与重复副标题
   （picker 行不再同时用副标题和控件显示同一个值，说明文字放分区脚注）。
 - 所有设置项保持即时生效 + UserDefaults 持久化；`AppSettings` 公开 API 不变。
-- **设置窗口底色必须显式**：内容 `#2B2C30`（深）/`#F2F2F6`（浅）、卡片 `#333438`/白、分隔线 `#3E3F44`/`#E3E3E8`，
+- **设置窗口底色必须显式**：内容 `#1F2024`（深）/`#F2F2F6`（浅）、卡片 `#26272B`/白、分隔线 `#303135`/`#E3E3E8`，
   不透明度 100%。不要依赖 `windowBackgroundColor`/系统材质（会被 Liquid Glass 环境按桌面/窗口激活态染色，
   导致「聚焦偏蓝、失焦中性」两种观感）；窗口 `isOpaque = true`、`backgroundColor` 同内容底色。
 

@@ -49,7 +49,7 @@ final class SettingsWindowController {
         // 设置窗口必须是「不透明中性灰」：不然 SwiftUI grouped Form 的玻璃底会跟随桌面/窗口振动，
         // 聚焦时被壁纸染成偏蓝，失去与系统设置一致的观感。
         window.isOpaque = true
-        window.backgroundColor = Theme.dynamicNSColor(dark: (0.169, 0.173, 0.188),
+        window.backgroundColor = Theme.dynamicNSColor(dark: (0.122, 0.125, 0.141),
                                                       light: (0.949, 0.949, 0.965))
         window.isRestorable = false
         window.tabbingMode = .disallowed

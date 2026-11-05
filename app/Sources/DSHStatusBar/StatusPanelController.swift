@@ -364,7 +364,8 @@ final class StatusPanelContentViewController: NSViewController {
                 // Liquid Glass 默认取色会随壁纸颜色过曝（深色模式下白字压不住高饱和背景）。
                 // 用系统窗口背景色做 tint：深色模式得到 Apple 原生 Control Center 那种
                 // 深色玻璃，浅色模式得到浅色磨砂，同时保留玻璃的模糊与折射。
-                glass.tintColor = .windowBackgroundColor
+                // 中性灰 tint：既有玻璃的模糊/折射，又不会像 windowBackgroundColor 那样压成近黑。
+                glass.tintColor = Theme.panelGlassTint
                 if #available(macOS 27.0, *) {
                     glass.effectIsInteractive = true
                 }

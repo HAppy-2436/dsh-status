@@ -51,10 +51,10 @@ final class CometAnimator {
 
         guard animate else { return }
 
-        // 旋转：顺时针，平均 3.0s/圈；速度做 ±32% 的平滑起伏（有节奏但不杂乱）
+        // 旋转：顺时针，平均 2.0s/圈；速度做 ±32% 的平滑起伏（有节奏但不杂乱）
         // 用数值采样生成关键帧，保证首尾正好整数圈、无缝循环。
         let cycle: Double = 6.0            // 一轮节奏 6s
-        let turns: Double = 2              // 6s 转 2 圈（平均 3s/圈）
+        let turns: Double = 3              // 6s 转 3 圈（平均 2s/圈）
         let samples = 48
         let dt = cycle / Double(samples)
         let totalAngle = turns * 2 * Double.pi

@@ -374,7 +374,10 @@ enum MenuBarIconRenderer {
 // MARK: - App 图标 / 弹窗图标（菜单栏同款鲸鱼，无底色）
 
 enum AppIconRenderer {
-    /// 透明底 + 白色鲸鱼（带极细深色描边，浅色背景也可见）。
+    /// App 图标的鲸鱼主色（#6485FC）。
+    static let brandColor = NSColor(hex: 0x6485FC)
+
+    /// 透明底 + 品牌蓝鲸鱼（轻微投影，深浅背景都可见）。
     /// 与菜单栏空闲态同一 glyph，不放圆角方块，避免和 DeepSeek Harness 官方图标混淆。
     static func image(size: CGFloat) -> NSImage {
         NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
@@ -390,12 +393,12 @@ enum AppIconRenderer {
 
             // 轻微投影：浅色背景上也能看清轮廓；不添加任何底色/描边
             let shadow = NSShadow()
-            shadow.shadowColor = NSColor.black.withAlphaComponent(0.30)
-            shadow.shadowBlurRadius = size * 0.035
-            shadow.shadowOffset = NSSize(width: 0, height: -size * 0.010)
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.26)
+            shadow.shadowBlurRadius = size * 0.030
+            shadow.shadowOffset = NSSize(width: 0, height: -size * 0.008)
             shadow.set()
 
-            NSColor.white.setFill()
+            brandColor.setFill()
             path.fill()
             return true
         }

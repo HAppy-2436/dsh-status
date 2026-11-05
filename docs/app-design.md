@@ -110,9 +110,23 @@
 - 空项目列表显示「暂无已知项目（连接 DSH 后出现）」。
 - 预览图：`docs/previews/settings-preview-dark.png`。
 
-## 4. 通知（最小实现）
+## 4. 通知
 
-- `UNUserNotificationCenter`：首次需要通知时请求权限；被拒绝则静默。
+### 4.0 系统权限（关键）
+
+- 通知权限**不能由 App 单方面决定**：被拒后 `requestAuthorization` 不会弹框，只会静默失败。
+  因此启动/打开面板时查询 `UNUserNotificationCenter.getNotificationSettings`：
+  - 未授权（notDetermined）：面板顶部提示「通知未开启，任务结束不会提醒 · 去开启」，点击后
+    `NSApp.activate` + `requestAuthorization`（避免 App 在后台时系统框被静默拒绝）；
+  - 已拒绝（denied）：提示变为「去开启」，点击打开系统设置「通知」面板；
+  - 已授权：面板正常，铃铛可切换待回答通知。
+- 设置页「通知」组顶部同样显示系统通知状态与操作按钮；发送通知不再依赖启动时的缓存
+  `authorized` 标志（权限可能在运行中被用户打开）。
+- App 已有 `.icns` 图标（构建时由鲸鱼设计生成），通知/系统设置里不再显示系统占位图标。
+
+### 4.1 行为
+
+- `UNUserNotificationCenter`：由用户点「允许通知」时才请求权限（前台弹框）；被拒绝时在面板/设置页给出入口。
 - 默认**只对「进入待回答」发通知**（title = 会话标题，body = 待回答摘要，点击 → 打开主页面）。
 - 已完成/已停止默认不发；待回答通知 30s 内同会话去重。
 - 通知点击：`open "dsh://open"`。

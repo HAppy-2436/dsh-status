@@ -7,9 +7,12 @@ final class AppModel: ObservableObject {
     @Published private(set) var state: BridgeState = .empty
     @Published private(set) var connected: Bool = false
     @Published private(set) var lastUpdate: Date?
+    @Published private(set) var notificationPermission: NotificationPermission = .unknown
 
     /// 状态跃迁：某会话进入新状态（用于通知；首帧基线不触发）。
     var onStatusTransition: ((SessionRow, SessionStatus) -> Void)?
+    var onRequestNotificationPermission: (() -> Void)?
+    var onOpenNotificationSettings: (() -> Void)?
     var onOpenSettings: (() -> Void)?
 
     var onOpenSession: ((String) -> Void)?
@@ -27,6 +30,10 @@ final class AppModel: ObservableObject {
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.objectWillChange.send() }
             }
+    }
+
+    func setNotificationPermission(_ permission: NotificationPermission) {
+        notificationPermission = permission
     }
 
     var iconModel: IconModel {

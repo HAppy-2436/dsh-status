@@ -14,6 +14,10 @@ struct StatusPanelView: View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.6)
+            if showsNotificationHint {
+                notificationHint
+                Divider().opacity(0.6)
+            }
             content
             Divider().opacity(0.6)
             footer
@@ -43,6 +47,44 @@ struct StatusPanelView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 40)
+    }
+
+    /// 通知未授权/被系统关闭时，在面板顶部给一条可操作的提示。
+    private var showsNotificationHint: Bool {
+        guard model.connected else { return false }
+        return model.notificationPermission == .denied
+            || model.notificationPermission == .notDetermined
+    }
+
+    private var notificationHint: some View {
+        Button {
+            if model.notificationPermission == .notDetermined {
+                model.onRequestNotificationPermission?()
+            } else {
+                model.onOpenNotificationSettings?()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "bell.slash")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.statusColor(.waiting, scheme: colorScheme))
+                Text("通知未开启，任务结束不会提醒")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                Text("去开启")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 内容
@@ -170,9 +212,20 @@ struct StatusPanelView: View {
 
             Spacer()
 
-            iconButton(systemName: model.settings.notifyWaiting ? "bell" : "bell.slash",
-                       help: "待回答通知（更多设置见设置页）") {
-                model.settings.notifyWaiting.toggle()
+            if model.notificationPermission == .authorized {
+                iconButton(systemName: model.settings.notifyWaiting ? "bell" : "bell.slash",
+                           help: "待回答通知（更多设置见设置页）") {
+                    model.settings.notifyWaiting.toggle()
+                }
+            } else {
+                iconButton(systemName: "bell.slash",
+                           help: "通知未开启，点此前往系统设置") {
+                    if model.notificationPermission == .notDetermined {
+                        model.onRequestNotificationPermission?()
+                    } else {
+                        model.onOpenNotificationSettings?()
+                    }
+                }
             }
             iconButton(systemName: "power", help: "退出") {
                 model.onQuit?()

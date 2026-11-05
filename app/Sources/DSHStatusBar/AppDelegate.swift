@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -42,11 +43,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         model.onOpenSettings = { [weak self] in
             self?.panelController.close()
+            self?.notifications.refreshPermission()
             self?.settingsWindow.show()
         }
 
         statusItemController = StatusItemController(model: model)
-        statusItemController.onTogglePopover = { [weak self] in self?.panelController.toggle() }
+        statusItemController.onTogglePopover = { [weak self] in
+            self?.notifications.refreshPermission()
+            self?.panelController.toggle()
+        }
         statusItemController.onOpenDSH = { [weak self] in self?.openDSH() }
         statusItemController.onQuit = { [weak self] in self?.confirmQuit() }
         statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
@@ -64,10 +69,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
 
         notifications.setup()
+        notifications.onPermissionChanged = { [weak self] permission in
+            guard let self else { return }
+            self.model.setNotificationPermission(permission)
+        }
         notifications.onClick = { [weak self] sessionId in
             guard let self else { return }
             if let sessionId { self.bridge.sendOpenSession(sessionId) }
             self.openDSH()
+        }
+        model.onRequestNotificationPermission = { [weak self] in
+            self?.panelController.close()
+            self?.notifications.requestPermission()
+        }
+        model.onOpenNotificationSettings = { [weak self] in
+            self?.panelController.close()
+            self?.notifications.openSystemSettings()
         }
 
         bridge = BridgeClient(bridgeFile: AppConfig.bridgeFile)
@@ -93,6 +110,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
                 self?.panelController.show()
             }
+        }
+        if CommandLine.arguments.contains("--test-notify") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                let content = UNMutableNotificationContent()
+                content.title = "DSH Status 测试通知"
+                content.body = "通知链路正常：任务完成时会这样提醒你。"
+                content.sound = .default
+                UNUserNotificationCenter.current().add(
+                    UNNotificationRequest(identifier: "test-\(UUID().uuidString)",
+                                         content: content, trigger: nil)
+                )
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { NSApp.terminate(nil) }
         }
         if CommandLine.arguments.contains("--preview-quit-confirm") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in

@@ -466,7 +466,27 @@ struct SettingsView: View {
 
     private var notificationSettings: some View {
         SettingsGroup("通知",
-                      footnote: "点击通知会打开 DSH 主页面；同会话 30 秒内不重复。") {
+                      footnote: "点击通知会打开对应会话；同会话 30 秒内不重复。") {
+            SettingsMenuRow(
+                symbol: notificationSymbol,
+                tint: notificationTint,
+                title: "系统通知",
+                subtitle: notificationSubtitle,
+                showDivider: true
+            ) {
+                switch model.notificationPermission {
+                case .authorized:
+                    Text("已开启").font(.system(size: 11)).foregroundStyle(.secondary)
+                case .denied:
+                    Button("打开系统设置") { model.onOpenNotificationSettings?() }
+                        .controlSize(.small)
+                case .notDetermined:
+                    Button("允许通知") { model.onRequestNotificationPermission?() }
+                        .controlSize(.small)
+                case .unknown:
+                    EmptyView()
+                }
+            }
             SettingsToggleRow(
                 symbol: "bell.badge.fill",
                 tint: Theme.statusColor(.waiting, scheme: colorScheme),
@@ -507,6 +527,31 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 18)
         .frame(height: 44)
+    }
+
+    private var notificationSymbol: String {
+        switch model.notificationPermission {
+        case .authorized: return "bell.badge.fill"
+        case .denied: return "bell.slash.fill"
+        case .notDetermined, .unknown: return "bell.badge.fill"
+        }
+    }
+
+    private var notificationTint: Color {
+        switch model.notificationPermission {
+        case .authorized: return Theme.statusColor(.completed, scheme: colorScheme)
+        case .denied: return Theme.statusColor(.stopped, scheme: colorScheme)
+        case .notDetermined, .unknown: return Theme.statusColor(.waiting, scheme: colorScheme)
+        }
+    }
+
+    private var notificationSubtitle: String {
+        switch model.notificationPermission {
+        case .authorized: return "系统通知已开启"
+        case .denied: return "被系统关闭，不会弹出任何提醒"
+        case .notDetermined: return "尚未授权"
+        case .unknown: return "状态未知"
+        }
     }
 
     // MARK: 数据与绑定

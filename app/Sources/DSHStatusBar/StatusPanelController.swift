@@ -139,6 +139,7 @@ final class StatusPanelController: NSObject {
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         ) { [weak self] event in
             guard let self else { return }
+            if self.isMenuBarPoint(NSEvent.mouseLocation) { return }
             if event.window != self.panel { self.close() }
         }
         localMonitor = NSEvent.addLocalMonitorForEvents(
@@ -158,12 +159,23 @@ final class StatusPanelController: NSObject {
             guard let self, self.panel.isVisible else { return event }
             if event.window === self.panel { return event }
             if event.window === self.statusItem.button?.window { return event }
-            if NSMouseInRect(NSEvent.mouseLocation, self.anchorScreenRect.insetBy(dx: -6, dy: -6), false) {
+            let location = NSEvent.mouseLocation
+            if self.isMenuBarPoint(location) { return event }
+            if NSMouseInRect(location, self.anchorScreenRect.insetBy(dx: -8, dy: -8), false) {
                 return event
             }
             self.close()
             return event
         }
+    }
+
+    /// 状态项位于菜单栏；真实鼠标点击的 mousedown 可能没有 window，必须按菜单栏区域放过，
+    /// 否则监听到 mousedown 先 close、mouseup 的 button action 又 toggle 成 show → 闪一下。
+    private func isMenuBarPoint(_ point: NSPoint) -> Bool {
+        for screen in NSScreen.screens where screen.frame.contains(point) {
+            return point.y >= screen.visibleFrame.maxY - 0.5
+        }
+        return false
     }
 
     private func removeEventMonitors() {

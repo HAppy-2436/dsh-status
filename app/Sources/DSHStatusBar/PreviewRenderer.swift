@@ -330,7 +330,7 @@ enum PreviewRenderer {
             rect.fill()
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("click 会话行跳转 · 待回答黄色 · 运行中蓝色 · 已完成绿色 · 已停止红色",
+            drawText("click 会话行跳转 · 子智能体缩进显示（不计入统计）",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

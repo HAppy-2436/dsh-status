@@ -65,6 +65,17 @@ final class AppModel: ObservableObject {
 
     var attendingCount: Int { state.counts.attention }
 
+    /// 某个父会话下的子智能体（已按状态过滤，按更新时间倒序）。
+    func subagents(for parentId: String) -> [SubagentRow] {
+        state.subagentRows
+            .filter { $0.parentId == parentId && settings.shows($0.statusKind) }
+            .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
+    }
+
+    func hasSubagents(_ parentId: String) -> Bool {
+        !subagents(for: parentId).isEmpty
+    }
+
     func apply(state: BridgeState) {
         let rows = state.sessions
         var next: [String: String] = [:]
@@ -161,7 +172,15 @@ enum DemoState {
             dsh: DSHInfo(pid: 12345, version: "0.2.1-rc.5"),
             client: ClientInfo(connected: true, lastPushAt: Date().timeIntervalSince1970 * 1000),
             counts: Counts(waiting: 1, running: 2, completed: 1, stopped: 1, attention: 3),
-            sessions: rows
+            sessions: rows,
+            subagents: [
+                SubagentRow(id: "sub-1", parentId: "session-dsh", title: "你是 A（设计系统与一级页面）",
+                            status: "running", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 20_000),
+                SubagentRow(id: "sub-2", parentId: "session-dsh", title: "谱面导入与叠印实现",
+                            status: "completed", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 120_000),
+                SubagentRow(id: "sub-3", parentId: "session-stability", title: "你是 B（录音/分析中/结果页）",
+                            status: "running", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 40_000),
+            ]
         )
     }()
 
@@ -171,6 +190,7 @@ enum DemoState {
         dsh: DSHInfo(pid: 12345, version: "0.2.1-rc.5"),
         client: ClientInfo(connected: true, lastPushAt: Date().timeIntervalSince1970 * 1000),
         counts: Counts(waiting: 0, running: 0, completed: 0, stopped: 0, attention: 0),
-        sessions: []
+        sessions: [],
+        subagents: []
     )
 }

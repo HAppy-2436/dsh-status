@@ -124,6 +124,10 @@ struct StatusPanelView: View {
             ForEach(rows) { row in
                 SessionRowView(row: row,
                                onOpen: { model.onOpenSession?(row.id) })
+                ForEach(model.subagents(for: row.id)) { sub in
+                    SubagentRowView(subagent: sub,
+                                    onOpen: { model.onOpenSession?(row.id) })
+                }
             }
         }
     }
@@ -153,9 +157,12 @@ struct StatusPanelView: View {
 
     private var contentHeight: CGFloat {
         let rows = model.sections.reduce(0) { $0 + $1.rows.count }
+        let subRows = model.sections.reduce(0) { total, section in
+            total + section.rows.reduce(0) { $0 + model.subagents(for: $1.id).count }
+        }
         let sections = model.sections.count
-        let height = CGFloat(rows) * 44 + CGFloat(sections) * 30 + 52
-        return min(max(height, 96), 480)
+        let height = CGFloat(rows) * 44 + CGFloat(subRows) * 22 + CGFloat(sections) * 30 + 52
+        return min(max(height, 96), 520)
     }
 
     // MARK: 空 / 未连接
@@ -245,6 +252,42 @@ struct StatusPanelView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+}
+
+// MARK: - 子智能体行
+
+private struct SubagentRowView: View {
+    let subagent: SubagentRow
+    let onOpen: () -> Void
+    @State private var hovering = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Theme.statusColor(subagent.statusKind, scheme: colorScheme).opacity(0.85))
+                    .frame(width: 5, height: 5)
+                Text(subagent.displayTitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 40)
+            .padding(.trailing, 8)
+            .frame(height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("子智能体 · 点击打开所属会话")
     }
 }
 

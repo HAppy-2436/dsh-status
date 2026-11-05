@@ -43,9 +43,25 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
     "stopped": 0,      // 已停止（未读）
     "attention": 2     // waiting + completed + stopped（菜单栏角标数字）
   },
-  "sessions": [ SessionRow, ... ]          // 只含非空闲会话
+  "sessions": [ SessionRow, ... ],         // 只含非空闲的**顶层**会话
+  "subagents": [ SubagentRow, ... ]        // 子智能体会话：仅用于面板展示，不计入 counts
 }
 ```
+
+### SubagentRow
+
+```jsonc
+{
+  "id": "242a87ce-...",
+  "parentId": "session-b99ab867-...",       // 所属顶层会话
+  "title": "你是 A（设计系统与一级页面）",
+  "status": "running",                     // 同 SessionRow.status
+  "pending": null,
+  "updatedAt": 1762324799000
+}
+```
+
+> 子智能体不参与 `counts` / 菜单栏图标 / 通知；面板里缩进显示在父会话下方，点击打开父会话。
 
 ### SessionRow
 

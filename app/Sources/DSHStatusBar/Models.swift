@@ -20,6 +20,10 @@ struct BridgeState: Codable, Equatable {
     let client: ClientInfo?
     let counts: Counts
     let sessions: [SessionRow]
+    /// 子智能体会话：只用于面板展示，不计入 counts / 图标 / 通知。
+    let subagents: [SubagentRow]?
+
+    var subagentRows: [SubagentRow] { subagents ?? [] }
 
     static let empty = BridgeState(
         version: 1,
@@ -27,7 +31,8 @@ struct BridgeState: Codable, Equatable {
         dsh: nil,
         client: nil,
         counts: Counts(waiting: 0, running: 0, completed: 0, stopped: 0, attention: 0),
-        sessions: []
+        sessions: [],
+        subagents: []
     )
 }
 
@@ -116,6 +121,22 @@ struct SessionRow: Codable, Equatable, Identifiable {
         case "question": return "等待回答问题"
         default: return "等待你的回复"
         }
+    }
+}
+
+/// 子智能体会话（挂在父会话下，用于面板展示）。
+struct SubagentRow: Codable, Equatable, Identifiable {
+    let id: String
+    let parentId: String?
+    let title: String?
+    let status: String
+    let pending: PendingInfo?
+    let updatedAt: Double?
+
+    var statusKind: SessionStatus { SessionStatus(rawValue: status) ?? .idle }
+    var displayTitle: String {
+        if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
+        return "子智能体"
     }
 }
 

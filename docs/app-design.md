@@ -73,6 +73,8 @@
   - 会话行：左侧 24pt SF Symbol（`questionmark.circle` / `play.circle` / `checkmark.circle` /
     `stop.circle`，对应状态色），标题 `.headline`、副标题 `.caption` secondary，右侧
     `chevron.right` tertiary；hover 8pt 圆角浅底；点击整行跳转。
+  - **子智能体**：缩进 40pt、11.5pt secondary、前置 5pt 状态色圆点、行高 22；点击打开其父会话；
+    不计入分组计数、图标与通知。
   - 颜色收敛到行首小图标上（Status Trio 做法），不再有彩色圆点/红色底。
 - 尾部「打开 DSH」行（`arrow.up.forward.app` + chevron）。
 - 空状态：鲸鱼 +「全部空闲 / 没有需要关注的会话」。

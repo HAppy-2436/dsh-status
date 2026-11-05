@@ -111,6 +111,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.panelController.show()
             }
         }
+        if CommandLine.arguments.contains("--request-notify") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.notifications.requestPermission()
+            }
+        }
         if CommandLine.arguments.contains("--test-notify") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 let content = UNMutableNotificationContent()

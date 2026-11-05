@@ -107,9 +107,28 @@ final class AppSettings: ObservableObject {
         didSet { save("panelBackgroundStyle", panelBackgroundStyle.rawValue) }
     }
 
+    private static let legacyDefaultsDomain = "com.liyitong.dsh-status"
+
+    /// 首次以新 bundle id 启动时，把旧域的设置搬过来（通知图标缓存按 bundle id 绑定，
+    /// 换 id 才能让系统重新解析通知图标）。
+    private static func migrateLegacyDefaultsIfNeeded(into defaults: UserDefaults) {
+        guard let bundleId = Bundle.main.bundleIdentifier,
+              bundleId == "com.liyitong.dshstatus" else { return }
+        guard defaults.object(forKey: "dshStatus.centerNumberMode") == nil,
+              let legacy = UserDefaults(suiteName: legacyDefaultsDomain) else { return }
+        for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "segmentCap",
+                    "notifyWaiting", "notifyCompleted", "notifyStopped", "confirmBeforeQuit",
+                    "panelBackgroundStyle"] {
+            if let value = legacy.object(forKey: "dshStatus.\(key)") {
+                defaults.set(value, forKey: "dshStatus.\(key)")
+            }
+        }
+    }
+
     init(persist: Bool = true, defaults: UserDefaults = .standard) {
         self.persist = persist
         self.defaults = persist ? defaults : nil
+        if persist { AppSettings.migrateLegacyDefaultsIfNeeded(into: defaults) }
         let storedStatuses = defaults.stringArray(forKey: "dshStatus.visibleStatuses")
         let statuses = storedStatuses?.compactMap { SessionStatus(rawValue: $0) } ?? []
         visibleStatuses = Set(statuses.isEmpty ? SessionStatus.allCases.filter { $0 != .idle } : statuses)

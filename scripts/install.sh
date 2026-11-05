@@ -8,7 +8,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_SRC="$ROOT/dist/DSHStatusBar.app"
-APP_DST="$HOME/Applications/DSHStatusBar.app"
+APP_DST="$HOME/Applications/DSH Status.app"
 
 echo "==> 构建 App"
 bash "$ROOT/scripts/build-app.sh"
@@ -17,7 +17,7 @@ echo "==> 安装到 $APP_DST"
 mkdir -p "$HOME/Applications"
 if [[ -d "$APP_DST" ]]; then
   # 已运行的旧实例先退出，避免覆盖运行中的二进制
-  pkill -f "DSHStatusBar.app/Contents/MacOS/DSHStatusBar" 2>/dev/null || true
+  pkill -f "Contents/MacOS/DSHStatusBar" 2>/dev/null || true
   rm -rf "$APP_DST"
 fi
 cp -R "$APP_SRC" "$APP_DST"
@@ -38,7 +38,7 @@ cat <<EOF
 
 插件激活后会：
   - 写 ~/.dsh-status/bridge.json
-  - 自动拉起 ~/Applications/DSHStatusBar.app（若存在）
+  - 自动拉起 ~/Applications/DSH Status.app（若存在）
   - 菜单栏出现 DSH 图标；首次待回答消息会请求通知权限
 
 只想先看界面效果（不装插件）：

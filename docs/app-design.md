@@ -122,8 +122,11 @@
   - 已授权：面板正常，铃铛可切换待回答通知。
 - 设置页「通知」组顶部同样显示系统通知状态与操作按钮；发送通知不再依赖启动时的缓存
   `authorized` 标志（权限可能在运行中被用户打开）。
-- Bundle ID 为 `com.liyitong.dshstatus`；旧域 `com.liyitong.dsh-status` 的 UserDefaults 在首次启动时自动迁移
-  （通知图标的解析结果按 bundle id 缓存，换 id 是修复「通知横幅显示占位图标」的唯一非 TCC 手段）。
+- 安装位置 `~/Applications/DSH Status.app`，Bundle ID `com.liyitong.dshstatus.menubar`；
+  历史设置域（`com.liyitong.dsh-status` / `.dshstatus` / `.dshstatus.app` / `.dshstatus.path`）首次启动自动迁移。
+- **通知图标缓存（重要）**：macOS 按「App 身份（bundle id + .app 路径）」缓存通知横幅里的图标，
+  改了图标/颜色但身份不变时会一直显示旧图标，重启/重装/`killall usernoted` 都无效（缓存库受 TCC 保护）。
+  需要刷新时：换新 bundle id **并且**换 .app 路径，再重新授权通知。
 - App 图标使用与菜单栏空闲态同款的鲸鱼 glyph：**透明底、无圆角方块、主色 `#416EFB`**
   （构建时由 `WhaleLogo` 生成 `.icns`），与宿主 DeepSeek Harness 的官方图标区分开；退出确认弹窗也用同一 glyph。
 

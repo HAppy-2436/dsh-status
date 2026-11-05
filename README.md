@@ -5,7 +5,8 @@
 
 ## 当前状态（2026-11-03）
 
-- **Bundle ID**：`com.liyitong.dshstatus`（旧域 `com.liyitong.dsh-status` 的设置会在首次启动时自动迁移）
+- **安装位置 / Bundle ID**：`~/Applications/DSH Status.app`，`com.liyitong.dshstatus.menubar`
+  （更早版本的设置域会在首次启动时自动迁移）
 - **App 图标**：与菜单栏空闲态同款的鲸鱼 glyph，**透明底、无圆角方块、主色 `#416EFB`**
   （构建时由 `WhaleLogo` 生成 `.icns`），避免和 DeepSeek Harness 官方图标混淆
 - **P0 已完成**：Swift 菜单栏 App 可用——**鲸鱼 + 分段圆环图标**（空闲=纯白鲸鱼；非空闲=按任务数等分、

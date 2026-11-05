@@ -15,7 +15,7 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
   "token": "64 位 hex 随机串",
   "pid": 12345,
   "startedAt": 1762324800000,
-  "appPath": "/Users/x/Applications/DSHStatusBar.app"
+  "appPath": "/Users/x/Applications/DSH Status.app"
 }
 ```
 
@@ -153,7 +153,7 @@ Client 行为要求：
 - 状态变化时向所有 SSE 客户端广播完整 `BridgeState`（无需增量）。
 - 卸载时：清理路由、关闭 SSE、删除 `bridge.json`（尽力而为）。
 - 可选：`config.appPath` 指向 `DSHStatusBar.app`，激活时若 App 未运行则 `spawn` 拉起；默认
-  `~/Applications/DSHStatusBar.app`。
+  `~/Applications/DSH Status.app`。
 
 ## 5. App 实现要点
 

@@ -107,21 +107,28 @@ final class AppSettings: ObservableObject {
         didSet { save("panelBackgroundStyle", panelBackgroundStyle.rawValue) }
     }
 
-    private static let legacyDefaultsDomain = "com.liyitong.dsh-status"
+    private static let legacyDefaultsDomains = [
+        "com.liyitong.dshstatus", "com.liyitong.dshstatus.app",
+        "com.liyitong.dshstatus.path", "com.liyitong.dsh-status"
+    ]
 
     /// 首次以新 bundle id 启动时，把旧域的设置搬过来（通知图标缓存按 bundle id 绑定，
     /// 换 id 才能让系统重新解析通知图标）。
     private static func migrateLegacyDefaultsIfNeeded(into defaults: UserDefaults) {
+        guard defaults.object(forKey: "dshStatus.centerNumberMode") == nil else { return }
         guard let bundleId = Bundle.main.bundleIdentifier,
-              bundleId == "com.liyitong.dshstatus" else { return }
-        guard defaults.object(forKey: "dshStatus.centerNumberMode") == nil,
-              let legacy = UserDefaults(suiteName: legacyDefaultsDomain) else { return }
-        for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "segmentCap",
-                    "notifyWaiting", "notifyCompleted", "notifyStopped", "confirmBeforeQuit",
-                    "panelBackgroundStyle"] {
-            if let value = legacy.object(forKey: "dshStatus.\(key)") {
-                defaults.set(value, forKey: "dshStatus.\(key)")
+              !legacyDefaultsDomains.contains(bundleId) else { return }
+        for domain in legacyDefaultsDomains {
+            guard let legacy = UserDefaults(suiteName: domain),
+                  legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
+            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "segmentCap",
+                        "notifyWaiting", "notifyCompleted", "notifyStopped", "confirmBeforeQuit",
+                        "panelBackgroundStyle"] {
+                if let value = legacy.object(forKey: "dshStatus.\(key)") {
+                    defaults.set(value, forKey: "dshStatus.\(key)")
+                }
             }
+            return
         }
     }
 

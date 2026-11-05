@@ -1,8 +1,10 @@
-# App 设计规范（v5 · 鲸鱼 + 单色优先级环）
+# App 设计规范（v6 · 原生 macOS 26/27 视觉）
 
-> 实现进度（2026-11-03）：**P0 已实现**（`app/`），预览见 `docs/previews/`。
-> v5 变更：外环始终是一整圈**单色**，颜色 = 当前最高优先级待办（红 > 黄 > 绿）；
-> 运行中用内层中性色动态弧；数字语义可配置。完全空闲仍显示 DeepSeek 鲸鱼 Logo。
+> 实现进度（2026-11-05）：**P0 可用，P1 插件已接通**（`app/`），预览见 `docs/previews/`。
+> v6 变更：按 macOS 26/27（Liquid Glass）原生规范重做**弹出面板**与**设置窗口**；
+> 图标系统保持 v5（鲸鱼 + 单色优先级环 + 运行中彗星弧）。
+> 依据：本机原生 UI 实测 [docs/research/macos-ui-conventions.md](research/macos-ui-conventions.md)、
+> 设计契约 [docs/ui-redesign-spec.md](ui-redesign-spec.md)；图标建议见 [docs/icon-suggestions.md](icon-suggestions.md)。
 > Logo 资源取自 DSH 前端 `FISH_LOGO_PATH`（viewBox 23.16×17.04）。
 
 面向 `app/` 的 Swift 菜单栏 App。图标设计是重点，需产出可评审的预览图。
@@ -14,8 +16,11 @@
 - 面板里点击会话行 → 跳转到 DSH 对应会话（发命令 + `open "dsh://open"`）。
 - 不显示空闲会话；显示 待回答 / 运行中 / 已完成 / 已停止 四类。
 - **子智能体会话不计入统计**（`origin === 'subagent'` 或带父会话），也不发通知。
+- **HIG 例外说明**：HIG 建议菜单栏 extra 默认弹出 menu 而非 popover；本 App 面板承载
+  「会话列表 + 行内操作 + 连接状态」，属于 "too complex for a menu" 的例外，因此保留自定义面板，
+  同时**保留右键原生菜单**（打开 DSH / 设置… / 退出）作为兜底入口。
 
-## 2. 菜单栏图标（鲸鱼 + 单色优先级环）
+## 2. 菜单栏图标（鲸鱼 + 单色优先级环，v5 不变）
 
 ### 2.1 设计原则
 
@@ -28,7 +33,7 @@
 | 情况 | 外环 | 内层 | 中心数字 |
 | --- | --- | --- | --- |
 | 完全空闲 | 无（显示鲸鱼 Logo） | — | — |
-| 只有运行中 | 无 | 外环大小的动态弧（300°） | 运行数 |
+| 只有运行中 | 无 | 外环大小的动态弧 | 运行数 |
 | 有已停止 | **红**（最高优先级） | 有运行时为内层动态弧 | 见设置 |
 | 有待回答 | **黄**（高于绿） | 同上 | 见设置 |
 | 只有已完成 | **绿** | 同上 | 见设置 |
@@ -41,86 +46,116 @@
   - 与环颜色一致的数量：只数当前环色对应状态；
   - 不显示。
 - 内外环同时存在时不显示数字（22pt 放不下第三层）。
-- 运行中动画（呼吸式）：**12fps**、顺时针；旋转 2.4s/圈，彗星弧弧长 **85°–215°** 以 **4.8s** 周期呼吸，
-  转速叠加 ±18% 节奏（伸长期略快、收缩期略慢）。
-- **性能**：整轮动画（4.8s）会**预渲染成帧序列**（约 58 帧、<500KB），定时器每帧只做一次图片切换，
-  不再逐帧重绘文字与整圈；实测常驻 CPU ≈ **2.3%**（单核占比），无运行中任务时为 **0%**。
-  同时尊重「减弱动态效果」、低电量模式（自动停）、设置项可彻底关闭。
-- 动态弧统一为 **淡色整环（轨道，白/黑 16%）+ 亮色彗星弧**：
-  - 轨道始终同心，解决「单段弧视觉重心偏离圆心」的问题；
-  - 亮弧在轨道上旋转 + 弧长呼吸（85°–215°）；
-  - 双层环时轨道在内圈（半径 4.95），只有运行中时轨道在外圈（半径 7.9）。
 
-## 2.4 资源
+### 2.3 动画（Core Animation，GPU）
+
+- **运行中彗星弧**：`CAShapeLayer` + `CAKeyframeAnimation`，顺时针；
+  6s 一个节奏周期转 3 圈（平均 2s/圈），速度按正弦 ±32% 平滑起伏（48 个采样关键帧，首尾整数圈无缝）；
+  弧长 `strokeEnd` 0.26 ⇄ 0.58、1.7s 单程呼吸。
+- 静态部分（外环 / 轨道 / 数字 / 鲸鱼）继续走 `button.image`，切换桌面/菜单栏重建时系统总有正确静态帧，
+  不会闪黑块；动画只加在图层上，由 GPU 驱动，实测常驻 CPU 0.0%。
+- **状态切换过渡**（可关）：外环颜色/有无变化时，隐藏外环的静态图打底 → `CAShapeLayer` 用新颜色扫一圈
+  （strokeEnd 0→1，0.45s）→ 颜色渐变 → 恢复完整静态图；过渡期间暂停彗星弧（0.75s 兜底）。
+- 尊重「减弱动态效果」与低电量模式（自动降级静态）；设置页「播放运行动画」可彻底关闭。
+
+### 2.4 资源
 
 - 鲸鱼矢量路径来自 DSH 前端 `FISH_LOGO_PATH`（`WhaleLogo.swift` 内置 path 与 M/C/L/Z 解析器），
-  不依赖外部图片，任何分辨率都清晰。
-- 面板 header 复用同一鲸鱼路径（模板图片，随主题着色）。
+  不依赖外部图片，任何分辨率都清晰；面板 header / 空态复用同一路径（模板图片，随主题着色）。
 
-## 3. 面板（自定义 NSPanel，参考 Status Trio）
+## 3. 弹出面板（自定义 NSPanel，原生 popover 观感）
+
+### 3.1 窗口与材质
 
 - 不用 `NSPopover`：无边框 `NSPanel`（`.borderless + .nonactivatingPanel`），**没有 popover 箭头**，
-  `.statusBar` 层级、跨 Space、不抢焦点；16→20pt continuous 圆角。
-- 材质（设置页「面板背景」可切换，默认液态玻璃）：
-  - macOS 26+ `NSGlassEffectView`（style `.regular`，`effectIsInteractive`）；
-  - 旧系统 `NSVisualEffectView(.popover)` 经典磨砂；
+  `.statusBar` 层级、跨 Space、不抢焦点；**20pt continuous 圆角**、系统窗口阴影。
+- 材质（设置页「面板背景」可切，默认液态玻璃）：
+  - macOS 26+：`NSGlassEffectView(style: .regular)`，`cornerRadius = 20`；
+    **`tintColor = .windowBackgroundColor`**——默认玻璃会随高饱和壁纸过曝（深色模式白字压不住），
+    用系统窗口背景色做 tint 后得到原生 Control Center 那种深色玻璃，浅色模式自动变浅色磨砂；
+  - 旧系统：`NSVisualEffectView(.popover)` 经典磨砂；
   - 显式选「实色」或系统开启「降低透明度」时用不透明填充。
-  - 跟随系统深浅色与壁纸；打开时 `makeKey()` 让内容按 active 渲染（状态色不被去饱和）。
-- 定位：状态项下方 6pt，按屏幕可见区域夹取；0.08s 淡入（Reduce Motion 时直接显示）。
-- 关闭：再次点击状态项、点击面板外（含 DSH 主窗口等本应用窗口）、Esc。
-- 宽 330pt、14pt 边距；内容 SwiftUI（`NSHostingController`），背景透明由面板提供材质；
-  离屏预览时退回实色。
-- header：鲸鱼 +「DSH 会话」headline + 右侧连接小点/「实时 / 未连接」。
-- 分组（有内容才显示）：待回答（黄）、运行中（蓝）、已完成（绿）、已停止（红）。
-  - 分组标题：`待回答 · 1`，11.5pt semibold secondary，无彩色圆点。
-  - 会话行：左侧 24pt SF Symbol（`questionmark.circle` / `play.circle` / `checkmark.circle` /
-    `stop.circle`，对应状态色），标题 `.headline`、副标题 `.caption` secondary，右侧
-    `chevron.right` tertiary；hover 8pt 圆角浅底；点击整行跳转。
-  - **子智能体**：缩进 40pt、11.5pt secondary、前置 5pt 状态色圆点、行高 22；点击打开其父会话；
-    不计入分组计数、图标与通知。
-  - 颜色收敛到行首小图标上（Status Trio 做法），不再有彩色圆点/红色底。
-- 尾部「打开 DSH」行（`arrow.up.forward.app` + chevron）。
-- 空状态：鲸鱼 +「全部空闲 / 没有需要关注的会话」。
-- 未连接：exclamationmark.circle +「DSH 未连接」+ 说明 +「打开 DSH」按钮。
-- footer（高 40）：左「⚙ 设置…」，右 bell（待回答通知）与 power（退出）；退出走二次确认。
+- 定位：状态项下方 **6pt**，按屏幕可见区域夹取（左右/底部 8pt）；宽度固定 **320pt**。
+- 出现：**0.16s ease-out 淡入**（Reduce Motion 时直接显示）；关闭立即。
+- 面板展示期间状态项图标显示**高亮胶囊**（与原生菜单栏项一致）。
+- 关闭：再次点击状态项、点击面板外（含本 App 其它窗口）、Esc。
 
-## 2.6 视觉规范
+### 3.2 结构（自上而下）
 
-- **材质**：面板用系统 Liquid Glass / 经典磨砂 / 实色（设置项），文字层级走系统语义色；
-  颜色只用于小面积（分段环、行首 SF Symbol、连接点）。
-- **圆角**：面板 20pt、设置卡片 10pt、行 8pt、图标容器 6.5pt（26pt 方块）。
-- **配色**：`Theme.swift` 统一系统强调色——待回答 `#F2B900`、运行中 `#0A84FF`、
-  已完成 `#34C759`、已停止系统红；未连接中性灰。
-- **分隔线**：1px、约 7% 前景色；hover 仅 4–6% 前景色。
-- **图标**：外环一个任务一段、等分、圆头端点 + 段间缺口；**段长 ≤ 26° 时改画圆点**（约 8 个任务起全是点）；
-  动态弧圆头端点；未连接为灰色虚线环 + 短横。
-- 说明：22pt 尺寸下黄/绿/红色相渐变会发脏（互补色混合），因此**不做色相渐变**，也不用同色合并。
+```
+┌ header 40 ────────────────────────────────┐  鲸鱼 13pt secondary + 「DSH 会话」13pt semibold
+│                                           │  右侧：6pt 连接圆点（systemGreen / tertiary）+ 「实时/未连接」11pt secondary
+├ 通知提示 32（仅未授权时）─────────────────┤  bell.slash(12, systemYellow) + 11pt secondary 文案 + 「去开启」+ chevron
+├ 内容（滚动，最大 480，随屏幕收缩）────────┤
+│  运行中 · 1                               │  分组标题 11pt semibold secondary，leading 6，高 26
+│  ▸ 会话行（44）                           │  16pt filled 状态 glyph（系统状态色）+ 13pt semibold 标题
+│    ◦ 子智能体行（24）                      │  + 11pt secondary 副标题 + 9pt chevron
+│  ── 分隔线（左右内缩 6，视觉 12）──        │
+│  打开 DSH（40）                           │  15pt secondary arrow.up.forward.app + 13pt regular 标题；无 chevron
+├ footer 38 ────────────────────────────────┤  左：gearshape 11 + 「设置…」12pt secondary
+└───────────────────────────────────────────┘  右：bell / power 13pt 图标按钮（24×24 命中区）
+```
 
-## 3.1 设置页（NSWindow + SwiftUI）
+- 会话行 leading 状态色只用系统调色板：待回答 `systemYellow`、运行中 `systemBlue`、
+  已完成 `systemGreen`、已停止 `systemRed`；未连接/不可用用 `secondaryLabelColor`。
+- hover：仅整行底色（主文字色 8%/6%，6pt continuous 圆角，0.08s），不改变文字颜色。
+- 子智能体：缩进 38pt、11pt secondary、4pt 状态色圆点、行高 24；点击打开父会话；不计入分组计数。
+- 空状态（高 132）：鲸鱼 24pt tertiary +「全部空闲」13 semibold +「没有需要关注的会话」11 secondary。
+- 未连接（高 148）：`exclamationmark.circle` 16 secondary +「DSH 未连接」13 semibold + 说明 + 原生 bordered 小按钮。
+- 分组之间与动作行前为发丝分隔线（`separatorColor`），左右内缩 12pt（视觉）。
 
-- 入口：面板 footer 齿轮按钮 / 右键菜单「设置…」（⌘,）。
-- 窗口 470×780 固定大小，可滚动分组内容 + 固定底栏（恢复默认 / 「退出前确认」checkbox / 版本与连接状态）。
-- 视觉参考 macOS 系统设置 / Status Trio：分组标题 11.5pt semibold secondary；卡片 `controlBackgroundColor`、
-  10pt continuous 圆角、7% 前景色描边；行内左侧 26pt 渐变圆角图标（白色 SF Symbol）+ 标题/副标题 + 控件；
-  行间分隔线从图标列之后开始。
-- 设置项（全部即时生效并持久化到 UserDefaults，键前缀 `dshStatus.`）：
+## 4. 设置窗口（NSWindow + 原生 grouped Form）
+
+### 4.1 窗口 chrome
+
+- 标准 `NSWindow`：`[.titled, .closable, .miniaturizable, .resizable]`，标题「DSH Status 设置」。
+- 默认内容尺寸 **540 × 640**，最小 **500 × 480**，可缩放；`setFrameAutosaveName("DSHStatusSettings")`
+  记住大小/位置；首次打开居中；关闭不退出 App，再次打开复用同一窗口。
+- 打开时 `NSApp.activate` + `makeKeyAndOrderFront`；内容背景 `windowBackgroundColor`。
+
+### 4.2 内容
+
+- SwiftUI **`Form` + `.formStyle(.grouped)`**：卡片背景、圆角、分隔线、分区标题、行高全部交给系统；
+  不自绘卡片/描边/底栏。
+- 行：左侧 **24×24** continuous 圆角色块（系统状态色 + 轻微渐变，白色 SF Symbol 12pt semibold）
+  + 标题 13pt + 可选副标题 11pt secondary + Spacer + 原生控件（`Toggle .switch` / `Picker .menu` / bordered 小按钮）。
+- 分区顺序：**菜单栏图标 → 显示 → 项目显示 → 通知 → 面板 → 通用**；页脚为 11pt tertiary 版本/连接脚注。
+- 分区说明文字为 11pt secondary、左对齐，位于卡片下方。
 
 | 分区 | 设置 | 说明 |
 | --- | --- | --- |
-| 显示状态 | 待回答 / 运行中 / 已完成 / 已停止 四个开关 | 关掉的状态不在面板出现，也不进圆环与数字 |
-| 项目显示 | 按 workspace 列出当前有会话的项目开关 | 关掉即隐藏该项目（会话本身不受影响） |
-| 菜单栏图标 | 中心数字：关注数 / 非空闲总数 / 不显示 | 关注数 = 待回答+已完成+已停止（默认） |
-| 菜单栏图标 | 圆环段数上限：4 / 6 / 8 / 12 / 不限 | 超出上限按优先级只画前 N 段，数字仍完整 |
-| 面板背景 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 | 「降低透明度」开启时自动用实色 |
-| 通知 | 待回答（默认开）/ 已完成 / 已停止 | 首帧基线不通知；同会话同状态 30s 去重 |
+| 菜单栏图标 | 中心数字 | 全部任务数（默认）/ 需要介入 / 与环颜色一致 / 不显示 |
+| | 状态切换动效 | 外环扫一圈 + 颜色渐变（默认开） |
+| | 播放运行动画 | 关闭可省电；低电量 / 减弱动态效果自动关闭 |
+| 显示 | 待回答 / 运行中 / 已完成 / 已停止 | 关掉的状态不在面板出现，也不进圆环与数字 |
+| 项目显示 | 按 workspace 逐个开关 | 关掉即隐藏该项目（会话本身不受影响） |
+| 通知 | 系统通知状态 | 已开启 / 允许通知 / 打开系统设置 |
+| | 待回答（推荐）/ 已完成 / 已停止 | 默认只开待回答 |
+| 面板 | 材质 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 |
+| 通用 | 退出前确认 | 点面板电源键或右键「退出」时先弹确认框 |
+| | 恢复所有设置… | NSAlert 二次确认后恢复推荐默认值 |
 
+- 所有设置项即时生效并持久化到 UserDefaults（键前缀 `dshStatus.`，含旧域迁移）。
+- HIG 说明：HIG 建议设置窗口采用「工具栏 + 多 pane」结构、不提供 app 专属外观设置；
+  本 App 为单页设置（内容量不足以拆分 pane），保持标准 titlebar + grouped Form；
+  「面板材质」保留为兼容/可读性选项（系统「降低透明度」优先），在文档中标注该取舍。
 
-- 空项目列表显示「暂无已知项目（连接 DSH 后出现）」。
-- 预览图：`docs/previews/settings-preview-dark.png`。
+## 5. 视觉规范（token）
 
-## 4. 通知
+- **颜色**：文字一律系统语义色（label / secondaryLabel / tertiaryLabel）；界面状态色用系统调色板
+  （systemYellow/Blue/Green/Red），彩色只出现在状态 glyph、设置图标块、连接点。
+  菜单栏图标另有 22pt 专用调色板（需要更大对比度），见 `Theme.statusNSColor`。
+- **字号**：面板行标题 13 semibold、副标题 11、分组标题 11 semibold；设置行标题 13、副标题 11、
+  分区 footnote 11；页脚 12/11。最小可读 10pt。
+- **圆角**：面板 20、hover 行 6、设置图标块 6（卡片/控件圆角由系统 Form 决定，约 10–12）。
+- **间距**：面板：header 40 / 行 44 / 子行 24 / 分组标题 26 / footer 38 / 内容内边距 6（视觉 12）；
+  设置：系统 Form 默认（约 20pt 外边距、48pt 图标行）。
+- **分隔线**：`separatorColor`；面板分组分隔线左右内缩 12；工具栏/卡片分层用系统 elevated 背景。
+- **动效**：出现 0.16s ease-out；hover 0.08s；状态切换 0.45s；全部可关闭/尊重 Reduce Motion。
 
-### 4.0 系统权限（关键）
+## 6. 通知
+
+### 6.0 系统权限（关键）
 
 - 通知权限**不能由 App 单方面决定**：被拒后 `requestAuthorization` 不会弹框，只会静默失败。
   因此启动/打开面板时查询 `UNUserNotificationCenter.getNotificationSettings`：
@@ -128,52 +163,62 @@
     `NSApp.activate` + `requestAuthorization`（避免 App 在后台时系统框被静默拒绝）；
   - 已拒绝（denied）：提示变为「去开启」，点击打开系统设置「通知」面板；
   - 已授权：面板正常，铃铛可切换待回答通知。
-- 设置页「通知」组顶部同样显示系统通知状态与操作按钮；发送通知不再依赖启动时的缓存
-  `authorized` 标志（权限可能在运行中被用户打开）。
-- 安装位置 `~/Applications/DSH Status.app`，Bundle ID `com.liyitong.dshstatus.menubar`；
-  历史设置域（`com.liyitong.dsh-status` / `.dshstatus` / `.dshstatus.app` / `.dshstatus.path`）首次启动自动迁移。
 - **通知图标缓存（重要）**：macOS 按「App 身份（bundle id + .app 路径）」缓存通知横幅里的图标，
-  改了图标/颜色但身份不变时会一直显示旧图标，重启/重装/`killall usernoted` 都无效（缓存库受 TCC 保护）。
-  需要刷新时：换新 bundle id **并且**换 .app 路径，再重新授权通知。
+  改了图标/颜色但身份不变时会一直显示旧图标。需要刷新时：换新 bundle id **并且**换 .app 路径。
 - App 图标使用与菜单栏空闲态同款的鲸鱼 glyph：**透明底、无圆角方块、主色 `#416EFB`**
-  （构建时由 `WhaleLogo` 生成 `.icns`），与宿主 DeepSeek Harness 的官方图标区分开；退出确认弹窗也用同一 glyph。
+  （构建时由 `WhaleLogo` 生成 `.icns`），与宿主 DeepSeek Harness 的官方图标区分开；退出确认弹窗同源。
+  图标改进建议（分层 squircle / Icon Composer）见 [docs/icon-suggestions.md](icon-suggestions.md)。
 
-### 4.1 行为
+### 6.1 行为
 
-- `UNUserNotificationCenter`：由用户点「允许通知」时才请求权限（前台弹框）；被拒绝时在面板/设置页给出入口。
-- 默认**只对「进入待回答」发通知**（title = 会话标题，body = 待回答摘要，点击 → 打开主页面）。
+- 默认**只对「进入待回答」发通知**（title = 会话标题，body = 待回答摘要，点击 → 打开对应会话）。
 - 已完成/已停止默认不发；待回答通知 30s 内同会话去重。
-- 通知点击：`open "dsh://open"`。
 
-## 5. App 结构（Swift Package，无第三方依赖）
+## 7. App 结构（Swift Package，无第三方依赖）
 
 ```
 app/
   Package.swift
   Sources/DSHStatusBar/
-    main.swift                  // 入口；--render-previews 时离屏出图
-    AppDelegate.swift
-    StatusItemController.swift  // NSStatusItem / 右键菜单 / 变体切换
-    MenuBarIconRenderer.swift   // §2 单圆形图标绘制（disc / ring）
+    main.swift                  // 入口；--render-previews / --render-app-icon 离屏出图
+    AppDelegate.swift           // 装配：模型 / 桥 / 状态项 / 面板 / 设置 / 通知
+    StatusItemController.swift  // NSStatusItem / 右键菜单 / 图标刷新 / 过渡
+    CometAnimator.swift         // 运行动画（CA 图层）
+    MenuBarIconRenderer.swift   // 图标绘制（鲸鱼 / 单色优先级环 / 数字）
+    WhaleLogo.swift             // 鲸鱼矢量路径 + SVG path 解析器
     BridgeClient.swift          // bridge.json 轮询 + SSE + 命令 POST + 重连
     Models.swift                // BridgeState / SessionRow / Command（Codable）
-    PopoverController.swift
-    StatusPanelView.swift       // SwiftUI 面板
-    NotificationManager.swift
-    PreviewRenderer.swift       // 预览图：图标矩阵 / 面板三态 / 场景示意
+    AppModel.swift              // UI 状态模型（过滤 / 分组 / 状态跃迁）
+    StatusPanelController.swift // 自定义 NSPanel + Liquid Glass 材质 + 定位/关闭
+    StatusPanelView.swift       // 面板 SwiftUI 内容
+    Settings.swift              // AppSettings（UserDefaults）+ 设置页 SwiftUI（grouped Form）
+    SettingsWindow.swift        // 设置窗口 chrome（标准 NSWindow / frame autosave）
+    NotificationManager.swift   // 通知权限与发送
+    Theme.swift                 // 设计 token（系统语义色 / 尺寸 / hover）
+    PreviewRenderer.swift       // 离屏预览图（图标矩阵 / 面板 / 场景 / 设置页）
 ```
 
 - 入口参数/环境：
-  - `--render-previews <outDir>`：生成 `icon-preview-light/dark.png`、`panel-preview-light/dark.png`、
-    `scene-preview-dark.png`（模拟菜单栏 + 打开面板）。
+  - `--render-previews <outDir>`：生成图标矩阵、面板三态、场景示意、设置页（深/浅）。
   - `--bridge-file <path>` / `DSH_STATUS_BRIDGE_FILE=<path>`：覆盖 bridge.json 路径。
-  - `--open-panel`：启动后自动打开面板（截图/调试）。
+  - `--open-panel` / `--open-settings`：启动后自动打开面板/设置（截图/调试）。
+  - `DSH_STATUS_APPEARANCE=light|dark`：强制界面外观（仅调试/出图，不改系统设置）。
+  - `--render-app-icon <path>`：生成 App 图标 PNG。
 - `scripts/build-app.sh`：`swift build -c release` → `dist/DSHStatusBar.app`（Info.plist + ad-hoc 签名）。
 - 异常宽容：bridge.json 缺失/损坏、SSE 断开、DSH 重启都不得崩溃。
 
-## 6. 验收
+## 8. 验收
 
 1. `swift build -c release` 通过；`scripts/build-app.sh` 产出可启动 .app。
-2. `--render-previews` 产出图标矩阵、面板三态、场景示意图。
+2. `--render-previews` 产出图标矩阵、面板三态（深/浅）、场景示意图、设置页（深/浅）。
 3. 连 mock 桥时图标数字/颜色随状态变化，面板分组正确，点行会 POST 命令并打开 DSH。
 4. 断开 mock 后 6s 内进入未连接态；mock 恢复后自动重连。
+5. 设置窗口：标准 titlebar、可缩放、位置记忆、关闭不退出；所有设置即时生效。
+6. 面板：Liquid Glass 材质下深浅色文字可读；Esc/外部点击关闭；状态项高亮随面板开合。
+
+## 9. 参考资料
+
+- 原生规范实测：[docs/research/macos-ui-conventions.md](research/macos-ui-conventions.md)（含 16 张标注截图）
+- 本次重设计契约：[docs/ui-redesign-spec.md](ui-redesign-spec.md)
+- 图标建议：[docs/icon-suggestions.md](icon-suggestions.md)
+- 协议：[docs/protocol.md](protocol.md)；产品设计：[docs/design.md](design.md)

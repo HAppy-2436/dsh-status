@@ -36,6 +36,10 @@ if let index = arguments.firstIndex(of: "--render-app-icon") {
 }
 
 let app = NSApplication.shared
+// 调试/截图：DSH_STATUS_APPEARANCE=light|dark 强制界面外观（不影响系统设置）。
+if let appearance = ProcessInfo.processInfo.environment["DSH_STATUS_APPEARANCE"] {
+    app.appearance = NSAppearance(named: appearance == "light" ? .aqua : .darkAqua)
+}
 let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(.accessory)

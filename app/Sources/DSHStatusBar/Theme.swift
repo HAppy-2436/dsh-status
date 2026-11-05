@@ -1,33 +1,77 @@
 import AppKit
 import SwiftUI
 
-/// 统一设计 token：圆角、柔和配色（深色模式优先），尽量贴近 macOS 系统风格。
+/// 统一设计 token：与 macOS 26/27 原生视觉一致（Liquid Glass 时代）。
+///
+/// 原则（见 docs/ui-redesign-spec.md）：
+/// - 界面颜色一律用系统语义色（label / secondaryLabel / separator / system 状态色）；
+/// - 彩色只用于状态 glyph、设置页图标块与连接点；
+/// - 菜单栏图标有自己的 22pt 调色板（`statusNSColor`），因为它画在壁纸/菜单栏上，
+///   需要比正文更大的对比度，这里保持既有调色不动。
 enum Theme {
-    enum Radius {
-        static let card: CGFloat = 14
-        static let row: CGFloat = 10
-        static let well: CGFloat = 12
-        static let control: CGFloat = 8
+    /// 面板/设置页视觉尺寸（pt）。改动会影响真机观感，改前先看 docs/ui-redesign-spec.md。
+    enum Metrics {
+        // 弹出面板
+        static let panelWidth: CGFloat = 320
+        static let panelCornerRadius: CGFloat = 20
+        static let panelHorizontalPadding: CGFloat = 12
+        static let headerHeight: CGFloat = 40
+        static let rowHeight: CGFloat = 44
+        static let subagentRowHeight: CGFloat = 24
+        static let sectionHeaderHeight: CGFloat = 26
+        static let footerHeight: CGFloat = 38
+        static let actionRowHeight: CGFloat = 40
+        static let maxContentHeight: CGFloat = 480
+
+        // 设置窗口
+        static let settingsWidth: CGFloat = 540
+        static let settingsHeight: CGFloat = 640
+        static let settingsMinWidth: CGFloat = 500
+        static let settingsMinHeight: CGFloat = 480
+        static let settingsIconSize: CGFloat = 24
+        static let settingsIconCorner: CGFloat = 6
     }
 
-    // MARK: 状态色（低饱和、深浅两套）
+    // MARK: - 界面状态色（动态系统色）
 
+    /// 面板/设置页里小面积使用的状态色。
+    /// 使用系统动态色，深浅色模式下自动取 Apple 原生色值。
+    static func uiColor(_ status: SessionStatus) -> Color {
+        Color(nsColor: uiNSColor(status))
+    }
+
+    static func uiNSColor(_ status: SessionStatus) -> NSColor {
+        switch status {
+        case .waiting: return .systemYellow
+        case .running: return .systemBlue
+        case .completed: return .systemGreen
+        case .stopped: return .systemRed
+        case .idle: return .secondaryLabelColor
+        }
+    }
+
+    /// 兼容旧调用点（设置页图标块用）。
     static func statusColor(_ status: SessionStatus, scheme: ColorScheme) -> Color {
-        let rgb = statusRGB(status, dark: scheme == .dark)
-        return Color(red: rgb.0, green: rgb.1, blue: rgb.2)
+        Color(nsColor: uiNSColor(status))
     }
 
     static func statusColor(_ status: SessionStatus, dark: Bool) -> Color {
-        let rgb = statusRGB(status, dark: dark)
-        return Color(red: rgb.0, green: rgb.1, blue: rgb.2)
+        Color(nsColor: uiNSColor(status))
     }
 
+    /// 未连接 = 次要文字色，不用彩色（系统里「不可用」不靠颜色表达）。
+    static func disconnectedColor(_ scheme: ColorScheme) -> Color {
+        Color(nsColor: .secondaryLabelColor)
+    }
+
+    // MARK: - 菜单栏图标调色板（22pt，需要更大对比度；保持 v5 既有取值）
+
     static func statusNSColor(_ status: SessionStatus, dark: Bool) -> NSColor {
-        let rgb = statusRGB(status, dark: dark)
+        let rgb = iconStatusRGB(status, dark: dark)
         return NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
     }
 
-    private static func statusRGB(_ status: SessionStatus, dark: Bool) -> (Double, Double, Double) {
+    private static func iconStatusRGB(_ status: SessionStatus, dark: Bool) -> (Double, Double, Double) {
         switch status {
         case .waiting:
             // 待回答 = 黄色（参考 Status Trio 的 Low Power Mode 黄 #F2B900）
@@ -46,14 +90,37 @@ enum Theme {
         }
     }
 
-    /// 未连接用中性灰（参考 Status Trio 用 30% 前景色表示不可用状态）。
-    static func disconnectedColor(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.557, green: 0.557, blue: 0.576)
-            : Color(red: 0.420, green: 0.420, blue: 0.447)
+    // MARK: - 表面与描边（系统语义色）
+
+    /// hover 底色：用主文字色的小透明度，深浅色通用。
+    static func hoverFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
     }
 
-    // MARK: 表面与描边
+    /// 面板内分隔线颜色（动态）。
+    static var separator: Color { Color(nsColor: .separatorColor) }
+
+    /// 面板内次级表面（如提示条、设置图标块底色）。
+    static func subtleFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04)
+    }
+
+    /// 设置页图标块：系统色 → 上亮下暗的轻微渐变（接近系统设置 sidebar 图标）。
+    static func iconBlockGradient(_ color: NSColor) -> LinearGradient {
+        let base = Color(nsColor: color)
+        return LinearGradient(colors: [base.opacity(0.98), base.opacity(0.88)],
+                              startPoint: .top,
+                              endPoint: .bottom)
+    }
+
+    // MARK: - 兼容旧设置页的 token（新设置页用 grouped Form，不再使用这些）
+
+    enum Radius {
+        static let card: CGFloat = 10
+        static let row: CGFloat = 8
+        static let well: CGFloat = 12
+        static let control: CGFloat = 6
+    }
 
     static func cardFill(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.035)
@@ -64,15 +131,7 @@ enum Theme {
     }
 
     static func hairline(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.07) : Color.black.opacity(0.07)
-    }
-
-    static func hoverFill(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.045)
-    }
-
-    static func subtleFill(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.065) : Color.black.opacity(0.05)
+        Color(nsColor: .separatorColor)
     }
 }
 

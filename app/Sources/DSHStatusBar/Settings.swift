@@ -190,404 +190,285 @@ final class AppSettings: ObservableObject {
     }
 }
 
-// MARK: - 设置窗口
+// MARK: - 设置页（原生 grouped Form）
 
-final class SettingsWindowController {
-    private let settings: AppSettings
-    private let model: AppModel
-    private var window: NSWindow?
-
-    init(settings: AppSettings, model: AppModel) {
-        self.settings = settings
-        self.model = model
-    }
-
-    func show() {
-        if window == nil {
-            let view = SettingsView(settings: settings, model: model)
-            let hosting = NSHostingController(rootView: view)
-            let window = NSWindow(contentViewController: hosting)
-            window.title = "DSH Status 设置"
-            window.styleMask = [.titled, .closable]
-            window.setContentSize(NSSize(width: 470, height: 780))
-            window.isReleasedWhenClosed = false
-            window.center()
-            self.window = window
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
-    }
-}
-
-// MARK: - 设置页视觉组件（参考 Status Trio / macOS 系统设置）
-
-private enum SettingsMetrics {
-    static let pageMargin: CGFloat = 14
-    static let groupSpacing: CGFloat = 12
-    static let cardCorner: CGFloat = 10
-    static let rowPaddingH: CGFloat = 14
-    static let rowPaddingV: CGFloat = 6
-    static let iconSize: CGFloat = 26
-    static let iconCorner: CGFloat = 6.5
-    static let dividerInset: CGFloat = rowPaddingH + iconSize + 12
-}
-
-private struct SettingsGroup<Content: View>: View {
-    var title: String
-    var footnote: String? = nil
-    @ViewBuilder let content: Content
-
-    init(_ title: String, footnote: String? = nil, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.footnote = footnote
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(title)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 2)
-
-            VStack(spacing: 0) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-            )
-
-            if let footnote {
-                Text(footnote)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 2)
-                    .padding(.top, 1)
-            }
-        }
-    }
-}
-
-private struct SettingsIcon: View {
-    let symbol: String
-    let tint: Color
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: SettingsMetrics.iconCorner, style: .continuous)
-            .fill(LinearGradient(colors: [tint.opacity(0.98), tint.opacity(0.72)],
-                                 startPoint: .top, endPoint: .bottom))
-            .frame(width: SettingsMetrics.iconSize, height: SettingsMetrics.iconSize)
-            .overlay(
-                Image(systemName: symbol)
-                    .font(.system(size: SettingsMetrics.iconSize * 0.52, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
-    }
-}
-
-private struct SettingsRowChrome<Content: View>: View {
-    var showDivider: Bool = true
-    @ViewBuilder let content: Content
-
-    init(showDivider: Bool = true, @ViewBuilder content: () -> Content) {
-        self.showDivider = showDivider
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .padding(.horizontal, SettingsMetrics.rowPaddingH)
-            .padding(.vertical, SettingsMetrics.rowPaddingV)
-            .overlay(alignment: .bottom) {
-                if showDivider {
-                    Divider().padding(.leading, SettingsMetrics.dividerInset)
-                }
-            }
-    }
-}
-
-private struct SettingsToggleRow: View {
-    let symbol: String
-    let tint: Color
-    let title: String
-    var subtitle: String? = nil
-    @Binding var isOn: Bool
-    var showDivider: Bool = true
-
-    var body: some View {
-        SettingsRowChrome(showDivider: showDivider) {
-            HStack(spacing: 10) {
-                SettingsIcon(symbol: symbol, tint: tint)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: 13))
-                    if let subtitle {
-                        Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                Toggle("", isOn: $isOn)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-            }
-        }
-    }
-}
-
-private struct SettingsMenuRow<Trailing: View>: View {
-    let symbol: String
-    let tint: Color
-    let title: String
-    var subtitle: String? = nil
-    @ViewBuilder let trailing: Trailing
-    var showDivider: Bool = true
-
-    var body: some View {
-        SettingsRowChrome(showDivider: showDivider) {
-            HStack(spacing: 10) {
-                SettingsIcon(symbol: symbol, tint: tint)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: 13))
-                    if let subtitle {
-                        Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                trailing
-            }
-        }
-    }
-}
-
-// MARK: - 设置页
-
+/// 设置页：macOS System Settings 风格的单页 grouped Form（见 docs/ui-redesign-spec.md §3）。
+///
+/// 卡片背景、圆角、分隔线、分区标题与行内边距全部交给系统 `Form`；
+/// 这里只负责「22pt 图标块 + 13pt 标题 + 11pt 副标题 + 原生控件」的行内容与分区顺序。
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var model: AppModel
-    @Environment(\.colorScheme) private var colorScheme
 
     private let statuses: [SessionStatus] = [.waiting, .running, .completed, .stopped]
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SettingsMetrics.groupSpacing) {
-                    displaySettings
-                    iconSettings
-                    panelSettings
-                    notificationSettings
-                    projectSettings
-                }
-                .padding(SettingsMetrics.pageMargin)
-            }
-            Divider()
-            footerBar
+        Form {
+            menuBarSection
+            displaySection
+            projectSection
+            notificationSection
+            panelSection
+            generalSection
+            aboutSection
         }
-        .frame(width: 470, height: 780)
+        .formStyle(.grouped)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    // MARK: 分组
+    // MARK: 菜单栏图标
 
-    private var displaySettings: some View {
-        SettingsGroup("显示状态",
-                      footnote: "隐藏的状态既不在面板里出现，也不计入菜单栏圆环与数字。") {
-            ForEach(Array(statuses.enumerated()), id: \.element) { index, status in
-                SettingsToggleRow(
-                    symbol: statusSymbol(status),
-                    tint: Theme.statusColor(status, scheme: colorScheme),
-                    title: status.label,
-                    subtitle: "\(count(status)) 个",
-                    isOn: binding(for: status),
-                    showDivider: index < statuses.count - 1
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var projectSettings: some View {
-        let workspaces = workspaceRows()
-        SettingsGroup("项目显示",
-                      footnote: workspaces.isEmpty ? nil : "关闭开关即隐藏该项目；会话本身不受影响。") {
-            if workspaces.isEmpty {
-                SettingsRowChrome(showDivider: false) {
-                    Text("暂无已知项目（连接 DSH 后出现）")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                ForEach(Array(workspaces.enumerated()), id: \.element.id) { index, workspace in
-                    SettingsToggleRow(
-                        symbol: "folder.fill",
-                        tint: Color(red: 0.36, green: 0.56, blue: 0.88),
-                        title: workspace.title,
-                        subtitle: "\(workspace.count) 个会话",
-                        isOn: binding(workspaceId: workspace.id),
-                        showDivider: index < workspaces.count - 1
-                    )
-                }
-            }
-        }
-    }
-
-    private var iconSettings: some View {
-        SettingsGroup("菜单栏图标",
-                      footnote: "外环单色 = 当前最高优先级待办（红停止 > 黄待答 > 绿完成）；彗星弧 = 运行中。流畅动画由 GPU 驱动（常驻 CPU≈0），静态则完全不耗电。") {
-            SettingsMenuRow(
-                symbol: "number.circle.fill",
-                tint: Theme.statusColor(.running, scheme: colorScheme),
-                title: "中心数字",
-                subtitle: settings.centerNumberMode.shortLabel
-            ) {
-                Picker("", selection: $settings.centerNumberMode) {
+    private var menuBarSection: some View {
+        Section {
+            SettingsRow(symbol: "number.circle.fill",
+                        color: Theme.uiNSColor(.running),
+                        title: "中心数字") {
+                Picker("中心数字", selection: $settings.centerNumberMode) {
                     ForEach(CenterNumberMode.allCases) { mode in
                         Text(mode.shortLabel).tag(mode)
                     }
                 }
-                .pickerStyle(.menu)
                 .labelsHidden()
-                .frame(width: 150)
+                .pickerStyle(.menu)
             }
-            SettingsToggleRow(
-                symbol: "circle.dashed",
-                tint: Theme.statusColor(.completed, scheme: colorScheme),
-                title: "状态切换动效",
-                subtitle: "状态变化时外环扫一圈 + 颜色渐变过渡",
-                isOn: $settings.transitionAnimation
-            )
-            SettingsMenuRow(
-                symbol: "arrow.triangle.2.circlepath",
-                tint: Theme.statusColor(.running, scheme: colorScheme),
-                title: "运行中动画",
-                subtitle: settings.runAnimation ? "流畅（GPU，60fps）" : "静态（不耗电）",
-                showDivider: false
-            ) {
-                Picker("", selection: $settings.runAnimation) {
-                    Text("流畅").tag(true)
-                    Text("静态").tag(false)
+            SettingsRow(symbol: "circle.dashed",
+                        color: Theme.uiNSColor(.completed),
+                        title: "状态切换动效",
+                        subtitle: "状态变化时外环扫一圈并渐变过渡") {
+                Toggle("状态切换动效", isOn: $settings.transitionAnimation)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            SettingsRow(symbol: "arrow.triangle.2.circlepath",
+                        color: Theme.uiNSColor(.running),
+                        title: "播放运行动画",
+                        subtitle: "关闭可省电；低电量或「减弱动态效果」时自动关闭") {
+                Toggle("播放运行动画", isOn: $settings.runAnimation)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+        } header: {
+            Text("菜单栏图标")
+        } footer: {
+            SettingsFootnote("中心数字：全部任务包含运行中；需要介入 = 待回答 + 已停止 + 已完成；与环色一致 = 只统计外环颜色对应状态的数量。")
+        }
+    }
+
+    // MARK: 显示
+
+    private var displaySection: some View {
+        Section {
+            ForEach(statuses, id: \.self) { status in
+                SettingsRow(symbol: statusSymbol(status),
+                            color: Theme.uiNSColor(status),
+                            title: status.label,
+                            subtitle: "当前 \(count(status)) 个") {
+                    Toggle(status.label, isOn: binding(for: status))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 110)
+            }
+        } header: {
+            Text("显示")
+        } footer: {
+            SettingsFootnote("关闭后该状态既不出现在面板中，也不计入菜单栏数字与外环。")
+        }
+    }
+
+    // MARK: 项目显示
+
+    private var projectSection: some View {
+        let workspaces = workspaceRows()
+        return Section {
+            if workspaces.isEmpty {
+                Text("暂无已知项目（连接 DSH 后出现）")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(workspaces) { workspace in
+                    SettingsRow(symbol: "folder.fill",
+                                color: .systemBlue,
+                                title: workspace.title,
+                                subtitle: "\(workspace.count) 个会话") {
+                        Toggle(workspace.title, isOn: binding(workspaceId: workspace.id))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                    }
+                }
+            }
+        } header: {
+            Text("项目显示")
+        } footer: {
+            if !workspaces.isEmpty {
+                SettingsFootnote("关闭开关只会把这个项目的会话从面板中隐藏，不影响会话本身。")
             }
         }
     }
 
-    private var panelSettings: some View {
-        SettingsGroup("面板背景",
-                      footnote: "开启系统「降低透明度」时会自动使用实色。") {
-            SettingsMenuRow(
-                symbol: "rectangle.on.rectangle",
-                tint: Color(red: 0.45, green: 0.50, blue: 0.62),
-                title: "材质",
-                subtitle: settings.panelBackgroundStyle.label,
-                showDivider: false
-            ) {
-                Picker("", selection: $settings.panelBackgroundStyle) {
+    // MARK: 通知
+
+    private var notificationSection: some View {
+        Section {
+            SettingsRow(symbol: notificationSymbol,
+                        color: notificationColor,
+                        title: "系统通知",
+                        subtitle: notificationSubtitle) {
+                notificationAction
+            }
+            SettingsRow(symbol: "bell.badge.fill",
+                        color: Theme.uiNSColor(.waiting),
+                        title: "待回答（推荐）") {
+                Toggle("待回答", isOn: $settings.notifyWaiting)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            SettingsRow(symbol: "checkmark.circle.fill",
+                        color: Theme.uiNSColor(.completed),
+                        title: "已完成") {
+                Toggle("已完成", isOn: $settings.notifyCompleted)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            SettingsRow(symbol: "stop.circle.fill",
+                        color: Theme.uiNSColor(.stopped),
+                        title: "已停止") {
+                Toggle("已停止", isOn: $settings.notifyStopped)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+        } header: {
+            Text("通知")
+        } footer: {
+            SettingsFootnote("点击通知会打开对应会话；同一会话 30 秒内不重复提醒。")
+        }
+    }
+
+    // MARK: 面板
+
+    private var panelSection: some View {
+        Section {
+            SettingsRow(symbol: "rectangle.on.rectangle",
+                        color: .systemGray,
+                        title: "材质") {
+                Picker("材质", selection: $settings.panelBackgroundStyle) {
                     ForEach(PanelBackgroundStyle.availableStyles) { style in
                         Text(style.label).tag(style)
                     }
                 }
-                .pickerStyle(.menu)
                 .labelsHidden()
-                .frame(width: 130)
+                .pickerStyle(.menu)
             }
+        } header: {
+            Text("面板")
+        } footer: {
+            SettingsFootnote("「液态玻璃」需要 macOS 26 或更高版本；开启系统「降低透明度」时自动使用实色。")
         }
     }
 
-    private var notificationSettings: some View {
-        SettingsGroup("通知",
-                      footnote: "点击通知会打开对应会话；同会话 30 秒内不重复。") {
-            SettingsMenuRow(
-                symbol: notificationSymbol,
-                tint: notificationTint,
-                title: "系统通知",
-                subtitle: notificationSubtitle,
-                showDivider: true
-            ) {
-                switch model.notificationPermission {
-                case .authorized:
-                    Text("已开启").font(.system(size: 11)).foregroundStyle(.secondary)
-                case .denied:
-                    Button("打开系统设置") { model.onOpenNotificationSettings?() }
-                        .controlSize(.small)
-                case .notDetermined:
-                    Button("允许通知") { model.onRequestNotificationPermission?() }
-                        .controlSize(.small)
-                case .unknown:
-                    EmptyView()
-                }
+    // MARK: 通用
+
+    private var generalSection: some View {
+        Section {
+            SettingsRow(symbol: "power",
+                        color: .systemGray,
+                        title: "退出前确认",
+                        subtitle: "点面板电源键或菜单「退出」时先弹确认框") {
+                Toggle("退出前确认", isOn: $settings.confirmBeforeQuit)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
             }
-            SettingsToggleRow(
-                symbol: "bell.badge.fill",
-                tint: Theme.statusColor(.waiting, scheme: colorScheme),
-                title: "待回答（推荐）",
-                isOn: $settings.notifyWaiting
-            )
-            SettingsToggleRow(
-                symbol: "checkmark.circle.fill",
-                tint: Theme.statusColor(.completed, scheme: colorScheme),
-                title: "已完成",
-                isOn: $settings.notifyCompleted
-            )
-            SettingsToggleRow(
-                symbol: "stop.circle.fill",
-                tint: Theme.statusColor(.stopped, scheme: colorScheme),
-                title: "已停止",
-                isOn: $settings.notifyStopped,
-                showDivider: false
-            )
+            SettingsRow(symbol: "arrow.counterclockwise",
+                        color: .systemOrange,
+                        title: "恢复默认设置",
+                        subtitle: "把所有选项恢复为推荐值") {
+                Button("恢复所有设置…") { confirmReset() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        } header: {
+            Text("通用")
         }
     }
 
-    // MARK: 底栏
+    // MARK: 关于（脚注）
 
-    private var footerBar: some View {
-        HStack {
-            Button("恢复默认") { settings.reset() }
-                .controlSize(.small)
-            Toggle("退出前确认", isOn: $settings.confirmBeforeQuit)
-                .toggleStyle(.checkbox)
-                .controlSize(.small)
-                .font(.system(size: 10.5))
-                .help("点面板电源键或右键菜单「退出」时先弹确认框")
-            Spacer()
-            Text("v\(AppConfig.appVersion) · \(model.connected ? "已连接" : "未连接")")
-                .font(.system(size: 10.5))
+    private var aboutSection: some View {
+        Section {
+        } footer: {
+            Text("DSH Status v\(AppConfig.appVersion) · \(model.connected ? "已连接到 DSH" : "未连接")")
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 2)
         }
-        .padding(.horizontal, 18)
-        .frame(height: 44)
+    }
+
+    // MARK: 通知状态展示
+
+    @ViewBuilder
+    private var notificationAction: some View {
+        switch model.notificationPermission {
+        case .authorized:
+            Text("已开启")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        case .denied:
+            Button("打开系统设置") { model.onOpenNotificationSettings?() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        case .notDetermined:
+            Button("允许通知") { model.onRequestNotificationPermission?() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        case .unknown:
+            EmptyView()
+        }
     }
 
     private var notificationSymbol: String {
         switch model.notificationPermission {
-        case .authorized: return "bell.badge.fill"
+        case .authorized, .notDetermined: return "bell.fill"
         case .denied: return "bell.slash.fill"
-        case .notDetermined, .unknown: return "bell.badge.fill"
+        case .unknown: return "bell"
         }
     }
 
-    private var notificationTint: Color {
+    private var notificationColor: NSColor {
         switch model.notificationPermission {
-        case .authorized: return Theme.statusColor(.completed, scheme: colorScheme)
-        case .denied: return Theme.statusColor(.stopped, scheme: colorScheme)
-        case .notDetermined, .unknown: return Theme.statusColor(.waiting, scheme: colorScheme)
+        case .authorized: return .systemGreen
+        case .denied: return .systemRed
+        case .notDetermined: return .systemYellow
+        case .unknown: return .systemGray
         }
     }
 
-    private var notificationSubtitle: String {
+    private var notificationSubtitle: String? {
         switch model.notificationPermission {
-        case .authorized: return "系统通知已开启"
+        case .authorized: return "任务状态变化时提醒"
         case .denied: return "被系统关闭，不会弹出任何提醒"
-        case .notDetermined: return "尚未授权"
-        case .unknown: return "状态未知"
+        case .notDetermined: return "尚未授权，不会弹出提醒"
+        case .unknown: return "暂时无法读取通知授权状态"
+        }
+    }
+
+    // MARK: 恢复默认（二次确认）
+
+    private func confirmReset() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "恢复所有设置？"
+        alert.informativeText = "所有选项将恢复为推荐默认值，已隐藏的状态和项目也会重置。此操作不可撤销。"
+        alert.addButton(withTitle: "恢复所有设置")
+        alert.addButton(withTitle: "取消")
+
+        if let window = NSApp.keyWindow {
+            alert.beginSheetModal(for: window) { response in
+                if response == .alertFirstButtonReturn { settings.reset() }
+            }
+        } else if alert.runModal() == .alertFirstButtonReturn {
+            settings.reset()
         }
     }
 
@@ -644,5 +525,87 @@ struct SettingsView: View {
 
     private func count(_ status: SessionStatus) -> Int {
         model.state.sessions.filter { $0.statusKind == status }.count
+    }
+}
+
+// MARK: - 行组件（System Settings 风格）
+
+/// 22×22 continuous 圆角色块 + 白色 SF Symbol 12pt semibold。
+private struct SettingsIconBlock: View {
+    let symbol: String
+    let color: NSColor
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: Theme.Metrics.settingsIconCorner, style: .continuous)
+            .fill(Theme.iconBlockGradient(color))
+            .frame(width: Theme.Metrics.settingsIconSize,
+                   height: Theme.Metrics.settingsIconSize)
+            .overlay {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// 设置行：图标块 + 13pt 标题（可选 11pt 副标题）+ Spacer + 原生控件。
+private struct SettingsRow<Trailing: View>: View {
+    let symbol: String
+    let color: NSColor
+    let title: String
+    let subtitle: String?
+    let trailing: Trailing
+
+    init(symbol: String,
+         color: NSColor,
+         title: String,
+         subtitle: String? = nil,
+         @ViewBuilder trailing: () -> Trailing) {
+        self.symbol = symbol
+        self.color = color
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            SettingsIconBlock(symbol: symbol, color: color)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            trailing
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// 分区脚注：11pt secondary、左对齐；不居中、不随 Form 默认排版漂移。
+private struct SettingsFootnote: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -36,8 +36,10 @@ enum PreviewRenderer {
         )
         try renderScene(appearance: dark, colorScheme: .dark,
                         to: directory.appendingPathComponent("scene-preview-dark.png"))
-        try renderSettingsSheet(appearance: dark,
+        try renderSettingsSheet(appearance: dark, colorScheme: .dark,
                                 to: directory.appendingPathComponent("settings-preview-dark.png"))
+        try renderSettingsSheet(appearance: light, colorScheme: .light,
+                                to: directory.appendingPathComponent("settings-preview-light.png"))
     }
 
     // MARK: - 图标矩阵
@@ -79,7 +81,7 @@ enum PreviewRenderer {
         let titleHeight: CGFloat = 66
         let headerHeight: CGFloat = 30
         let stripHeight: CGFloat = 104
-        let width: CGFloat = 760
+        let width: CGFloat = 900
         let height = titleHeight + headerHeight + rowHeight * CGFloat(states.count) + stripHeight + margin
 
         try savePNG(width: width, height: height, appearance: appearance, to: url) { rect in
@@ -141,7 +143,7 @@ enum PreviewRenderer {
         let width: CGFloat = 1100
         let height: CGFloat = 720
         let menuBarHeight: CGFloat = 26
-        let panelWidth: CGFloat = 344
+        let panelWidth: CGFloat = Theme.Metrics.panelWidth
 
         let demo = AppModel.demo()
         let panelImage = renderPanel(model: demo, width: panelWidth,
@@ -246,14 +248,18 @@ enum PreviewRenderer {
 
     // MARK: - 设置页预览
 
-    private static func renderSettingsSheet(appearance: NSAppearance, to url: URL) throws {
+    private static func renderSettingsSheet(appearance: NSAppearance,
+                                            colorScheme: ColorScheme,
+                                            to url: URL) throws {
+        let width = Theme.Metrics.settingsWidth
+        let height = Theme.Metrics.settingsHeight
         let settings = AppSettings.preview()
         let model = AppModel.demo(settings: settings)
         let root = SettingsView(settings: settings, model: model)
-            .environment(\.colorScheme, .dark)
+            .environment(\.colorScheme, colorScheme)
         let hosting = NSHostingView(rootView: root)
         hosting.appearance = appearance
-        hosting.frame = NSRect(x: 0, y: 0, width: 470, height: 780)
+        hosting.frame = NSRect(x: 0, y: 0, width: width, height: height)
         hosting.layoutSubtreeIfNeeded()
 
         guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
@@ -261,32 +267,33 @@ enum PreviewRenderer {
         }
         rep.size = hosting.bounds.size
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
-        let image = NSImage(size: NSSize(width: 470, height: 780))
+        let image = NSImage(size: NSSize(width: width, height: height))
         image.addRepresentation(rep)
 
         let margin: CGFloat = 34
         let titleHeight: CGFloat = 86
-        let width = 470 + margin * 2
-        let height = 780 + margin + titleHeight
+        let sheetWidth = width + margin * 2
+        let sheetHeight = height + margin + titleHeight
 
-        try savePNG(width: width, height: height, appearance: appearance, to: url) { rect in
-            NSColor(hex: 0x0E0E10).setFill()
+        try savePNG(width: sheetWidth, height: sheetHeight, appearance: appearance, to: url) { rect in
+            (colorScheme == .dark ? NSColor(hex: 0x0E0E10) : NSColor(hex: 0xF0F0F3)).setFill()
             rect.fill()
-            drawText("DSH Status 设置页 · 深色", font: .systemFont(ofSize: 15, weight: .semibold),
-                     color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("显示状态 / 隐藏项目 / 菜单栏数字语义 / 运行中动画 / 面板材质 / 通知；修改即时生效",
+            drawText("DSH Status 设置页 · " + (colorScheme == .dark ? "深色" : "浅色"),
+                     font: .systemFont(ofSize: 15, weight: .semibold),
+                     color: .labelColor, at: NSPoint(x: margin, y: sheetHeight - margin - 18))
+            drawText("原生 grouped Form：菜单栏图标 / 显示 / 通知 / 面板 / 通用；修改即时生效",
                      font: .systemFont(ofSize: 11), color: .secondaryLabelColor,
-                     at: NSPoint(x: margin, y: height - margin - 36))
+                     at: NSPoint(x: margin, y: sheetHeight - margin - 36))
 
             let x = margin
             let y = margin
             NSColor.labelColor.withAlphaComponent(0.14).setFill()
-            NSBezierPath(roundedRect: NSRect(x: x - 1, y: y - 1, width: 472, height: 782),
+            NSBezierPath(roundedRect: NSRect(x: x - 1, y: y - 1, width: width + 2, height: height + 2),
                          xRadius: 13, yRadius: 13).fill()
             NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: 470, height: 780),
+            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: width, height: height),
                          xRadius: 12, yRadius: 12).addClip()
-            image.draw(in: NSRect(x: x, y: y, width: 470, height: 780))
+            image.draw(in: NSRect(x: x, y: y, width: width, height: height))
             NSGraphicsContext.restoreGraphicsState()
         }
     }
@@ -303,7 +310,7 @@ enum PreviewRenderer {
             ("全部空闲", emptyModel()),
             ("未连接", AppModel.demoDisconnected()),
         ]
-        let panelWidth: CGFloat = 344
+        let panelWidth: CGFloat = Theme.Metrics.panelWidth
         let gap: CGFloat = 30
         let margin: CGFloat = 30
         let titleHeight: CGFloat = 64

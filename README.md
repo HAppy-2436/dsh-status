@@ -2,8 +2,10 @@
 
 > macOS 菜单栏常驻工具：图标旁数字 = DeepSeek Harness 中「待回答 + 已完成 + 已停止」的会话数；
 > 单击弹出面板，只列非空闲会话（运行中 / 已完成 / 已停止 / 待回答），点击某行跳到 DSH 主窗口并打开该会话。
+> 面板与设置窗口按 **macOS 26/27（Liquid Glass）原生规范**重做：无箭头自定义 NSPanel + 系统玻璃材质、
+> 系统语义色与字号；设置窗口为标准 NSWindow + 原生 grouped Form。
 
-## 当前状态（2026-11-03）
+## 当前状态（2026-11-05）
 
 - **安装位置 / Bundle ID**：`~/Applications/DSH Status.app`，`com.liyitong.dshstatus.menubar`
   （更早版本的设置域会在首次启动时自动迁移）
@@ -15,14 +17,19 @@
     静态层只在状态变化时重绘，实测常驻 CPU ≈ 0%；
   - 只有运行中：动态弧直接用外环大小 + 中心运行数；内外环同时存在时不显示数字；
   - 中心数字可在设置里选：全部任务（默认）/ 需要介入 / 与环色一致 / 不显示；
-  - 完全空闲时显示 DeepSeek 鲸鱼 Logo。、面板、**设置页**（自定义显示状态 / 隐藏项目 / 中心数字 / 段数上限 / 通知）、
-  SSE 桥客户端、未连接态、通知；
-  界面按 macOS 原生风格调校（自定义无箭头 NSPanel + Liquid Glass 材质、20pt 圆角、系统强调色；
-可切换液态玻璃 / 经典磨砂 / 实色）；
-  配套 mock 桥可脱离 DSH 演示；设计预览图与真机截图在 [`docs/previews/`](docs/previews/README.md)。
-- **P1 已实现（待安装验证）**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令）代码与测试完成；
-  还差在 DSH 里通过 Plugins 页面安装（Desktop profile 只能 GUI 安装），然后真机验证。
-- 图标已升级到 v4（双层环），配色/材质/通知等也已在真机联调中迭代。
+  - 完全空闲时显示 DeepSeek 鲸鱼 Logo。
+  - 面板：**自定义无箭头 NSPanel**（320pt 宽、20pt 圆角、状态项下方 6pt），
+    Liquid Glass（`NSGlassEffectView` + 系统窗口背景色 tint）/ 经典磨砂 / 实色可切；
+    系统语义色、13/11pt 字号、hover 底色、面板打开时状态项高亮；通知未授权时面板顶部可操作提示。
+  - 设置窗口：标准 NSWindow（540×640、可缩放、位置记忆、关闭不退出）+ 原生 `Form(.grouped)`；
+    分区「菜单栏图标 / 显示 / 项目显示 / 通知 / 面板 / 通用」，24pt 图标块 + 原生开关/弹出按钮；
+    恢复默认带二次确认，页脚显示版本与连接状态。
+  - SSE 桥客户端、未连接态、通知；配套 mock 桥可脱离 DSH 演示；
+    设计预览图与真机截图在 [`docs/previews/`](docs/previews/README.md)。
+- **P1 已实现并真机接通（2026-11-05）**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令）已在 DSH 安装启用，
+  真实状态推送正常；待验证「点击会话行跳转」与「通知点击」。
+- 图标系统 v5（鲸鱼 + 单色优先级环 + 运行中彗星弧）；进一步图标改进建议见
+  [docs/icon-suggestions.md](docs/icon-suggestions.md)。
 
 ## 快速开始（P0 演示，假数据）
 
@@ -55,6 +62,9 @@ DSH Host ── 插件 Host 薄桥（bridge.json + 路由）────┘
 - 协议：[docs/protocol.md](docs/protocol.md)
 - 产品设计：[docs/design.md](docs/design.md)
 - App / 图标设计规范：[docs/app-design.md](docs/app-design.md)
+- 原生 UI 实测与 HIG 依据：[docs/research/macos-ui-conventions.md](docs/research/macos-ui-conventions.md)
+- 本次面板/设置重设计契约：[docs/ui-redesign-spec.md](docs/ui-redesign-spec.md)
+- 图标设计建议：[docs/icon-suggestions.md](docs/icon-suggestions.md)
 - P0 演示与协议自检：`scripts/demo.sh`、`scripts/test-bridge.sh`
 
 ## 目录结构

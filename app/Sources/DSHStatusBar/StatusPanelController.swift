@@ -34,7 +34,10 @@ final class StatusPanelController: NSObject {
         hostingController = hosting
         contentController = content
         panel.contentViewController = content
-        panel.onClose = { [weak self] in self?.removeEventMonitors() }
+        panel.onClose = { [weak self] in
+            self?.removeEventMonitors()
+            self?.setStatusItemHighlighted(false)
+        }
         self.themeObserver = DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
             object: nil, queue: .main
@@ -63,6 +66,8 @@ final class StatusPanelController: NSObject {
         fitToContent()
         panel.alphaValue = 0
         panel.orderFrontRegardless()
+        // 与原生菜单栏项一致：面板展示期间图标保持高亮（系统 highlight() 在非激活面板下不生效）
+        setStatusItemHighlighted(true)
         // 非激活面板也让它成为 key window，内容才按 active 状态渲染（颜色不被去饱和）
         panel.makeKey()
         positionPanel(button: button)
@@ -74,7 +79,8 @@ final class StatusPanelController: NSObject {
             return
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.08
+            context.duration = 0.16
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             context.allowsImplicitAnimation = true
             self.panel.animator().alphaValue = 1
         }
@@ -92,6 +98,29 @@ final class StatusPanelController: NSObject {
         fitToContent()
         positionPanel(button: button)
         panel.invalidateShadow()
+    }
+
+    // MARK: 状态项高亮（面板打开时，与原生菜单栏项一致）
+
+    private var selectionView: NSView?
+
+    private func setStatusItemHighlighted(_ highlighted: Bool) {
+        guard let button = statusItem.button else { return }
+        if highlighted {
+            if selectionView?.superview !== button {
+                let view = PassthroughView(frame: button.bounds.insetBy(dx: 1, dy: 3))
+                view.wantsLayer = true
+                view.layer?.cornerRadius = 6
+                view.layer?.cornerCurve = .continuous
+                view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.14).cgColor
+                view.autoresizingMask = [.width, .height]
+                button.addSubview(view, positioned: .below, relativeTo: nil)
+                selectionView = view
+            }
+            selectionView?.isHidden = false
+        } else {
+            selectionView?.isHidden = true
+        }
     }
 
     /// 语言/主题变化时重建背景材质。
@@ -196,8 +225,13 @@ final class StatusPanelController: NSObject {
 
 // MARK: - 面板窗口
 
+/// 不参与命中测试的装饰视图（状态项高亮背景，不能抢走按钮点击）。
+private final class PassthroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 final class AnchoredStatusPanel: NSPanel {
-    static let cornerRadius: CGFloat = 20
+    static let cornerRadius: CGFloat = Theme.Metrics.panelCornerRadius
     var onClose: (() -> Void)?
 
     init() {
@@ -327,6 +361,10 @@ final class StatusPanelContentViewController: NSViewController {
                 let glass = NSGlassEffectView(frame: container.bounds)
                 glass.style = .regular
                 glass.cornerRadius = AnchoredStatusPanel.cornerRadius
+                // Liquid Glass 默认取色会随壁纸颜色过曝（深色模式下白字压不住高饱和背景）。
+                // 用系统窗口背景色做 tint：深色模式得到 Apple 原生 Control Center 那种
+                // 深色玻璃，浅色模式得到浅色磨砂，同时保留玻璃的模糊与折射。
+                glass.tintColor = .windowBackgroundColor
                 if #available(macOS 27.0, *) {
                     glass.effectIsInteractive = true
                 }

@@ -129,7 +129,7 @@ enum MenuBarIconRenderer {
                             phase: model.animationPhase, time: model.animationTime, useTrack: true)
             } else {
                 drawSpinner(dark: dark, radius: outerRadius, width: outerWidth,
-                            phase: model.animationPhase, time: model.animationTime, useTrack: false)
+                            phase: model.animationPhase, time: model.animationTime, useTrack: true)
             }
         }
 
@@ -164,7 +164,7 @@ enum MenuBarIconRenderer {
 
         // 淡轨道：整圈、低对比，作为同心参考（只在有外环、需要「内圈居中」时用）
         if useTrack {
-            base.withAlphaComponent(0.22).setStroke()
+            base.withAlphaComponent(0.16).setStroke()
             let track = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius,
                                                     width: radius * 2, height: radius * 2))
             track.lineWidth = width

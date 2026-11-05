@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 
 // MARK: - 菜单栏图标 v3：鲸鱼 + 分段圆环
 //
@@ -171,22 +172,36 @@ enum MenuBarIconRenderer {
         default: size = 7.6
         }
         let font = roundedFont(size: size, weight: .bold)
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(dark ? 0.30 : 0.16)
-        shadow.shadowBlurRadius = 1.2
-        shadow.shadowOffset = NSSize(width: 0, height: -0.4)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: dark ? NSColor.white : NSColor(hex: 0x0F1115),
-            .shadow: shadow,
             .kern: 0.1
         ]
         let attributed = NSAttributedString(string: text, attributes: attrs)
-        let textSize = attributed.size()
-        attributed.draw(at: NSPoint(
-            x: center.x - textSize.width / 2,
-            y: center.y - textSize.height / 2 + 0.3
-        ))
+        let line = CTLineCreateWithAttributedString(attributed)
+        // 用字形墨迹（ink bounds）而不是行高来居中，避免数字因上下留白看起来偏上
+        let ink = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            let textSize = attributed.size()
+            attributed.draw(at: NSPoint(
+                x: center.x - textSize.width / 2,
+                y: center.y - textSize.height / 2 + 0.3
+            ))
+            return
+        }
+        context.saveGState()
+        context.setShadow(
+            offset: CGSize(width: 0, height: -0.3),
+            blur: 1.0,
+            color: (dark ? NSColor.black.withAlphaComponent(0.30)
+                         : NSColor.black.withAlphaComponent(0.16)).cgColor
+        )
+        context.textPosition = CGPoint(
+            x: center.x - ink.midX,
+            y: center.y - ink.midY
+        )
+        CTLineDraw(line, context)
+        context.restoreGState()
     }
 
     // MARK: 未连接

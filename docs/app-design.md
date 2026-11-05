@@ -124,7 +124,7 @@
   `authorized` 标志（权限可能在运行中被用户打开）。
 - Bundle ID 为 `com.liyitong.dshstatus`；旧域 `com.liyitong.dsh-status` 的 UserDefaults 在首次启动时自动迁移
   （通知图标的解析结果按 bundle id 缓存，换 id 是修复「通知横幅显示占位图标」的唯一非 TCC 手段）。
-- App 图标使用与菜单栏空闲态同款的鲸鱼 glyph：**透明底、无圆角方块、主色 `#6485FC`**
+- App 图标使用与菜单栏空闲态同款的鲸鱼 glyph：**透明底、无圆角方块、主色 `#416EFB`**
   （构建时由 `WhaleLogo` 生成 `.icns`），与宿主 DeepSeek Harness 的官方图标区分开；退出确认弹窗也用同一 glyph。
 
 ### 4.1 行为

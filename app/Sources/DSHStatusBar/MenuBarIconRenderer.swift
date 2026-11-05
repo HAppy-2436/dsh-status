@@ -374,8 +374,8 @@ enum MenuBarIconRenderer {
 // MARK: - App 图标 / 弹窗图标（菜单栏同款鲸鱼，无底色）
 
 enum AppIconRenderer {
-    /// App 图标的鲸鱼主色（#6485FC）。
-    static let brandColor = NSColor(hex: 0x6485FC)
+    /// App 图标的鲸鱼主色（取参考图正中鲸鱼的实测色 #416EFB）。
+    static let brandColor = NSColor(hex: 0x416EFB)
 
     /// 透明底 + 品牌蓝鲸鱼（轻微投影，深浅背景都可见）。
     /// 与菜单栏空闲态同一 glyph，不放圆角方块，避免和 DeepSeek Harness 官方图标混淆。

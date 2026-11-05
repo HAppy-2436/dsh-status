@@ -19,15 +19,7 @@ struct StatusPanelView: View {
             footer
         }
         .frame(width: width)
-        .background(
-            Group {
-                if usesMaterial {
-                    VisualEffectBackground()
-                } else {
-                    Color(nsColor: .windowBackgroundColor)
-                }
-            }
-        )
+        .background(usesMaterial ? Color.clear : Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: 头部

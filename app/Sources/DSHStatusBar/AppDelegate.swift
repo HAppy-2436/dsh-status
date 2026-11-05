@@ -5,7 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var model: AppModel!
     private var bridge: BridgeClient!
     private var statusItemController: StatusItemController!
-    private var popoverController: PopoverController!
+    private var panelController: StatusPanelController!
     private var settingsWindow: SettingsWindowController!
     private let settings = AppSettings.shared
     private let notifications = NotificationManager()
@@ -15,9 +15,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         model = AppModel(settings: settings)
-        model.onOpenSession = { [weak self] sessionId in self?.openSession(sessionId) }
-        model.onOpenDSH = { [weak self] in self?.openDSH() }
-        model.onQuit = { [weak self] in self?.confirmQuit() }
+        model.onOpenSession = { [weak self] sessionId in
+            self?.panelController.close()
+            self?.openSession(sessionId)
+        }
+        model.onOpenDSH = { [weak self] in
+            self?.panelController.close()
+            self?.openDSH()
+        }
+        model.onQuit = { [weak self] in
+            self?.panelController.close()
+            self?.confirmQuit()
+        }
         model.onStatusTransition = { [weak self] row, status in
             guard let self else { return }
             switch status {
@@ -31,15 +40,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 break
             }
         }
-        model.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
+        model.onOpenSettings = { [weak self] in
+            self?.panelController.close()
+            self?.settingsWindow.show()
+        }
 
         statusItemController = StatusItemController(model: model)
-        statusItemController.onTogglePopover = { [weak self] in self?.popoverController.toggle() }
+        statusItemController.onTogglePopover = { [weak self] in self?.panelController.toggle() }
         statusItemController.onOpenDSH = { [weak self] in self?.openDSH() }
         statusItemController.onQuit = { [weak self] in self?.confirmQuit() }
         statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
 
-        popoverController = PopoverController(model: model, statusItem: statusItemController.statusItem)
+        panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem)
         settingsWindow = SettingsWindowController(settings: settings, model: model)
 
         // 设置变化 → 立即重绘图标
@@ -62,11 +74,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.model.apply(state: state)
             self.statusItemController.refresh()
+            self.panelController.fitIfVisible()
         }
         bridge.onConnectionChange = { [weak self] connected in
             guard let self else { return }
             self.model.setConnected(connected)
             self.statusItemController.refresh()
+            self.panelController.fitIfVisible()
         }
         bridge.onLog = { message in
             FileHandle.standardError.write(Data(("[dsh-status] " + message + "\n").utf8))
@@ -76,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 调试：启动后自动打开面板（便于截图/验收）
         if CommandLine.arguments.contains("--open-panel") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
-                self?.popoverController.show()
+                self?.panelController.show()
             }
         }
         if CommandLine.arguments.contains("--preview-quit-confirm") {

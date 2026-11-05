@@ -1,0 +1,306 @@
+import AppKit
+import SwiftUI
+
+/// 状态面板：参考 Status Trio 的 `AnchoredStatusPanel`——
+/// 无边框 `NSPanel`（不画 NSPopover 的箭头），16pt 连续圆角，
+/// macOS 26+ 使用 Liquid Glass（`NSGlassEffectView`），旧系统退回
+/// `NSVisualEffectView(.popover)`，开启「降低透明度」时退回实色。
+final class StatusPanelController: NSObject {
+    private let panel = AnchoredStatusPanel()
+    private let model: AppModel
+    private let statusItem: NSStatusItem
+    private var hostingController: NSHostingController<StatusPanelView>?
+    private var contentController: StatusPanelContentViewController?
+    private var outsideMonitor: Any?
+    private var localMonitor: Any?
+    private var localMouseMonitor: Any?
+    private var globalMonitor: Any?
+
+    init(model: AppModel, statusItem: NSStatusItem) {
+        self.model = model
+        self.statusItem = statusItem
+        super.init()
+        let hosting = NSHostingController(rootView: StatusPanelView(model: model))
+        let content = StatusPanelContentViewController(hostingController: hosting)
+        hostingController = hosting
+        contentController = content
+        panel.contentViewController = content
+        panel.onClose = { [weak self] in self?.removeEventMonitors() }
+    }
+
+    var isShown: Bool { panel.isVisible }
+
+    // MARK: 显示 / 隐藏
+
+    func toggle() {
+        if panel.isVisible { close() } else { show() }
+    }
+
+    func show() {
+        guard let button = statusItem.button else { return }
+        fitToContent()
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        positionPanel(button: button)
+        panel.invalidateShadow()
+        installEventMonitors()
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            panel.alphaValue = 1
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.08
+            context.allowsImplicitAnimation = true
+            self.panel.animator().alphaValue = 1
+        }
+    }
+
+    func close() {
+        guard panel.isVisible else { return }
+        removeEventMonitors()
+        panel.close()
+    }
+
+    /// 数据更新导致内容高度变化时，保持锚点重新适配。
+    func fitIfVisible() {
+        guard panel.isVisible, let button = statusItem.button else { return }
+        fitToContent()
+        positionPanel(button: button)
+        panel.invalidateShadow()
+    }
+
+    /// 语言/主题变化时重建背景材质。
+    func refreshBackground() {
+        contentController?.applyBackgroundStyle()
+    }
+
+    // MARK: 尺寸与位置
+
+    private func fitToContent() {
+        guard let content = contentController else { return }
+        content.loadViewIfNeededCompat()
+        content.view.layoutSubtreeIfNeeded()
+        let size = content.intrinsicContentSize
+        guard size.width > 0, size.height > 0 else { return }
+        let target = NSSize(width: ceil(size.width), height: ceil(size.height))
+        if abs(panel.frame.width - target.width) > 0.5 || abs(panel.frame.height - target.height) > 0.5 {
+            panel.setContentSize(target)
+        }
+    }
+
+    private func positionPanel(button: NSStatusBarButton) {
+        guard let buttonWindow = button.window else { return }
+        let anchorRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let size = panel.frame.size
+        let gap: CGFloat = 6
+        var x = anchorRect.midX - size.width / 2
+        var y = anchorRect.minY - gap - size.height
+
+        if let screen = buttonWindow.screen ?? NSScreen.main {
+            let visible = screen.visibleFrame
+            x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
+            if y < visible.minY + 8 { y = visible.minY + 8 }
+            if y + size.height > visible.maxY { y = visible.maxY - size.height }
+        }
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    // MARK: 事件
+
+    private func installEventMonitors() {
+        removeEventMonitors()
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] event in
+            guard let self else { return }
+            if event.window != self.panel { self.close() }
+        }
+        localMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.keyDown]
+        ) { [weak self] event in
+            guard let self else { return event }
+            if event.keyCode == 53, self.panel.isVisible {
+                self.close()
+                return nil
+            }
+            return event
+        }
+        // 点击 DSH 主窗口等本应用内其他窗口时也要关闭面板
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] event in
+            guard let self, self.panel.isVisible else { return event }
+            if event.window === self.panel { return event }
+            if event.window === self.statusItem.button?.window { return event }
+            self.close()
+            return event
+        }
+    }
+
+    private func removeEventMonitors() {
+        if let globalMonitor {
+            NSEvent.removeMonitor(globalMonitor)
+            self.globalMonitor = nil
+        }
+        if let localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            self.localMonitor = nil
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+            self.localMouseMonitor = nil
+        }
+    }
+}
+
+// MARK: - 面板窗口
+
+final class AnchoredStatusPanel: NSPanel {
+    static let cornerRadius: CGFloat = 16
+    var onClose: (() -> Void)?
+
+    init() {
+        super.init(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        isFloatingPanel = true
+        level = .statusBar
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        isReleasedWhenClosed = false
+        hidesOnDeactivate = false
+        isMovable = false
+        animationBehavior = .none
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 {
+            close()
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        close()
+    }
+
+    override func close() {
+        guard isVisible else { return }
+        super.close()
+        onClose?()
+    }
+}
+
+// MARK: - 内容容器（材质）
+
+final class StatusPanelContentViewController: NSViewController {
+    private let hostingController: NSViewController
+    private var backgroundView: NSView?
+
+    init(hostingController: NSViewController) {
+        self.hostingController = hostingController
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let container = NSView(frame: .zero)
+        container.wantsLayer = true
+        container.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        container.layer?.masksToBounds = true
+        view = container
+
+        addChild(hostingController)
+        installBackground(in: container)
+    }
+
+    func loadViewIfNeededCompat() {
+        _ = view
+    }
+
+    var intrinsicContentSize: NSSize {
+        hostingController.view.fittingSize
+    }
+
+    func applyBackgroundStyle() {
+        guard isViewLoaded else { return }
+        installBackground(in: view)
+    }
+
+    private var reduceTransparency: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    }
+
+    private func installBackground(in container: NSView) {
+        backgroundView?.removeFromSuperview()
+        backgroundView = nil
+        hostingController.view.removeFromSuperview()
+
+        let background = makeBackgroundView(in: container)
+        background.autoresizingMask = [.width, .height]
+        background.frame = container.bounds
+        container.addSubview(background)
+        backgroundView = background
+
+        if hostingController.view.superview == nil {
+            hostingController.view.frame = container.bounds
+            hostingController.view.autoresizingMask = [.width, .height]
+            container.addSubview(hostingController.view)
+        }
+    }
+
+    private func makeBackgroundView(in container: NSView) -> NSView {
+        if reduceTransparency {
+            let solid = NSView(frame: container.bounds)
+            solid.wantsLayer = true
+            solid.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            solid.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+            solid.layer?.masksToBounds = true
+            solid.autoresizingMask = [.width, .height]
+            return solid
+        }
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView(frame: container.bounds)
+            glass.style = .regular
+            glass.cornerRadius = AnchoredStatusPanel.cornerRadius
+            let glassContent = NSView(frame: glass.bounds)
+            glassContent.autoresizingMask = [.width, .height]
+            hostingController.view.frame = glassContent.bounds
+            hostingController.view.autoresizingMask = [.width, .height]
+            glassContent.addSubview(hostingController.view)
+            glass.contentView = glassContent
+            return glass
+        }
+        let effect = NSVisualEffectView(frame: container.bounds)
+        effect.material = .popover
+        effect.blendingMode = .behindWindow
+        effect.state = .active
+        effect.wantsLayer = true
+        effect.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        effect.layer?.masksToBounds = true
+        return effect
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        if #available(macOS 26.0, *), let glass = backgroundView as? NSGlassEffectView {
+            hostingController.view.frame = hostingController.view.superview?.bounds ?? glass.bounds
+        } else {
+            hostingController.view.frame = view.bounds
+        }
+    }
+}

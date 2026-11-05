@@ -53,8 +53,6 @@ enum MenuBarIconRenderer {
     private static let innerWidth: CGFloat = 1.4
     /// 动态弧跨度。
     private static let spinnerSweep: CGFloat = 250
-    /// 颜色交界处的渐变过渡角度。
-    private static let blendAngle: CGFloat = 34
 
     // MARK: 对外入口
 
@@ -94,7 +92,7 @@ enum MenuBarIconRenderer {
         let hasOuter = !segments.isEmpty
 
         if hasOuter {
-            drawGradientRing(segments)
+            drawAttentionRing(segments)
         }
 
         if model.runningCount > 0 {
@@ -185,12 +183,14 @@ enum MenuBarIconRenderer {
         return result
     }
 
-    private static func drawGradientRing(_ weighted: [(NSColor, CGFloat)]) {
+    /// 连续整环 + 颜色交界处的发丝分隔（1pt 白色 45%）。
+    /// 不做色相渐变：黄/绿/红在 22pt 上混合会发脏，改用清晰色块 + 极细分隔线。
+    private static func drawAttentionRing(_ weighted: [(NSColor, CGFloat)]) {
         let segments = angledSegments(weighted)
         guard !segments.isEmpty else { return }
 
-        // 单色：直接一个整环，不留接缝
         if segments.count == 1 {
+            segments[0].color.setStroke()
             let ring = NSBezierPath(ovalIn: NSRect(
                 x: center.x - outerRadius,
                 y: center.y - outerRadius,
@@ -198,62 +198,47 @@ enum MenuBarIconRenderer {
                 height: outerRadius * 2
             ))
             ring.lineWidth = outerWidth
-            segments[0].color.setStroke()
             ring.stroke()
             return
         }
 
-        // 多色：按 0.8° 采样逐个描小弧，交界处做渐变
-        var angle: CGFloat = 0
-        while angle < 360 {
-            let sample = angle + 0.4
-            let color = colorAt(sample, segments: segments)
-            color.setStroke()
+        // 色块：首尾相接，不留背景缝（用 butt 端点避免圆头互相咬合）
+        for segment in segments {
             let arc = NSBezierPath()
             arc.appendArc(withCenter: center, radius: outerRadius,
-                          startAngle: 90 - angle, endAngle: 90 - angle - 1.0, clockwise: true)
+                          startAngle: 90 - segment.start,
+                          endAngle: 90 - (segment.start + segment.length),
+                          clockwise: true)
             arc.lineWidth = outerWidth
             arc.lineCapStyle = .butt
+            segment.color.setStroke()
             arc.stroke()
-            angle += 0.8
         }
-    }
 
-    private static func colorAt(_ angle: CGFloat, segments: [RingSegment]) -> NSColor {
-        let half = blendAngle / 2
-        // 交界处渐变（含首尾环绕）
-        for (index, segment) in segments.enumerated() {
-            let boundary = segment.start
-            var delta = angle - boundary
-            if delta > 180 { delta -= 360 }
-            if delta < -180 { delta += 360 }
-            if abs(delta) <= half {
-                let previous = segments[(index - 1 + segments.count) % segments.count]
-                let t = smoothstep((delta + half) / blendAngle)
-                return blend(previous.color, segment.color, t)
-            }
-        }
+        // 交界：径向发丝线，制造清晰分界
         for segment in segments {
-            var local = angle - segment.start
-            if local < 0 { local += 360 }
-            if local < segment.length { return segment.color }
+            drawSeparator(at: segment.start)
         }
-        return segments[0].color
     }
 
-    private static func smoothstep(_ t: CGFloat) -> CGFloat {
-        let x = min(max(t, 0), 1)
-        return x * x * (3 - 2 * x)
+    /// 在指定角度画一条径向发丝分隔线（略微超出环宽，端点是圆的）。
+    private static func drawSeparator(at angle: CGFloat) {
+        let radians = (90 - angle) * .pi / 180
+        let direction = NSPoint(x: cos(radians), y: sin(radians))
+        let innerRadius = outerRadius - outerWidth / 2 + 0.15
+        let outerR = outerRadius + outerWidth / 2 - 0.15
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: center.x + direction.x * innerRadius,
+                              y: center.y + direction.y * innerRadius))
+        path.line(to: NSPoint(x: center.x + direction.x * outerR,
+                              y: center.y + direction.y * outerR))
+        path.lineWidth = 0.9
+        path.lineCapStyle = .round
+        NSColor.white.withAlphaComponent(0.45).setStroke()
+        path.stroke()
     }
 
-    private static func blend(_ a: NSColor, _ b: NSColor, _ t: CGFloat) -> NSColor {
-        let ca = a.usingColorSpace(.sRGB) ?? a
-        let cb = b.usingColorSpace(.sRGB) ?? b
-        return NSColor(srgbRed: ca.redComponent + (cb.redComponent - ca.redComponent) * t,
-                       green: ca.greenComponent + (cb.greenComponent - ca.greenComponent) * t,
-                       blue: ca.blueComponent + (cb.blueComponent - ca.blueComponent) * t,
-                       alpha: ca.alphaComponent + (cb.alphaComponent - ca.alphaComponent) * t)
-    }
+
 
     // MARK: 运行中动态弧
 

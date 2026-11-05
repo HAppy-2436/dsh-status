@@ -17,7 +17,7 @@
 | `quit-confirm-dark.png` | 退出二次确认弹窗（深色，默认焦点在「取消」） |
 | `p1-devhost-panel.png` / `p1-devhost-menubar.png` | P1 联调截图：`plugin/test/dev-host.mjs` 假 Host + 真实 App 走完整桥协议（SSE/状态合并）；数据为开发演示数据，非真实 DSH |
 
-图标语义（v4 双层环）：空闲 = 鲸鱼；外层彩色渐变环 = 需要介入（待回答黄 / 已停止红 / 已完成绿，按数量比例）；
+图标语义（v4 双层环）：空闲 = 鲸鱼；外层彩色环 = 需要介入（待回答黄 / 已停止红 / 已完成绿，按数量比例）；
 内层动态弧 = 运行中；只有运行中时动态弧用外环大小 + 中心运行数；双层时不显示数字。
 
 配色与面板/设置页结构参考 [Status Trio](https://github.com/lingyired/status-trio)（Apache-2.0）。

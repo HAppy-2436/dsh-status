@@ -51,19 +51,39 @@ final class CometAnimator {
 
         guard animate else { return }
 
-        // 匀速旋转（3.0s/圈，线性）+ 轻柔呼吸（1.8s 单程自动反转，幅度较小）
-        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
-        spin.fromValue = 0
-        spin.toValue = -2 * Double.pi      // 顺时针
-        spin.duration = 3.0
+        // 旋转：顺时针，平均 3.0s/圈；速度做 ±32% 的平滑起伏（有节奏但不杂乱）
+        // 用数值采样生成关键帧，保证首尾正好整数圈、无缝循环。
+        let cycle: Double = 6.0            // 一轮节奏 6s
+        let turns: Double = 2              // 6s 转 2 圈（平均 3s/圈）
+        let samples = 48
+        let dt = cycle / Double(samples)
+        let totalAngle = turns * 2 * Double.pi
+        let baseSpeed = totalAngle / cycle
+        var values: [Double] = []
+        var keyTimes: [NSNumber] = []
+        var angle: Double = 0
+        var t: Double = 0
+        for i in 0...samples {
+            values.append(angle)                     // 正角度 = 顺时针
+            keyTimes.append(NSNumber(value: t / cycle))
+            let modulation = 1.0 + 0.32 * sin(2 * Double.pi * t / cycle)
+            angle += baseSpeed * modulation * dt
+            t += dt
+        }
+        values[samples] = totalAngle                 // 收尾对齐整数圈
+
+        let spin = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+        spin.values = values
+        spin.keyTimes = keyTimes
+        spin.duration = cycle
         spin.repeatCount = .infinity
-        spin.timingFunction = CAMediaTimingFunction(name: .linear)
+        spin.calculationMode = .linear
         cometLayer.add(spin, forKey: "spin")
 
         let breathe = CABasicAnimation(keyPath: "strokeEnd")
-        breathe.fromValue = 0.28
-        breathe.toValue = 0.52
-        breathe.duration = 1.8
+        breathe.fromValue = 0.26
+        breathe.toValue = 0.58
+        breathe.duration = 1.7
         breathe.autoreverses = true
         breathe.repeatCount = .infinity
         breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)

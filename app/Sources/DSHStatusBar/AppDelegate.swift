@@ -106,6 +106,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bridge.start()
 
         // 调试：启动后自动打开面板（便于截图/验收）
+        if CommandLine.arguments.contains("--test-ring-transition") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.statusItemController.debugPlayRingTransition()
+            }
+        }
         if CommandLine.arguments.contains("--open-panel") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
                 self?.panelController.show()

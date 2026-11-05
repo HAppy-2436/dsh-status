@@ -82,9 +82,12 @@ enum MenuBarIconRenderer {
     }
 
     /// 只渲染静态层（外环/轨道/数字/鲸鱼/虚线），供 Core Animation 图层复用。
-    static func staticImage(for model: IconModel, appearance: NSAppearance) -> NSImage {
+    /// `includeRing == false` 时不画外层彩色环（状态切换过渡用：先藏环再扫入）。
+    static func staticImage(for model: IconModel, appearance: NSAppearance,
+                            includeRing: Bool = true) -> NSImage {
         render(width: canvas, height: canvas, appearance: appearance) { _ in
-            draw(model: model, appearance: appearance, includeComet: false, cometSweep: nil)
+            draw(model: model, appearance: appearance, includeComet: false, cometSweep: nil,
+                 includeRing: includeRing)
         }
     }
 
@@ -107,6 +110,15 @@ enum MenuBarIconRenderer {
 
     static var canvasCenter: CGPoint { center }
 
+    /// 外环的半径/线宽（点）。
+    static var ringGeometry: (radius: CGFloat, width: CGFloat) { (outerRadius, outerWidth) }
+
+    /// 当前状态外环的颜色；nil 表示无外环（空闲 / 未连接）。
+    static func ringColor(for model: IconModel, appearance: NSAppearance) -> NSColor? {
+        guard model.connected, let top = model.topPriorityStatus else { return nil }
+        return Theme.statusNSColor(top, dark: isDark(appearance))
+    }
+
     static func tooltip(for model: IconModel) -> String {
         guard model.connected else { return "DSH 未连接" }
         guard !model.isEmpty else { return "DSH：全部空闲" }
@@ -122,7 +134,8 @@ enum MenuBarIconRenderer {
 
     private static func draw(model: IconModel, appearance: NSAppearance,
                              includeComet: Bool,
-                             cometSweep: (start: CGFloat, sweep: CGFloat)?) {
+                             cometSweep: (start: CGFloat, sweep: CGFloat)?,
+                             includeRing: Bool = true) {
         let dark = isDark(appearance)
 
         guard model.connected else {
@@ -139,7 +152,7 @@ enum MenuBarIconRenderer {
         let top = model.topPriorityStatus
         let hasOuter = top != nil
 
-        if let top {
+        if let top, includeRing {
             Theme.statusNSColor(top, dark: dark).setStroke()
             let ring = NSBezierPath(ovalIn: NSRect(
                 x: center.x - outerRadius,

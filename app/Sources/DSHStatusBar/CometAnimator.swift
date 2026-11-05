@@ -114,6 +114,79 @@ final class CometAnimator {
     }
 
     private var currentSpec: MenuBarIconRenderer.CometSpec?
+    /// 状态切换过渡用的临时外环图层。
+    private var ringTransitionLayer: CAShapeLayer?
+
+    /// 过渡期间暂停并隐藏彗星弧，避免和外环扫入叠在一起。
+    func suspendComet() {
+        cometLayer.removeAllAnimations()
+        cometLayer.isHidden = true
+    }
+
+    // MARK: 状态切换过渡
+
+    /// 外环状态变化时的过渡：旧色 → 新色渐变，同时按「扫一圈」填充/收缩。
+    /// - from / to 为外环颜色，nil 表示没有外环（空闲/未连接）。
+    func playRingTransition(from: NSColor?, to: NSColor?, completion: @escaping () -> Void) {
+        guard let button = attachedButton else { completion(); return }
+        cancelRingTransition()
+
+        let geometry = MenuBarIconRenderer.ringGeometry
+        let scale = max(0.5, min(button.bounds.height / designSize, 1.6))
+        let layer = CAShapeLayer()
+        layer.frame = button.bounds
+        layer.fillColor = nil
+        layer.lineWidth = geometry.width * scale
+        layer.lineCap = .round
+        layer.strokeStart = 0
+        layer.strokeEnd = 0
+        let center = CGPoint(x: button.bounds.midX, y: button.bounds.midY)
+        let path = CGMutablePath()
+        path.addArc(center: center, radius: geometry.radius * scale,
+                    startAngle: -.pi / 2, endAngle: .pi * 1.5, clockwise: false)
+        layer.path = path
+        layer.strokeColor = (to ?? from ?? NSColor.white).cgColor
+        button.layer?.addSublayer(layer)
+        ringTransitionLayer = layer
+
+        let duration: CFTimeInterval = 0.45
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            self?.finishRingTransition()
+            completion()
+        }
+
+        // 扫一圈：从无到有（或从有到无）
+        let sweep = CABasicAnimation(keyPath: "strokeEnd")
+        sweep.fromValue = (to == nil ? 1.0 : 0.0)
+        sweep.toValue = (to == nil ? 0.0 : 1.0)
+        sweep.duration = duration
+        sweep.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(sweep, forKey: "sweep")
+        layer.strokeEnd = (to == nil ? 0.0 : 1.0)
+
+        // 颜色渐变：新旧颜色都存在且不同时，颜色跟着扫过从旧色过渡到新色
+        if let from, let to, from != to {
+            let colorAnim = CAKeyframeAnimation(keyPath: "strokeColor")
+            colorAnim.values = [from.cgColor, to.cgColor]
+            colorAnim.duration = duration
+            colorAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(colorAnim, forKey: "color")
+        }
+        CATransaction.commit()
+    }
+
+    func cancelRingTransition() {
+        ringTransitionLayer?.removeAllAnimations()
+        ringTransitionLayer?.removeFromSuperlayer()
+        ringTransitionLayer = nil
+    }
+
+    private func finishRingTransition() {
+        ringTransitionLayer?.removeAllAnimations()
+        ringTransitionLayer?.removeFromSuperlayer()
+        ringTransitionLayer = nil
+    }
 
     private func rebuildPath(radius: CGFloat) {
         let center = CGPoint(x: bounds.midX, y: bounds.midY)

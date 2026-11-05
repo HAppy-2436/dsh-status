@@ -95,6 +95,7 @@ final class AppSettings: ObservableObject {
         didSet { save("centerNumberMode", centerNumberMode.rawValue) }
     }
     @Published var runAnimation: Bool { didSet { save("runAnimation", runAnimation) } }
+    @Published var transitionAnimation: Bool { didSet { save("transitionAnimation", transitionAnimation) } }
     @Published var notifyWaiting: Bool { didSet { save("notifyWaiting", notifyWaiting) } }
     @Published var notifyCompleted: Bool { didSet { save("notifyCompleted", notifyCompleted) } }
     @Published var notifyStopped: Bool { didSet { save("notifyStopped", notifyStopped) } }
@@ -117,7 +118,7 @@ final class AppSettings: ObservableObject {
         for domain in legacyDefaultsDomains {
             guard let legacy = UserDefaults(suiteName: domain),
                   legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
-            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation",
+            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "confirmBeforeQuit",
                         "panelBackgroundStyle"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
@@ -144,6 +145,7 @@ final class AppSettings: ObservableObject {
         }
         centerNumberMode = storedCenterMode
         runAnimation = defaults.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
+        transitionAnimation = defaults.object(forKey: "dshStatus.transitionAnimation") as? Bool ?? true
         notifyWaiting = defaults.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
         notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
         notifyStopped = defaults.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
@@ -162,6 +164,7 @@ final class AppSettings: ObservableObject {
         hiddenWorkspaces = []
         centerNumberMode = .all
         runAnimation = true
+        transitionAnimation = true
         notifyWaiting = true
         notifyCompleted = false
         notifyStopped = false
@@ -451,6 +454,13 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 150)
             }
+            SettingsToggleRow(
+                symbol: "circle.dashed",
+                tint: Theme.statusColor(.completed, scheme: colorScheme),
+                title: "状态切换动效",
+                subtitle: "状态变化时外环扫一圈 + 颜色渐变过渡",
+                isOn: $settings.transitionAnimation
+            )
             SettingsMenuRow(
                 symbol: "arrow.triangle.2.circlepath",
                 tint: Theme.statusColor(.running, scheme: colorScheme),

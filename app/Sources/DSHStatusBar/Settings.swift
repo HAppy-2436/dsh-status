@@ -5,24 +5,42 @@ import Combine
 // MARK: - 设置模型
 
 enum CenterNumberMode: String, CaseIterable, Identifiable {
+    /// 全部非空闲任务（含运行中）——默认。
+    case all
+    /// 需要介入的数量（待回答 + 已停止 + 已完成）。
     case attention
-    case nonIdle
+    /// 与当前环颜色一致的那一类状态的数量。
+    case matched
     case hidden
 
     var id: String { rawValue }
 
+    /// 历史值 `nonIdle` 等价于 `all`。
+    init(stored: String?) {
+        switch stored {
+        case "nonIdle": self = .all
+        case CenterNumberMode.all.rawValue: self = .all
+        case CenterNumberMode.attention.rawValue: self = .attention
+        case CenterNumberMode.matched.rawValue: self = .matched
+        case CenterNumberMode.hidden.rawValue: self = .hidden
+        default: self = .all
+        }
+    }
+
     var label: String {
         switch self {
-        case .attention: return "关注数（待回答+已完成+已停止）"
-        case .nonIdle: return "非空闲总数（含运行中）"
+        case .all: return "全部任务数（含运行中）"
+        case .attention: return "需要介入的数量"
+        case .matched: return "与环颜色一致的数量"
         case .hidden: return "不显示数字"
         }
     }
 
     var shortLabel: String {
         switch self {
-        case .attention: return "关注数"
-        case .nonIdle: return "非空闲总数"
+        case .all: return "全部任务"
+        case .attention: return "需要介入"
+        case .matched: return "与环色一致"
         case .hidden: return "不显示"
         }
     }
@@ -118,7 +136,13 @@ final class AppSettings: ObservableObject {
         let statuses = storedStatuses?.compactMap { SessionStatus(rawValue: $0) } ?? []
         visibleStatuses = Set(statuses.isEmpty ? SessionStatus.allCases.filter { $0 != .idle } : statuses)
         hiddenWorkspaces = Set(defaults.stringArray(forKey: "dshStatus.hiddenWorkspaces") ?? [])
-        centerNumberMode = CenterNumberMode(rawValue: defaults.string(forKey: "dshStatus.centerNumberMode") ?? "") ?? .attention
+        var storedCenterMode = CenterNumberMode(stored: defaults.string(forKey: "dshStatus.centerNumberMode"))
+        if persist, defaults.object(forKey: "dshStatus.centerNumberModeVersion") == nil {
+            // 旧版默认是「关注数」，新版默认「全部任务数」；只有「不显示」视为用户明确选择
+            if storedCenterMode != .hidden { storedCenterMode = .all }
+            defaults.set(2, forKey: "dshStatus.centerNumberModeVersion")
+        }
+        centerNumberMode = storedCenterMode
         runAnimation = defaults.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
         notifyWaiting = defaults.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
         notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
@@ -136,7 +160,7 @@ final class AppSettings: ObservableObject {
     func reset() {
         visibleStatuses = Set(SessionStatus.allCases.filter { $0 != .idle })
         hiddenWorkspaces = []
-        centerNumberMode = .attention
+        centerNumberMode = .all
         runAnimation = true
         notifyWaiting = true
         notifyCompleted = false
@@ -411,7 +435,7 @@ struct SettingsView: View {
 
     private var iconSettings: some View {
         SettingsGroup("菜单栏图标",
-                      footnote: "外层环 = 需要介入的任务（黄待答 / 红停止 / 绿完成，按数量渐变）；内层动态弧 = 运行中。") {
+                      footnote: "外环单色 = 当前最高优先级待办（红停止 > 黄待答 > 绿完成）；内层动态弧 = 运行中。") {
             SettingsMenuRow(
                 symbol: "number.circle.fill",
                 tint: Theme.statusColor(.running, scheme: colorScheme),

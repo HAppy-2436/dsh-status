@@ -44,25 +44,24 @@ enum PreviewRenderer {
 
     private static let states: [(String, String, IconModel)] = [
         ("空闲", "没有任何非空闲任务 · 鲸鱼 Logo", IconModel(statuses: [])),
-        ("1 个运行中", "整个圆环 = 动态弧 · 中心 1", IconModel(statuses: [.running], animationPhase: 0)),
-        ("3 个运行中", "整个圆环 = 动态弧 · 中心 3", IconModel(statuses: [.running, .running, .running], animationPhase: 40)),
-        ("1 个待回答", "整环 = 黄 · 中心 1", IconModel(statuses: [.waiting])),
+        ("1 个运行中", "整环 = 动态弧 · 中心 1", IconModel(statuses: [.running], animationPhase: 0)),
+        ("3 个运行中", "整环 = 动态弧 · 中心 3", IconModel(statuses: [.running, .running, .running], animationPhase: 40)),
         ("1 个已完成", "整环 = 绿 · 中心 1", IconModel(statuses: [.completed])),
-        ("1 个已停止", "整环 = 红 · 中心 1", IconModel(statuses: [.stopped])),
-        ("2 待答 + 2 完成", "一个任务一段（不合并）· 圆头端点 + 缺口 · 中心 4", IconModel(statuses: [.waiting, .waiting, .completed, .completed])),
-        ("1 停止 + 1 待答", "两段 · 红/黄 · 中心 2", IconModel(statuses: [.stopped, .waiting])),
-        ("2 运行 + 1 待答", "外环 1 段黄 + 内环动态弧（不显示数字）",
-         IconModel(statuses: [.waiting, .running, .running], animationPhase: 0)),
-        ("2 运行 + 1 待答 + 1 完成", "外环两段（黄/绿）+ 内环动态弧",
-         IconModel(statuses: [.waiting, .completed, .running, .running], animationPhase: 30)),
-        ("3 运行 + 1 停止", "外环 1 段红 + 内环动态弧",
-         IconModel(statuses: [.stopped, .running, .running, .running], animationPhase: 70)),
-        ("4 待答 + 4 完成", "8 段 · 每段就是一个圆点",
-         IconModel(statuses: Array(repeating: .waiting, count: 4) + Array(repeating: .completed, count: 4))),
-        ("6 待答 + 6 完成", "12 段 · 每段就是一个圆点",
-         IconModel(statuses: Array(repeating: .waiting, count: 6) + Array(repeating: .completed, count: 6))),
-        ("数字 = 非空闲总数", "设置：中心数字改为「非空闲总数」",
-         IconModel(statuses: [.waiting, .completed], numberMode: .nonIdle)),
+        ("3 个已完成", "整环 = 绿 · 中心 3", IconModel(statuses: [.completed, .completed, .completed])),
+        ("2 个待回答", "整环 = 黄（高于绿）· 中心 2", IconModel(statuses: [.waiting, .waiting])),
+        ("待回答 + 已完成", "整环 = 黄（黄高于绿）· 中心 3", IconModel(statuses: [.waiting, .completed, .completed])),
+        ("1 个已停止", "整环 = 红（最高）· 中心 1", IconModel(statuses: [.stopped])),
+        ("停止 + 待答 + 完成", "整环 = 红 · 中心 = 全部任务数 6", IconModel(statuses: [.stopped, .waiting, .waiting, .completed, .completed, .completed])),
+        ("红 + 2 个运行中", "外环红 + 内环动态弧（不显示数字）",
+         IconModel(statuses: [.stopped, .running, .running], animationPhase: 0)),
+        ("黄 + 2 个运行中", "外环黄 + 内环动态弧",
+         IconModel(statuses: [.waiting, .running, .running], animationPhase: 30)),
+        ("绿 + 1 个运行中", "外环绿 + 内环动态弧",
+         IconModel(statuses: [.completed, .running], animationPhase: 70)),
+        ("中心数字 = 与环色一致", "设置：数字只显示环色对应状态的数量",
+         IconModel(statuses: [.waiting, .waiting, .completed], numberMode: .matched)),
+        ("中心数字 = 仅需介入", "设置：数字显示待回答+已停止+已完成",
+         IconModel(statuses: [.waiting, .running, .running], numberMode: .attention)),
         ("未连接", "灰色虚线环 + 短横", IconModel(statuses: [], connected: false)),
     ]
 
@@ -88,7 +87,7 @@ enum PreviewRenderer {
 
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold), color: .labelColor,
                      at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("外层环 = 需要介入（一个任务一段，黄待答/红停止/绿完成）· 内层动态弧 = 运行中 · 中心数字见说明",
+            drawText("外环单色 = 最高优先级待办（红停止 > 黄待答 > 绿完成）· 内层动态弧 = 运行中 · 中心数字可设置",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 
@@ -273,7 +272,7 @@ enum PreviewRenderer {
             rect.fill()
             drawText("DSH Status 设置页 · 深色", font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("显示状态 / 隐藏项目 / 菜单栏数字 / 圆环段数上限 / 通知；修改即时生效",
+            drawText("显示状态 / 隐藏项目 / 菜单栏数字语义 / 运行中动画 / 面板材质 / 通知；修改即时生效",
                      font: .systemFont(ofSize: 11), color: .secondaryLabelColor,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

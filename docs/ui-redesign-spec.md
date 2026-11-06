@@ -66,8 +66,7 @@
   图标按钮 24×24 命中区、hover 底色圆角 5；禁用彩色 hover。
 - 面板出现：**0.16s ease-out 淡入**（Reduce Motion 时直接显示）；关闭立即；内容高度变化不打断交互。
 - 面板打开期间状态项显示**高亮胶囊**：胶囊形（圆角=高度/2）、高度≈23pt、宽度≈item 宽、白色 18%（对齐原生天气模块）。
-- **材质用独立非 key 子窗口渲染**（内容窗口仍 key）：`NSGlassEffectView` 在 key 窗口下会叠加提亮/实色，
-  只有非 key 渲染才是与「失焦态」一致的半透明液态玻璃；双窗口结构同时保住 Esc/键盘交互。
+- 玻璃与内容同处一个 key 窗口（保证原生液态玻璃的折射/高光），阴影用窗口四周 24pt 透明边距 + 图层自绘。
 - 键盘：Esc 关闭；点击外部关闭（含本 App 其它窗口）；再次点状态项关闭。逻辑保持现有实现，
   仅把 footer 按钮改为整块可点区域（避免点不中）。
 
@@ -76,9 +75,9 @@
 - 保持自定义 `NSPanel`（无箭头、`.statusBar` 层级、跨 Space、非激活面板但 `makeKey` 保证 active 渲染），
   圆角 20pt；材质三档保持：Liquid Glass（`NSGlassEffectView`，macOS 26+）/ 经典磨砂（`.popover`）/ 实色；
   「降低透明度」→ 实色。
-- Liquid Glass 的 tint 必须是**低透明度**（`NSColor(white:1, alpha:0.12)`）：
-  不透明 tint（`.windowBackgroundColor`/不透明灰）在窗口为 key 时会被 `NSGlassEffectView` 渲染成实色卡片；
-  低透明度 tint 才能让焦点态保持半透明液态玻璃（与未聚焦观感一致）。
+- Liquid Glass 的 tint 用**低透明度黑色**（`NSColor(white:0, alpha:0.25)`）：对齐原生天气模块的深色通透玻璃；
+  不透明 tint 在 key 窗口下会渲染成实色卡片，白色 tint 会发白发雾（失去液态玻璃通透感）。
+- **玻璃必须渲染在 key 窗口**：`NSGlassEffectView` 在非 key 窗口/子窗口里会退化成平的模糊，没有折射与高光。
 - 定位：锚定状态项下方 6pt；屏幕可见区域夹取（左右 8pt、底部 8pt）；高度随内容，最大 480。
 - 阴影用系统窗口阴影，不额外自绘。
 

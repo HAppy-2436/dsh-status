@@ -129,10 +129,11 @@ final class StatusPanelController: NSObject {
             // 按下态高亮实测（相对按钮）：左右各外扩 2、顶部比按钮顶高 1、底部比按钮底低 3（合计高 26.5）。
             let width = buttonRect.width + 4
             let height: CGFloat = 26.5
-            let frame = NSRect(x: buttonRect.midX - width / 2,
-                               y: buttonRect.maxY + 1 - height,
-                               width: width,
-                               height: height)
+            let capsule = NSRect(x: buttonRect.midX - width / 2,
+                                 y: buttonRect.maxY + 1 - height,
+                                 width: width,
+                                 height: height)
+            let frame = capsule
             highlightWindow.setFrame(frame, display: false)
             highlightWindow.orderFrontRegardless()
         } else {
@@ -259,11 +260,12 @@ final class StatusItemHighlightWindow: NSPanel {
         animationBehavior = .none
         ignoresMouseEvents = true
 
+        // 与系统按下态一致：42×26.5、圆角 13.25 continuous、白色 26%（实测按下态填充 114/255）。
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 42, height: 26.5))
         view.wantsLayer = true
-        view.layer?.cornerRadius = 10.75
-        view.layer?.cornerCurve = .circular
-        view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.28).cgColor
+        view.layer?.cornerRadius = 13.25
+        view.layer?.cornerCurve = .continuous
+        view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.26).cgColor
         view.autoresizingMask = [.width, .height]
         contentView = view
     }

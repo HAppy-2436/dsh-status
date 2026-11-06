@@ -111,45 +111,32 @@ final class StatusPanelController: NSObject {
         contentController?.refreshBackground()
     }
 
-    // MARK: 状态项高亮（面板打开时，与原生菜单栏项一致）
+    // MARK: 状态项高亮（完全对齐系统「按下状态」的高亮）
 
-    private var selectionView: NSView?
+    /// 状态项自己的窗口只有 item 宽度，画不出系统按下态那种 42pt 宽的胶囊；
+    /// 用一个透明覆盖窗口在菜单栏上画，尺寸/颜色/位置按本机实测的按下高亮复刻：
+    /// 宽度 = item 宽 + 4、高 26.5、圆角 10.75、白色 28%、顶部距菜单栏顶 2.5。
+    private let highlightWindow = StatusItemHighlightWindow()
 
     private func setStatusItemHighlighted(_ highlighted: Bool) {
         guard let button = statusItem.button,
-              let host = button.window?.contentView ?? button.superview else { return }
+              let itemWindow = button.window else {
+            highlightWindow.orderOut(nil)
+            return
+        }
         if highlighted {
-            // 对齐 Status Trio / 原生菜单栏 extra 的胶囊高亮（实测 40×26.5pt、白色 15%）：
-            // 高 26.5、顶部与按钮顶部齐、底部贴菜单栏下沿；放进菜单栏窗口最底层才不会被按钮 bounds 裁掉。
-            let buttonRect = host.convert(button.bounds, from: button)
+            let buttonRect = itemWindow.convertToScreen(button.convert(button.bounds, to: nil))
+            // 按下态高亮实测（相对按钮）：左右各外扩 2、顶部比按钮顶高 1、底部比按钮底低 3（合计高 26.5）。
+            let width = buttonRect.width + 4
             let height: CGFloat = 26.5
-            let width = button.bounds.width + 4.5
             let frame = NSRect(x: buttonRect.midX - width / 2,
-                               y: buttonRect.minY - 3.5,
+                               y: buttonRect.maxY + 1 - height,
                                width: width,
                                height: height)
-            if selectionView?.superview !== host {
-                selectionView?.removeFromSuperview()
-                let view = PassthroughView(frame: frame)
-                view.wantsLayer = true
-                view.layer?.cornerRadius = height / 2
-                // 用默认 circular 曲线：胶囊两端是半圆（continuous 会变成 squircle，和系统高亮不一致）
-                view.layer?.cornerCurve = .circular
-                view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.15).cgColor
-                // 放进菜单栏窗口的最底层，避开按钮/内部视图的裁剪（胶囊要占满 29pt 菜单栏高度）。
-                if let first = host.subviews.first {
-                    host.addSubview(view, positioned: .below, relativeTo: first)
-                } else {
-                    host.addSubview(view)
-                }
-                selectionView = view
-            } else {
-                selectionView?.frame = frame
-                selectionView?.layer?.cornerRadius = height / 2
-            }
-            selectionView?.isHidden = false
+            highlightWindow.setFrame(frame, display: false)
+            highlightWindow.orderFrontRegardless()
         } else {
-            selectionView?.isHidden = true
+            highlightWindow.orderOut(nil)
         }
     }
 
@@ -250,12 +237,41 @@ final class StatusPanelController: NSObject {
 
 // MARK: - 面板窗口
 
-/// 不参与命中测试的装饰视图（状态项高亮背景，不能抢走按钮点击）。
-private final class PassthroughView: NSView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+/// 与 Status Trio 的 `AnchoredStatusPanel` 同构：无边框、非激活、可成为 key、系统窗口阴影、圆角 16。
+/// 菜单栏状态项的「按下态」高亮覆盖窗口：只画一个圆角矩形，忽略鼠标事件。
+final class StatusItemHighlightWindow: NSPanel {
+    init() {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 42, height: 26.5),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        isFloatingPanel = true
+        level = .statusBar
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = false
+        isReleasedWhenClosed = false
+        hidesOnDeactivate = false
+        isMovable = false
+        animationBehavior = .none
+        ignoresMouseEvents = true
+
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 42, height: 26.5))
+        view.wantsLayer = true
+        view.layer?.cornerRadius = 10.75
+        view.layer?.cornerCurve = .circular
+        view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.28).cgColor
+        view.autoresizingMask = [.width, .height]
+        contentView = view
+    }
+
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }
 
-/// 与 Status Trio 的 `AnchoredStatusPanel` 同构：无边框、非激活、可成为 key、系统窗口阴影、圆角 16。
 final class AnchoredStatusPanel: NSPanel {
     static let cornerRadius: CGFloat = Theme.Metrics.panelCornerRadius
     var onClose: (() -> Void)?

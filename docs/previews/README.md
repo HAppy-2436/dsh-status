@@ -3,7 +3,7 @@
 - 离屏图：由 `dist/DSHStatusBar.app/Contents/MacOS/DSHStatusBar --render-previews docs/previews` 生成
   （`*-preview-*.png`、`scene-preview-dark.png`、`scene-preview-light.png`）；
 - 真机截图：`menubar-real.png` / `icon-real-zoom.png` / `panel-real-dark.png` /
-  `panel-real-expanded-dark.png` / `panel-real-idle-dark.png` / `settings-real-dark.png`
+  `panel-real-expanded-dark.png` / `panel-real-idle-dark.png` / `panel-real-idle-hover-dark.png` / `settings-real-dark.png`
   （macOS 27.2 深色模式，2x；空闲态那张用空闲 mock 桥出图）。
 - 面板离屏预览用实色背景（毛玻璃无法离屏渲染），真实玻璃观感以 `panel-real-dark.png` 为准。
 
@@ -17,6 +17,7 @@
 | `panel-real-expanded-dark.png` | 同上，点父行**行尾「数量 + 下箭头」**展开子智能体后的状态（下箭头转成上箭头，面板高度自动适配） |
 | `panel-preview-dark.png` / `panel-preview-light.png` | 面板六态：默认折叠 / 行悬停 / 按钮悬停 / 展开子智能体 / 全部空闲 / 未连接（后两态 = 330×68 一整块大按钮） |
 | `panel-real-idle-dark.png` | 真机空闲态（Liquid Glass，330×68）：鲸鱼 +「全部空闲」，整块面板可点打开 DSH |
+| `panel-real-idle-hover-dark.png` | 同上，鼠标悬停态：高亮底色铺满整块内容区（圆角 12），说明点哪里都有效 |
 | `scene-preview-dark.png` / `scene-preview-light.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板；外壳圆角与真机同为 16pt continuous） |
 | `settings-preview-dark.png` / `settings-preview-light.png` | 设置页（离屏渲染，深/浅）：原生 grouped Form 的六个分区 |
 | `settings-real-dark.png` | 设置窗口真机截图（深色，540×640 标准 NSWindow） |

@@ -13,8 +13,8 @@ enum Theme {
     enum Metrics {
         // 弹出面板
         static let panelWidth: CGFloat = 320
-        static let panelCornerRadius: CGFloat = 20
-        static let panelHorizontalPadding: CGFloat = 12
+        static let panelCornerRadius: CGFloat = 16
+        static let panelHorizontalPadding: CGFloat = 16
         static let headerHeight: CGFloat = 40
         static let rowHeight: CGFloat = 44
         static let subagentRowHeight: CGFloat = 24
@@ -97,7 +97,7 @@ enum Theme {
     /// - 不能用不透明灰：同理，焦点态会变成灰色纯色卡片。
     /// - 用低透明度的白色 tint：焦点态仍是半透明玻璃，同时比无 tint 更接近系统未聚焦时的观感。
     static var panelGlassTint: NSColor {
-        NSColor(white: 1.0, alpha: 0.12)
+        NSColor(white: 1.0, alpha: 0.22)
     }
 
     /// 离屏预览（无材质）时的面板底色，近似真实灰玻璃在常见深色背景上的观感。

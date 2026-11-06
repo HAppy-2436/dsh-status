@@ -21,8 +21,8 @@
 | 用途 | 值 |
 | --- | --- |
 | 面板宽度 | **320pt** |
-| 面板圆角 | **20pt** continuous（Liquid Glass 浮层） |
-| 面板边距 | 水平 6pt（滚动容器）+ 行内 6pt = 文字距面板边 12pt（原生弹出面板内边距 12） |
+| 面板圆角 | **16pt** continuous（实测原生天气模块 ≈15–16pt） |
+| 面板边距 | 水平 10pt（滚动容器）+ 行内 6pt = 文字距面板边 16pt（对齐原生天气模块） |
 | 行高 | 会话行 **44pt**；子智能体行 **24pt**；分组标题行 26pt；footer **38pt**；header **40pt** |
 | 字号 | 行标题 13pt semibold；行副标题 11pt regular；分组标题 11pt semibold；footer 12pt regular；连接状态 11pt |
 | 图标 | 行首状态 glyph 16pt（filled circle 系列）；footer 按钮 13pt（24×24 命中区）；chevron 9pt semibold |
@@ -31,7 +31,7 @@
 | 状态色 | `systemYellow`（待回答）/ `systemBlue`（运行中）/ `systemGreen`（已完成）/ `systemRed`（已停止）；
 | | 未连接 = `secondaryLabelColor`；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
 | 圆角 | 面板 20；行 hover 6；设置卡片/控件交给系统（约 10/6） |
-| 阴影 | 面板**自绘图层阴影**（黑 38% / blur 16 / 向下 6），不用系统窗口阴影（会在玻璃边缘画深色描边）；页面内不加投影 |
+| 阴影 | 面板**自绘图层阴影**（黑 50% / blur 18 / 向下 9），不用系统窗口阴影（会在玻璃边缘画深色描边）；另加 1px 白 32% 内描边模拟玻璃高光边 |
 
 ## 2. 弹出面板（StatusPanelView + StatusPanelController）
 

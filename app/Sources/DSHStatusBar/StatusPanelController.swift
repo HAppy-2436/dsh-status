@@ -383,6 +383,7 @@ final class StatusPanelGlassViewController: NSViewController {
 
     private var backgroundStyle: PanelBackgroundStyle
     private var backgroundView: NSView?
+    private var rimView: NSView?
     private var glassContainer: NSView?
 
     init(backgroundStyle: PanelBackgroundStyle) {
@@ -406,12 +407,24 @@ final class StatusPanelGlassViewController: NSViewController {
         container.layer?.cornerCurve = .continuous
         // 参考原生菜单栏天气面板：柔和阴影，向下偏移；比系统窗口阴影更轻、不会在边缘勒出描边。
         container.layer?.shadowColor = NSColor.black.cgColor
-        container.layer?.shadowOpacity = 0.38
-        container.layer?.shadowRadius = 16
-        container.layer?.shadowOffset = CGSize(width: 0, height: -6)
+        // 参考原生天气面板实测的阴影衰减（2pt 处约暗 4%，15pt 内归零）
+        container.layer?.shadowOpacity = 0.50
+        container.layer?.shadowRadius = 18
+        container.layer?.shadowOffset = CGSize(width: 0, height: -9)
         root.addSubview(container)
         glassContainer = container
         installBackground(in: container)
+
+        // 原生玻璃边缘有一圈 1px 的高光描边（实测天气面板顶边亮度比内部高 ~56/255），这里补上。
+        let rim = NSView(frame: container.bounds)
+        rim.wantsLayer = true
+        rim.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        rim.layer?.cornerCurve = .continuous
+        rim.layer?.borderWidth = 0.5
+        rim.layer?.borderColor = NSColor.white.withAlphaComponent(0.32).cgColor
+        rim.autoresizingMask = [.width, .height]
+        container.addSubview(rim)
+        rimView = rim
     }
 
     override func viewDidLayout() {
@@ -425,6 +438,7 @@ final class StatusPanelGlassViewController: NSViewController {
                                              cornerHeight: radius,
                                              transform: nil)
         backgroundView?.frame = container.bounds
+        rimView?.frame = container.bounds
     }
 
     func applyBackgroundStyle(_ style: PanelBackgroundStyle) {

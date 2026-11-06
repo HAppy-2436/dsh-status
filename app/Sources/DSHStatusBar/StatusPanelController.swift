@@ -114,10 +114,10 @@ final class StatusPanelController: NSObject {
         glassWindow.invalidateShadow()
     }
 
-    /// 材质窗口与内容窗口保持同 frame（子窗口随父窗口移动，但尺寸变化要手动同步）。
+    /// 材质窗口比内容窗口四周大 `shadowMargin`，留给图层自绘阴影；内容区正好对齐。
     private func syncGlassWindow() {
-        glassWindow.setFrame(panel.frame, display: false)
-        glassWindow.invalidateShadow()
+        let m = StatusPanelGlassViewController.shadowMargin
+        glassWindow.setFrame(panel.frame.insetBy(dx: -m, dy: -m), display: false)
     }
 
     // MARK: 状态项高亮（面板打开时，与原生菜单栏项一致）
@@ -128,11 +128,14 @@ final class StatusPanelController: NSObject {
         guard let button = statusItem.button else { return }
         if highlighted {
             if selectionView?.superview !== button {
-                let view = PassthroughView(frame: button.bounds.insetBy(dx: 1, dy: 3))
+                // 原生菜单栏 extra（如天气模块）在面板打开时是「胶囊」高亮：
+                // 高度≈24（几乎占满 29pt 菜单栏的可点击区）、宽度≈item 宽、圆角=高度/2。
+                let frame = button.bounds.insetBy(dx: 1, dy: 0.5)
+                let view = PassthroughView(frame: frame)
                 view.wantsLayer = true
-                view.layer?.cornerRadius = 6
+                view.layer?.cornerRadius = frame.height / 2
                 view.layer?.cornerCurve = .continuous
-                view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.14).cgColor
+                view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.18).cgColor
                 view.autoresizingMask = [.width, .height]
                 button.addSubview(view, positioned: .below, relativeTo: nil)
                 selectionView = view
@@ -317,7 +320,8 @@ final class PanelGlassWindow: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        // 阴影由 StatusPanelGlassViewController 用图层自绘（系统窗口阴影会在玻璃边缘画出一圈深色描边）。
+        hasShadow = false
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         isMovable = false
@@ -374,8 +378,12 @@ final class StatusPanelContentViewController: NSViewController {
 // MARK: - 材质容器（玻璃/磨砂/实色）
 
 final class StatusPanelGlassViewController: NSViewController {
+    /// 材质窗口比内容窗口四周多出的空间，用于图层自绘阴影（系统窗口阴影会在玻璃边缘画出一圈深色描边）。
+    static let shadowMargin: CGFloat = 26
+
     private var backgroundStyle: PanelBackgroundStyle
     private var backgroundView: NSView?
+    private var glassContainer: NSView?
 
     init(backgroundStyle: PanelBackgroundStyle) {
         self.backgroundStyle = backgroundStyle
@@ -388,12 +396,35 @@ final class StatusPanelGlassViewController: NSViewController {
     }
 
     override func loadView() {
+        let root = NSView(frame: .zero)
+        root.wantsLayer = true
+        view = root
+
         let container = NSView(frame: .zero)
         container.wantsLayer = true
         container.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
-        container.layer?.masksToBounds = true
-        view = container
+        container.layer?.cornerCurve = .continuous
+        // 参考原生菜单栏天气面板：柔和阴影，向下偏移；比系统窗口阴影更轻、不会在边缘勒出描边。
+        container.layer?.shadowColor = NSColor.black.cgColor
+        container.layer?.shadowOpacity = 0.38
+        container.layer?.shadowRadius = 16
+        container.layer?.shadowOffset = CGSize(width: 0, height: -6)
+        root.addSubview(container)
+        glassContainer = container
         installBackground(in: container)
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        guard let container = glassContainer else { return }
+        let m = Self.shadowMargin
+        container.frame = view.bounds.insetBy(dx: m, dy: m)
+        let radius = AnchoredStatusPanel.cornerRadius
+        container.layer?.shadowPath = CGPath(roundedRect: container.bounds,
+                                             cornerWidth: radius,
+                                             cornerHeight: radius,
+                                             transform: nil)
+        backgroundView?.frame = container.bounds
     }
 
     func applyBackgroundStyle(_ style: PanelBackgroundStyle) {

@@ -36,6 +36,8 @@ enum PreviewRenderer {
         )
         try renderScene(appearance: dark, colorScheme: .dark,
                         to: directory.appendingPathComponent("scene-preview-dark.png"))
+        try renderScene(appearance: light, colorScheme: .light,
+                        to: directory.appendingPathComponent("scene-preview-light.png"))
         try renderSettingsSheet(appearance: dark, colorScheme: .dark,
                                 to: directory.appendingPathComponent("settings-preview-dark.png"))
         try renderSettingsSheet(appearance: light, colorScheme: .light,
@@ -191,28 +193,11 @@ enum PreviewRenderer {
             shadow.shadowColor = NSColor.black.withAlphaComponent(0.45)
             shadow.shadowBlurRadius = 26
             shadow.shadowOffset = NSSize(width: 0, height: -10)
-            NSGraphicsContext.saveGraphicsState()
-            shadow.set()
-            NSColor.windowBackgroundColor.setFill()
-            NSBezierPath(roundedRect: NSRect(x: panelX, y: panelY,
-                                             width: panelWidth, height: panelImage.size.height),
-                         xRadius: 12, yRadius: 12).fill()
-            NSGraphicsContext.restoreGraphicsState()
-
-            NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(roundedRect: NSRect(x: panelX, y: panelY,
-                                             width: panelWidth, height: panelImage.size.height),
-                         xRadius: 12, yRadius: 12).addClip()
-            panelImage.draw(in: NSRect(x: panelX, y: panelY,
-                                       width: panelWidth, height: panelImage.size.height))
-            NSGraphicsContext.restoreGraphicsState()
-
-            NSColor.white.withAlphaComponent(0.10).setStroke()
-            let border = NSBezierPath(roundedRect: NSRect(x: panelX + 0.5, y: panelY + 0.5,
-                                                          width: panelWidth - 1, height: panelImage.size.height - 1),
-                                      xRadius: 12, yRadius: 12)
-            border.lineWidth = 1
-            border.stroke()
+            drawPanelShell(in: NSRect(x: panelX, y: panelY,
+                                      width: panelWidth, height: panelImage.size.height),
+                           image: panelImage,
+                           dark: colorScheme == .dark,
+                           shadow: shadow)
 
             let arrowX = iconX + icon.size.width / 2
             let panelTop = panelY + panelImage.size.height
@@ -229,6 +214,44 @@ enum PreviewRenderer {
                      color: NSColor.white.withAlphaComponent(0.38),
                      at: NSPoint(x: 30, y: 22))
         }
+    }
+
+    /// 画一块「真机同款」面板外壳：圆角 = `Theme.Metrics.panelCornerRadius`（16pt，continuous），
+    /// 阴影收在圆角外侧（先画阴影层再裁切内容），避免预览里出现「圆角 16 + 方角阴影」的违和感。
+    private static func drawPanelShell(in rect: NSRect,
+                                       image: NSImage,
+                                       dark: Bool,
+                                       shadow: NSShadow? = nil) {
+        let radius = Theme.Metrics.panelCornerRadius
+        let shape = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+
+        if let shadow {
+            NSGraphicsContext.saveGraphicsState()
+            shadow.set()
+            (dark ? NSColor(white: 0.10, alpha: 0.95) : NSColor.white).setFill()
+            shape.fill()
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        NSGraphicsContext.saveGraphicsState()
+        shape.addClip()
+        Theme.panelFallbackBackgroundNSColor.setFill()
+        rect.fill()
+        image.draw(in: rect)
+        NSGraphicsContext.restoreGraphicsState()
+
+        // 顶边 1px 高光（液态玻璃的「亮边」），裁剪到圆角内。
+        NSGraphicsContext.saveGraphicsState()
+        shape.addClip()
+        NSColor.white.withAlphaComponent(dark ? 0.14 : 0.55).setFill()
+        NSRect(x: rect.minX, y: rect.maxY - 0.75, width: rect.width, height: 0.75).fill()
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSColor.labelColor.withAlphaComponent(dark ? 0.16 : 0.10).setStroke()
+        let border = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5),
+                                  xRadius: radius - 0.5, yRadius: radius - 0.5)
+        border.lineWidth = 1
+        border.stroke()
     }
 
     private static func drawSymbol(_ name: String, size: CGFloat, color: NSColor, center: NSPoint) {
@@ -343,17 +366,17 @@ enum PreviewRenderer {
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
+            shadow.shadowBlurRadius = 14
+            shadow.shadowOffset = NSSize(width: 0, height: -4)
             for (index, image) in images.enumerated() {
                 let x = margin + CGFloat(index) * (panelWidth + gap)
                 let y = margin + labelHeight + (maxHeight - image.size.height) / 2
-                NSColor.labelColor.withAlphaComponent(0.14).setFill()
-                NSBezierPath(roundedRect: NSRect(x: x - 1, y: y - 1, width: panelWidth + 2, height: image.size.height + 2),
-                             xRadius: 13, yRadius: 13).fill()
-                NSGraphicsContext.saveGraphicsState()
-                NSBezierPath(roundedRect: NSRect(x: x, y: y, width: panelWidth, height: image.size.height),
-                             xRadius: 12, yRadius: 12).addClip()
-                image.draw(in: NSRect(x: x, y: y, width: panelWidth, height: image.size.height))
-                NSGraphicsContext.restoreGraphicsState()
+                drawPanelShell(in: NSRect(x: x, y: y, width: panelWidth, height: image.size.height),
+                               image: image,
+                               dark: colorScheme == .dark,
+                               shadow: shadow)
                 drawText(models[index].0, font: .systemFont(ofSize: 11.5),
                          color: secondary, at: NSPoint(x: x, y: margin - 6))
             }

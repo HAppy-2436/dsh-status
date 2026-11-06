@@ -316,7 +316,11 @@ final class StatusPanelController: NSObject {
 
 // MARK: - 面板窗口
 
-/// 与 Status Trio 的 `AnchoredStatusPanel` 同构：无边框、非激活、可成为 key、系统窗口阴影、圆角 16。
+/// 与 Status Trio 的 `AnchoredStatusPanel` 同构：无边框、非激活、可成为 key、系统窗口阴影。
+///
+/// 圆角阶梯（`Theme.Metrics`，全部 continuous 超椭圆曲线）：
+/// - 窗口/背景本体 16pt（与原生天气模块一致）；
+/// - 内容内距 8pt → 行 hover 8pt（= 16 − 8，内外曲率对齐）→ 行尾胶囊 5pt（= 8 − 3，随行内距收小）。
 final class AnchoredStatusPanel: NSPanel {
     static let cornerRadius: CGFloat = Theme.Metrics.panelCornerRadius
     var onClose: (() -> Void)?
@@ -386,6 +390,7 @@ final class StatusPanelContentViewController: NSViewController {
         let container = NSView(frame: .zero)
         container.wantsLayer = true
         container.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
         view = container
 
@@ -444,6 +449,9 @@ final class StatusPanelContentViewController: NSViewController {
                 let glass = NSGlassEffectView(frame: container.bounds)
                 glass.style = .regular
                 glass.cornerRadius = AnchoredStatusPanel.cornerRadius
+                // NSGlassEffectView 没有 cornerCurve API：把超椭圆曲线打在它的图层上（玻璃会读图层圆角）。
+                glass.wantsLayer = true
+                glass.layer?.cornerCurve = .continuous
                 // 不设 tintColor：保留 Liquid Glass 的原生折射与高光（这是"液态玻璃质感"的来源）。
                 let glassContent = NSView(frame: glass.bounds)
                 glassContent.autoresizingMask = [.width, .height]
@@ -468,6 +476,7 @@ final class StatusPanelContentViewController: NSViewController {
         effect.state = .active
         effect.wantsLayer = true
         effect.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        effect.layer?.cornerCurve = .continuous
         effect.layer?.masksToBounds = true
         return effect
     }
@@ -477,6 +486,7 @@ final class StatusPanelContentViewController: NSViewController {
         solid.wantsLayer = true
         solid.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         solid.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
+        solid.layer?.cornerCurve = .continuous
         solid.layer?.masksToBounds = true
         return solid
     }

@@ -21,7 +21,7 @@
 | 用途 | 值 |
 | --- | --- |
 | 面板宽度 | **330pt**（同 Status Trio） |
-| 面板圆角 | **16pt** continuous（实测原生天气模块 ≈15–16pt） |
+| 面板圆角 | **16pt** continuous 超椭圆（实测原生天气模块 ≈15–16pt；macOS 26 窗口一律 `cornerCurve = .continuous`） |
 | 面板边距 | 水平 10pt（滚动容器）+ 行内 6pt = 文字距面板边 16pt（对齐原生天气模块） |
 | 行高 | 会话行 **44pt**；子智能体行 **24pt**；footer **38pt** |
 | 字号 | 行标题 13pt semibold；行副标题 11pt regular；footer 按钮 13pt 图标 |
@@ -30,7 +30,7 @@
 | hover 底色 | 行：主文字色 8%（深色）/ 6%（浅色），圆角 8pt；行尾按钮再深一档（16%/10%），圆角 5pt |
 | 状态色 | `systemYellow`（待回答）/ `systemBlue`（运行中）/ `systemGreen`（已完成）/ `systemRed`（已停止）；
 | | 未连接 = `secondaryLabelColor`（footer 连接点、空状态）；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
-| 圆角（统一阶梯） | 面板 **16** → 行 hover / 子智能体行 **8** → 行尾披露胶囊 **5**（全 continuous，嵌套时逐级收小）；设置卡片/控件交给系统 |
+| 圆角（统一阶梯） | 面板 **16** → 行 hover / 子智能体行 **8**（= 16 − 内容内距 8）→ 行尾披露胶囊 **5**（= 8 − 行内距 3）；全 continuous，满足「内层 = 外层 − 内边距」时曲率才连续，否则对着看会出现「外圆内方」的违和感；设置卡片/控件交给系统 |
 | 动效（`Theme.Motion`） | hover/press 0.12s easeOut；披露箭头 + 面板高度 0.22–0.24s easeInOut；子行错班 0.035s/条、0.18s easeOut；全部尊重「减弱动态效果」（瞬时） |
 | 阴影 | 面板用**系统窗口阴影**（`hasShadow`），不自绘阴影/内描边（会破坏 Liquid Glass 折射与高光） |
 
@@ -72,6 +72,8 @@
 - 面板打开期间状态项显示**系统原生高亮**：不再自绘；用一个 1×1、alpha=0 的 `NSPopover`
   （`.applicationDefined`）锚定状态项按钮来触发系统高亮，面板关闭时关闭该 popover。
 - 玻璃与内容同处一个 key 窗口（原生液态玻璃渲染），阴影用系统窗口阴影（`hasShadow`）。
+- 圆角曲线：窗口/容器/`NSGlassEffectView`/磨砂/实色背景统一切 `.continuous`（`NSGlassEffectView` 无该 API，
+  打在图层上），与 macOS 26 窗口的连续曲率一致；实测轮廓与系统圆角形状吻合（边缘采样误差 < 0.5px）。
 - 键盘：Esc 关闭；点击外部关闭（含本 App 其它窗口）；再次点状态项关闭。逻辑保持现有实现，
   仅把 footer 按钮改为整块可点区域（避免点不中）。
 

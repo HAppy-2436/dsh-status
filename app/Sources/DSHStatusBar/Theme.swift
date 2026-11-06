@@ -13,6 +13,9 @@ enum Theme {
     enum Metrics {
         // 弹出面板
         static let panelWidth: CGFloat = 330
+        /// 面板外壳圆角。内层圆角阶梯必须满足「内层 = 外层 − 内边距」，视觉曲率才连续：
+        /// 16（外壳）→ 8（行，内容内距 8）→ 5（行尾胶囊，行内距 3~4）。
+        /// 实测参考：原生天气模块 ≈15–16pt；macOS 26 应用窗口为超椭圆曲线（`cornerCurve = .continuous`）。
         static let panelCornerRadius: CGFloat = 16
         static let rowHeight: CGFloat = 44
         static let subagentRowHeight: CGFloat = 24
@@ -100,7 +103,11 @@ enum Theme {
 
     /// 离屏预览（无材质）时的面板底色，近似真实灰玻璃在常见深色背景上的观感。
     static var panelFallbackBackground: Color {
-        Color(nsColor: dynamicNSColor(dark: (0.19, 0.19, 0.21), light: (0.95, 0.95, 0.96)))
+        Color(nsColor: panelFallbackBackgroundNSColor)
+    }
+
+    static var panelFallbackBackgroundNSColor: NSColor {
+        dynamicNSColor(dark: (0.19, 0.19, 0.21), light: (0.95, 0.95, 0.96))
     }
 
     // MARK: - 设置窗口（原生实测色板，显式不透明色，避免跟随桌面/窗口激活态变色）

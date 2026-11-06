@@ -1,7 +1,7 @@
 # 预览图
 
 - 离屏图：由 `dist/DSHStatusBar.app/Contents/MacOS/DSHStatusBar --render-previews docs/previews` 生成
-  （`*-preview-*.png`、`scene-preview-dark.png`）；
+  （`*-preview-*.png`、`scene-preview-dark.png`、`scene-preview-light.png`）；
 - 真机截图：`menubar-real.png` / `icon-real-zoom.png` / `panel-real-dark.png` /
   `panel-real-expanded-dark.png` / `settings-real-dark.png`（macOS 27.2 深色模式，2x）。
 - 面板离屏预览用实色背景（毛玻璃无法离屏渲染），真实玻璃观感以 `panel-real-dark.png` 为准。
@@ -15,7 +15,7 @@
 | `panel-real-dark.png` | 真机面板（深色，Liquid Glass，330pt；扁平列表 + 已完成/运行中两态圆点；子智能体默认折叠） |
 | `panel-real-expanded-dark.png` | 同上，点父行**行尾「数量 + 下箭头」**展开子智能体后的状态（下箭头转成上箭头，面板高度自动适配） |
 | `panel-preview-dark.png` / `panel-preview-light.png` | 面板四态：默认折叠 / 展开子智能体 / 全部空闲 / 未连接 |
-| `scene-preview-dark.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板） |
+| `scene-preview-dark.png` / `scene-preview-light.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板；外壳圆角与真机同为 16pt continuous） |
 | `settings-preview-dark.png` / `settings-preview-light.png` | 设置页（离屏渲染，深/浅）：原生 grouped Form 的六个分区 |
 | `settings-real-dark.png` | 设置窗口真机截图（深色，540×640 标准 NSWindow） |
 | `ui-before-after-dark.png` | 改版前后对照（面板 + 设置窗口，深色） |

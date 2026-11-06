@@ -79,6 +79,17 @@ final class AppModel: ObservableObject {
             .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
     }
 
+    // MARK: 预览用悬停状态（仅供离屏出图，真机不走这里）
+
+    enum PreviewHoverTrailing { case row, control }
+
+    /// 预览渲染时强制某行进入悬停态：`trailing` 指定悬停的是整行还是行尾披露按钮。
+    private(set) var previewHover: (rowId: String, trailing: PreviewHoverTrailing)?
+
+    func setPreviewHover(rowId: String, trailing: PreviewHoverTrailing) {
+        previewHover = (rowId, trailing)
+    }
+
     func hasSubagents(_ parentId: String) -> Bool {
         !subagents(for: parentId).isEmpty
     }

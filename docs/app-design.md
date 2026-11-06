@@ -99,6 +99,10 @@
 
 - 行首圆点：待回答 `systemYellow`、运行中 `systemBlue`、已完成 `systemGreen`、已停止 `systemRed`；
   8pt 实心圆，所有行（含无子会话的行）保持同一列。
+- **圆角阶梯**：面板 16 → 行 hover 8 → 行尾披露胶囊 5（连续圆角，逐级收小，和 macOS 嵌套控件一致）。
+- **动效**（`Theme.Motion`，全部尊重「减弱动态效果」）：行 hover 0.12s 底色渐显、按住再深一档且轻微下沉 1.5%；
+  行尾按钮 hover 出现独立胶囊底色、按下更深；披露箭头 0.22s easeInOut 旋转 180°；
+  子行 0.18s 淡入 + 4pt 上浮，逐条错开 0.035s；面板窗口高度 0.22s easeInOut 跟随内容变化（顶边钉住菜单栏）。
 - 子智能体：默认折叠；**行尾**是导航/披露区：
   - 没有子会话 → `chevron.right`（9pt semibold tertiary），只作导航提示，点卡片任意位置打开会话；
   - 有子会话 → 「子智能体数量（11pt medium，等宽数字，secondary）+ `chevron.down`」按钮，独立命中区：

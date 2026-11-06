@@ -27,10 +27,11 @@
 | 字号 | 行标题 13pt semibold；行副标题 11pt regular；footer 按钮 13pt 图标 |
 | 图标 | 行首状态圆点 8pt（实心）；子智能体圆点 4pt；footer 按钮 13pt（24×24 命中区）；chevron 9pt semibold |
 | 分隔线 | `separatorColor`（动态）；仅通知提示下方与 footer 上方各一条全宽 1px；设置卡片内分隔线从文字列开始 |
-| hover 底色 | 主文字色 8%（深色）/ 6%（浅色），圆角 6pt，0.08s |
+| hover 底色 | 行：主文字色 8%（深色）/ 6%（浅色），圆角 8pt；行尾按钮再深一档（16%/10%），圆角 5pt |
 | 状态色 | `systemYellow`（待回答）/ `systemBlue`（运行中）/ `systemGreen`（已完成）/ `systemRed`（已停止）；
 | | 未连接 = `secondaryLabelColor`（footer 连接点、空状态）；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
-| 圆角 | 面板 16；行 hover 6；设置卡片/控件交给系统（约 10/6） |
+| 圆角（统一阶梯） | 面板 **16** → 行 hover / 子智能体行 **8** → 行尾披露胶囊 **5**（全 continuous，嵌套时逐级收小）；设置卡片/控件交给系统 |
+| 动效（`Theme.Motion`） | hover/press 0.12s easeOut；披露箭头 + 面板高度 0.22–0.24s easeInOut；子行错班 0.035s/条、0.18s easeOut；全部尊重「减弱动态效果」（瞬时） |
 | 阴影 | 面板用**系统窗口阴影**（`hasShadow`），不自绘阴影/内描边（会破坏 Liquid Glass 折射与高光） |
 
 ## 2. 弹出面板（StatusPanelView + StatusPanelController）

@@ -27,6 +27,8 @@ final class StatusPanelController: NSObject {
     private var isClosing = false
     /// 关闭动画的代际：显示时自增，防止旧的完成回调把新面板关掉。
     private var closeGeneration = 0
+    /// 是否对「内容高度变化」做窗口高度动画（仅在面板已经上屏之后）。
+    private var animateResize = false
 
     init(model: AppModel, statusItem: NSStatusItem, settings: AppSettings) {
         self.model = model
@@ -88,7 +90,9 @@ final class StatusPanelController: NSObject {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.panel.isVisible else { return }
             self.contentController?.view.layoutSubtreeIfNeeded()
+            self.animateResize = false
             self.fitToContent()
+            self.animateResize = true
             guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
                 self.panel.alphaValue = 1
                 return
@@ -175,6 +179,26 @@ final class StatusPanelController: NSObject {
     // MARK: 尺寸与位置
 
     private func fitToContent() {
+        let previous = panel.frame
+        applyContentSize()
+        let current = panel.frame
+        // 面板高度随内容变化（展开/收起子智能体、列表增减）时做原生窗口高度动画：
+        // 顶边钉在菜单栏下沿、只动底边；窗口本体不缩放内容，文字不会变形。
+        guard animateResize,
+              abs(current.width - previous.width) < 0.5,
+              abs(current.height - previous.height) > 0.5,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let rect = NSRect(x: current.minX, y: current.minY,
+                          width: current.width, height: current.height)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+            panel.animator().setFrame(rect, display: true)
+        }
+    }
+
+    private func applyContentSize() {
         guard let content = contentController else { return }
         content.loadViewIfNeededCompat()
         content.view.layoutSubtreeIfNeeded()

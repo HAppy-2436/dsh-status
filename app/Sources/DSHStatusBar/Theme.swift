@@ -18,6 +18,17 @@ enum Theme {
         static let subagentRowHeight: CGFloat = 24
         static let maxContentHeight: CGFloat = 480
 
+        // 面板内的统一圆角阶梯（全部 continuous，避免「三个圆角各讲各的」）
+        /// 会话行 hover 底色 / 子智能体行 hover 底色。
+        static let rowCornerRadius: CGFloat = 8
+        /// 行尾披露按钮（数量 + 箭头）的悬停胶囊 —— 与系统菜单项里的行内按钮同款。
+        static let inlineControlCornerRadius: CGFloat = 5
+        /// 面板内容外边距：圆角 16 的面板里行的圆角/内距都相对它对齐。
+        static let panelContentInset: CGFloat = 8
+        static let rowHorizontalPadding: CGFloat = 6
+        static let subagentIndent: CGFloat = 18
+        static let subagentTrailingPadding: CGFloat = 8
+
         // 设置窗口
         static let settingsWidth: CGFloat = 540
         static let settingsHeight: CGFloat = 640
@@ -129,6 +140,38 @@ enum Theme {
     /// hover 底色：用主文字色的小透明度，深浅色通用。
     static func hoverFill(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
+    }
+
+    /// 行内控件（披露按钮）的悬停底色：比整行 hover 再深一档，保证「行 hover + 控件 hover」时层次清楚。
+    static func controlHoverFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.16) : Color.black.opacity(0.10)
+    }
+
+    /// 整行按下：比行 hover 略深一档（系统列表行按住时的观感）。
+    static func pressedFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.045)
+    }
+
+    static func controlPressedFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.24) : Color.black.opacity(0.16)
+    }
+
+    // MARK: - 动效 token（与 macOS 系统动画曲线同款）
+
+    /// 鼠标悬停 / 按下：系统菜单项也是这种「快进快出」的短时长。
+    enum Motion {
+        static let hover: Animation = .easeOut(duration: 0.12)
+        /// 披露箭头旋转、子智能体展开/收起。
+        static let disclosure: Animation = .easeInOut(duration: 0.22)
+        /// 子行逐条错开班次。
+        static let stagger: Double = 0.035
+        /// 面板高度随内容变化（纯高度动画，不缩放文字）。
+        static let panelResize: Animation = .easeInOut(duration: 0.24)
+    }
+
+    /// 「减弱动态效果」时把动画降级为瞬时（系统设置跟随 `NSWorkspace`）。
+    static func respectingReduceMotion(_ animation: Animation) -> Animation? {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : animation
     }
 
     /// 面板内分隔线颜色（动态）。

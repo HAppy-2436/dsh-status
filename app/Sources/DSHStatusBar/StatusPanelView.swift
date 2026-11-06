@@ -40,24 +40,34 @@ struct StatusPanelView: View {
                     sessionBlock(row)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Theme.Metrics.panelContentInset)
             .padding(.vertical, 6)
         }
         .frame(height: contentHeight)
+        .clipped()
+        // 展开/收起时纯高度动画（不缩放文字），与面板窗口的高度跟随同一曲线。
+        .animation(Theme.respectingReduceMotion(Theme.Motion.panelResize),
+                   value: model.expandedSubagentParents)
     }
 
     @ViewBuilder
     private func sessionBlock(_ row: SessionRow) -> some View {
         let subagents = model.subagents(for: row.id)
+        let expanded = model.isSubagentsExpanded(row.id)
         SessionRowView(row: row,
                        subagentCount: subagents.count,
-                       expanded: model.isSubagentsExpanded(row.id),
+                       expanded: expanded,
+                       previewHover: model.previewHover.flatMap { $0.rowId == row.id ? $0.trailing : nil },
                        onToggleSubagents: { model.toggleSubagents(for: row.id) },
                        onOpen: { model.onOpenSession?(row.id) })
-        if model.isSubagentsExpanded(row.id) {
-            ForEach(subagents) { sub in
-                SubagentRowView(subagent: sub,
-                                onOpen: { model.onOpenSession?(row.id) })
+        if expanded {
+            // 逐条错开淡入 + 轻微下移（系统「列表展开」的节奏）；减弱动态效果时瞬时出现。
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(subagents.enumerated()), id: \.element.id) { index, sub in
+                    SubagentRowView(subagent: sub,
+                                    onOpen: { model.onOpenSession?(row.id) })
+                        .modifier(StaggeredReveal(index: index))
+                }
             }
         }
     }
@@ -138,18 +148,18 @@ private struct SubagentRowView: View {
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
             }
-            .padding(.leading, 18)
-            .padding(.trailing, 6)
+            .padding(.leading, Theme.Metrics.subagentIndent)
+            .padding(.trailing, Theme.Metrics.subagentTrailingPadding)
             .frame(height: Theme.Metrics.subagentRowHeight)
             .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Metrics.rowCornerRadius, style: .continuous)
                     .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PanelRowButtonStyle(cornerRadius: Theme.Metrics.rowCornerRadius))
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.08), value: hovering)
+        .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: hovering)
         .help("子智能体 · 点击打开所属会话")
     }
 }
@@ -160,12 +170,17 @@ private struct SessionRowView: View {
     let row: SessionRow
     let subagentCount: Int
     let expanded: Bool
+    /// 离屏预览用的强制悬停（真机永远 nil）。
+    let previewHover: AppModel.PreviewHoverTrailing?
     let onToggleSubagents: () -> Void
     let onOpen: () -> Void
-    @State private var hovering = false
+    @State private var hoverRow = false
+    @State private var hoverToggle = false
     @Environment(\.colorScheme) private var colorScheme
 
     private var hasSubagents: Bool { subagentCount > 0 }
+    private var hovering: Bool { hoverRow || previewHover == .row }
+    private var toggleHovering: Bool { hoverToggle || previewHover == .control }
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -198,58 +213,76 @@ private struct SessionRowView: View {
                 .frame(height: Theme.Metrics.rowHeight)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PanelRowButtonStyle(cornerRadius: Theme.Metrics.rowCornerRadius))
 
             if hasSubagents {
                 subagentToggle
                     .padding(.trailing, 8)
-            } else {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .padding(.trailing, 10)
-                    .allowsHitTesting(false)
+            }
+        }
+        // 没有子会话：行尾只放一个右箭头作导航提示（不可单独点，点卡片任意位置都能进会话）。
+        .overlay(alignment: .trailing) {
+            if !hasSubagents {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .padding(.trailing, 10)
+                }
+                .frame(height: Theme.Metrics.rowHeight)
+                .allowsHitTesting(false)
             }
         }
         .frame(height: Theme.Metrics.rowHeight)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Metrics.rowCornerRadius, style: .continuous)
                 .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
         )
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.08), value: hovering)
+        .onHover { hoverRow = $0 }
+        .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: hovering)
         .help(hasSubagents
               ? (expanded ? "点右侧箭头收起 \(subagentCount) 个子智能体 · 点其它区域打开会话"
                           : "点右侧箭头展开 \(subagentCount) 个子智能体 · 点其它区域打开会话")
               : (row.pendingSummary ?? row.displayTitle))
     }
 
-    /// 行尾「子智能体数量 + 披露箭头」：独立命中区，点展开/收起，不跳转会话。
+    /// 行尾「子智能体数量 + 披露箭头」：独立命中区 + 独立悬停胶囊（点它展开/收起，不跳转会话）。
     private var subagentToggle: some View {
         Button(action: onToggleSubagents) {
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 Text("\(subagentCount)")
                     .font(.system(size: 11, weight: .medium))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(expanded ? 180 : 0))
+                    .animation(Theme.respectingReduceMotion(Theme.Motion.disclosure), value: expanded)
             }
-            .frame(height: Theme.Metrics.rowHeight)
+            .foregroundStyle(toggleHovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .frame(height: 26)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Metrics.inlineControlCornerRadius, style: .continuous)
+                    .fill(toggleHovering ? Theme.controlHoverFill(colorScheme) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.16), value: expanded)
+        .buttonStyle(InlineControlButtonStyle(cornerRadius: Theme.Metrics.inlineControlCornerRadius))
+        .onHover { hoverToggle = $0 }
+        .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: toggleHovering)
         .help(expanded ? "收起 \(subagentCount) 个子智能体"
                        : "展开 \(subagentCount) 个子智能体")
     }
 
-    /// 行尾为箭头 / 「数量 + 箭头」预留的宽度，保证标题截断不与控件重叠。
+    /// 行尾为箭头 / 「数量 + 箭头」预留的宽度。
+    /// 预留 = 控件实际宽度 + 间隙：标题截断不会压到控件，行尾也不会留出大片空白。
     private var trailingReserve: CGFloat {
-        if hasSubagents { return subagentCount >= 10 ? 38 : 28 }
-        return 12
+        guard hasSubagents else { return 12 }
+        // 数字（11pt 等宽 ≈ 7pt/位）+ 3 间隙 + 9 箭头 + 6×2 胶囊内距 + 额外余量
+        // （SwiftUI 内建布局先于 overlay 排版，留一点余量保证标题截断后不会压到胶囊）
+        let numberWidth = CGFloat(String(subagentCount).count) * 7
+        return ceil(numberWidth + 3 + 9 + 12 + 14)
     }
 
     private var subtitle: String {
@@ -267,5 +300,61 @@ private struct SessionRowView: View {
         case .idle:
             return row.projectName
         }
+    }
+}
+
+// MARK: - 行按钮样式（按住时轻微压暗/下沉，接近 macOS 原生列表行）
+
+/// 行卡片：按下时整体轻微变暗（系统列表行也是按住即反馈），松开交给 action。
+private struct PanelRowButtonStyle: ButtonStyle {
+    let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(configuration.isPressed ? Theme.pressedFill(colorScheme) : Color.clear)
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: configuration.isPressed)
+    }
+}
+
+/// 行内小控件：按下时胶囊再深一档。
+private struct InlineControlButtonStyle: ButtonStyle {
+    let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(configuration.isPressed ? Theme.controlPressedFill(colorScheme) : Color.clear)
+            )
+            .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: configuration.isPressed)
+    }
+}
+
+// MARK: - 动效修饰器
+
+/// 子行插入时的错班淡入：每条延迟 `Theme.Motion.stagger × index`，淡入 + 4pt 下移。
+/// 减弱动态效果时直接显示（不改透明度/位移）。
+private struct StaggeredReveal: ViewModifier {
+    let index: Int
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        content
+            .opacity(shown || reduceMotion ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : -4)
+            .onAppear {
+                guard !reduceMotion else { shown = true; return }
+                withAnimation(.easeOut(duration: 0.18)
+                    .delay(Theme.Motion.stagger * Double(index))) {
+                    shown = true
+                }
+            }
     }
 }

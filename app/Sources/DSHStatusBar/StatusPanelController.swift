@@ -23,6 +23,10 @@ final class StatusPanelController: NSObject {
     private var localMouseMonitor: Any?
     private var globalMonitor: Any?
     private var anchorScreenRect: NSRect = .zero
+    /// 关闭动画进行中（淡出后真正 close）。
+    private var isClosing = false
+    /// 关闭动画的代际：显示时自增，防止旧的完成回调把新面板关掉。
+    private var closeGeneration = 0
 
     init(model: AppModel, statusItem: NSStatusItem, settings: AppSettings) {
         self.model = model
@@ -61,11 +65,16 @@ final class StatusPanelController: NSObject {
     // MARK: 显示 / 隐藏
 
     func toggle() {
-        if panel.isVisible { close() } else { show() }
+        if panel.isVisible && !isClosing { close() } else { show() }
     }
 
     func show() {
         guard let button = statusItem.button else { return }
+        closeGeneration += 1
+        isClosing = false
+        // 取消可能进行中的淡出，重新从透明开始淡入
+        panel.alphaValue = 1
+        panel.alphaValue = 0
         fitToContent()
         panel.alphaValue = 0
         panel.orderFrontRegardless()
@@ -85,7 +94,8 @@ final class StatusPanelController: NSObject {
                 return
             }
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.08
+                context.duration = 0.12
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 context.allowsImplicitAnimation = true
                 self.panel.animator().alphaValue = 1
             }
@@ -93,8 +103,29 @@ final class StatusPanelController: NSObject {
     }
 
     func close() {
-        guard panel.isVisible else { return }
+        guard panel.isVisible, !isClosing else { return }
+        isClosing = true
+        let generation = closeGeneration
         removeEventMonitors()
+        // 高亮随关闭立即消失（与原生菜单一致），面板本体做淡出。
+        setStatusItemHighlighted(false)
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            finishClose(generation: generation)
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.allowsImplicitAnimation = true
+            self.panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            self?.finishClose(generation: generation)
+        })
+    }
+
+    private func finishClose(generation: Int) {
+        guard generation == closeGeneration, isClosing else { return }
+        isClosing = false
         panel.close()
     }
 
@@ -181,7 +212,14 @@ final class StatusPanelController: NSObject {
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         ) { [weak self] event in
             guard let self else { return }
-            if self.isMenuBarPoint(NSEvent.mouseLocation) { return }
+            let location = NSEvent.mouseLocation
+            if self.isMenuBarPoint(location) {
+                // 点自己图标：交给状态项 action 的 toggle（避免 mousedown 先关、mouseup 又开）
+                if self.isStatusItemIconPoint(location) { return }
+                // 点菜单栏其它图标/菜单：关闭面板
+                self.close()
+                return
+            }
             if event.window != self.panel { self.close() }
         }
         localMonitor = NSEvent.addLocalMonitorForEvents(
@@ -200,15 +238,29 @@ final class StatusPanelController: NSObject {
         ) { [weak self] event in
             guard let self, self.panel.isVisible else { return event }
             if event.window === self.panel { return event }
-            if event.window === self.statusItem.button?.window { return event }
             let location = NSEvent.mouseLocation
-            if self.isMenuBarPoint(location) { return event }
+            if event.window === self.statusItem.button?.window {
+                if self.isStatusItemIconPoint(location) { return event }
+            }
+            if self.isMenuBarPoint(location) {
+                if self.isStatusItemIconPoint(location) { return event }
+                self.close()
+                return event
+            }
             if NSMouseInRect(location, self.anchorScreenRect.insetBy(dx: -8, dy: -8), false) {
                 return event
             }
             self.close()
             return event
         }
+    }
+
+    /// 是否点在我们自己的状态项图标上（含一点容差）。
+    private func isStatusItemIconPoint(_ point: NSPoint) -> Bool {
+        guard let button = statusItem.button,
+              let window = button.window else { return false }
+        let iconRect = window.convertToScreen(button.convert(button.bounds, to: nil))
+        return NSMouseInRect(point, iconRect.insetBy(dx: -8, dy: -8), false)
     }
 
     /// 状态项位于菜单栏；真实鼠标点击的 mousedown 可能没有 window，必须按菜单栏区域放过，

@@ -111,33 +111,33 @@ final class StatusPanelController: NSObject {
         contentController?.refreshBackground()
     }
 
-    // MARK: 状态项高亮（完全对齐系统「按下状态」的高亮）
+    // MARK: 状态项高亮（直接用系统自带的高亮）
 
-    /// 状态项自己的窗口只有 item 宽度，画不出系统按下态那种 42pt 宽的胶囊；
-    /// 用一个透明覆盖窗口在菜单栏上画，尺寸/颜色/位置按本机实测的按下高亮复刻：
-    /// 宽度 = item 宽 + 4、高 26.5、圆角 10.75、白色 28%、顶部距菜单栏顶 2.5。
-    private let highlightWindow = StatusItemHighlightWindow()
+    /// 系统只在「按下状态项」或「有 NSPopover 锚定在该状态项上」时绘制原生高亮。
+    /// 所以这里不自己画，而是用一个 1×1、窗口透明的 NSPopover 锚定到状态项上——
+    /// 系统会按原生逻辑绘制按下态高亮（尺寸/材质/圆角/深浅色全由系统决定），
+    /// 同时把 popover 窗口 alpha 设为 0，视觉上完全不可见。
+    private lazy var highlightPopover: NSPopover = {
+        let popover = NSPopover()
+        popover.behavior = .applicationDefined
+        popover.animates = false
+        let controller = NSViewController()
+        controller.view = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+        popover.contentViewController = controller
+        popover.contentSize = NSSize(width: 1, height: 1)
+        return popover
+    }()
 
     private func setStatusItemHighlighted(_ highlighted: Bool) {
-        guard let button = statusItem.button,
-              let itemWindow = button.window else {
-            highlightWindow.orderOut(nil)
-            return
-        }
+        guard let button = statusItem.button else { return }
         if highlighted {
-            let buttonRect = itemWindow.convertToScreen(button.convert(button.bounds, to: nil))
-            // 按下态高亮实测（相对按钮）：左右各外扩 2、顶部比按钮顶高 1、底部比按钮底低 3（合计高 26.5）。
-            let width = buttonRect.width + 4
-            let height: CGFloat = 26.5
-            let capsule = NSRect(x: buttonRect.midX - width / 2,
-                                 y: buttonRect.maxY + 1 - height,
-                                 width: width,
-                                 height: height)
-            let frame = capsule
-            highlightWindow.setFrame(frame, display: false)
-            highlightWindow.orderFrontRegardless()
-        } else {
-            highlightWindow.orderOut(nil)
+            if !highlightPopover.isShown {
+                highlightPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+                // 只借系统高亮，popover 本体不可见。
+                highlightPopover.contentViewController?.view.window?.alphaValue = 0
+            }
+        } else if highlightPopover.isShown {
+            highlightPopover.performClose(nil)
         }
     }
 
@@ -239,44 +239,6 @@ final class StatusPanelController: NSObject {
 // MARK: - 面板窗口
 
 /// 与 Status Trio 的 `AnchoredStatusPanel` 同构：无边框、非激活、可成为 key、系统窗口阴影、圆角 16。
-/// 菜单栏状态项的「按下态」高亮覆盖窗口：只画一个圆角矩形，忽略鼠标事件。
-final class StatusItemHighlightWindow: NSPanel {
-    init() {
-        super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 42, height: 26.5),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        isFloatingPanel = true
-        // 关键：高亮必须画在状态项图标「下面」（.mainMenu 层低于状态项窗口），
-        // 否则半透明层会压暗/覆盖图标——这正是之前"效果完全不一样"的原因。
-        level = .mainMenu
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        isReleasedWhenClosed = false
-        hidesOnDeactivate = false
-        isMovable = false
-        animationBehavior = .none
-        ignoresMouseEvents = true
-
-        // 系统按下态：42×26.5、圆角 13.25 continuous、白色 26%（实测按下填充 114/255#）。
-        // 画在图标下面，玻璃/图标都不受影响。
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 42, height: 26.5))
-        view.wantsLayer = true
-        view.layer?.cornerRadius = 13.25
-        view.layer?.cornerCurve = .continuous
-        view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.26).cgColor
-        view.autoresizingMask = [.width, .height]
-        contentView = view
-    }
-
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-}
-
 final class AnchoredStatusPanel: NSPanel {
     static let cornerRadius: CGFloat = Theme.Metrics.panelCornerRadius
     var onClose: (() -> Void)?

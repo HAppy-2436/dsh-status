@@ -68,19 +68,12 @@
 ### 3.1 窗口与材质
 
 - 不用 `NSPopover`：无边框 `NSPanel`（`.borderless + .nonactivatingPanel`），**没有 popover 箭头**，
-  `.statusBar` 层级、跨 Space、不抢焦点；**20pt continuous 圆角**、系统窗口阴影。
+  `.statusBar` 层级、跨 Space、不抢焦点；**16pt continuous 圆角**、系统窗口阴影。
 - 材质（设置页「面板背景」可切，默认液态玻璃）：
-  - macOS 26+：`NSGlassEffectView(style: .regular)`，`cornerRadius = 20`；
-    tint 用 **低透明度白色**（`NSColor(white: 1, alpha: 0.12)`）：焦点态保持**半透明液态玻璃**，
-    与未聚焦时（切到别的菜单栏菜单时）的观感一致。
-    关键：`NSGlassEffectView` 在窗口为 key 时会把**不透明 tint**（如 `.windowBackgroundColor`、不透明灰）
-    渲染成实色卡片；只有低透明度 tint 才能保持玻璃的模糊/折射。
+  - macOS 26+：`NSGlassEffectView(style: .regular)`，**不设 tint**（保留原生折射/高光），
+    内容宿主放在 `glass.contentView` 内的一层普通容器里；
   - 旧系统：`NSVisualEffectView(.popover)` 经典磨砂；
   - 显式选「实色」或系统开启「降低透明度」时用不透明填充。
-- **双层窗口**：SwiftUI 内容在可成为 key 的透明面板窗口里（Esc/键盘/active 文本），
-  材质背景放在一个**永不成为 key 的子窗口**（`PanelGlassWindow`）里，窗口比面板四周大 26pt。原因：`NSGlassEffectView`
-  在窗口为 key 时会叠加提亮/实色观感——点开面板时和失焦（点开其它菜单栏菜单）时观感不一致；
-  材质始终由非 key 窗口渲染后，**常态即等于失焦态的半透明液态玻璃**。
 - **几何**：圆角 16pt、内容左右内边距 14pt、面板宽度 330pt（同 Status Trio）；阴影用系统窗口阴影。
 - **状态项高亮直接使用系统自带的绘制**（不再自绘）：系统只在两种情况下画原生高亮——
   鼠标按住状态项、或有 `NSPopover` 锚定在该状态项上。做法：打开面板时展示一个 **1×1、窗口 alpha=0 的
@@ -96,26 +89,25 @@
 ### 3.2 结构（自上而下）
 
 ```
-┌ header 40 ────────────────────────────────┐  鲸鱼 13pt secondary + 「DSH 会话」13pt semibold
-│                                           │  右侧：6pt 连接圆点（systemGreen / tertiary）+ 「实时/未连接」11pt secondary
-├ 通知提示 32（仅未授权时）─────────────────┤  bell.slash(12, systemYellow) + 11pt secondary 文案 + 「去开启」+ chevron
-├ 内容（滚动，最大 480，随屏幕收缩）────────┤
-│  运行中 · 1                               │  分组标题 11pt semibold secondary，leading 6，高 26
-│  ▸ 会话行（44）                           │  16pt filled 状态 glyph（系统状态色）+ 13pt semibold 标题
-│    ◦ 子智能体行（24）                      │  + 11pt secondary 副标题 + 9pt chevron
-│  ── 分隔线（左右内缩 6，视觉 12）──        │
-│  打开 DSH（40）                           │  15pt secondary arrow.up.forward.app + 13pt regular 标题；无 chevron
-├ footer 38 ────────────────────────────────┤  左：gearshape 11 + 「设置…」12pt secondary
-└───────────────────────────────────────────┘  右：bell / power 13pt 图标按钮（24×24 命中区）
+┌ 内容（滚动，最大 480，随屏幕收缩）──────────┐  无 header：打开面板直接是会话列表
+│  ● 会话行（44）                           │  行首 8pt 状态圆点 + 13pt semibold 标题
+│    ▸ 子智能体行（24，默认折叠）            │  + 11pt secondary 副标题（项目 · 摘要/运行时长/时间）+ 9pt chevron
+│  ● 会话行（44）                           │  ← 不分组，按「最近一次状态变化（since）」倒序
+├ footer 38 ────────────────────────────────┤  左：7pt 连接状态圆点（绿=已连接，灰=未连接）
+└───────────────────────────────────────────┘  右：设置 / 勿扰 / 退出 13pt 图标按钮（24×24 命中区）
 ```
 
-- 会话行 leading 状态色只用系统调色板：待回答 `systemYellow`、运行中 `systemBlue`、
-  已完成 `systemGreen`、已停止 `systemRed`；未连接/不可用用 `secondaryLabelColor`。
+- 行首圆点：待回答 `systemYellow`、运行中 `systemBlue`、已完成 `systemGreen`、已停止 `systemRed`；
+  8pt 实心圆，所有行（含无子会话的行）保持同一列。
+- 子智能体：默认折叠；父行最左侧 18pt 披露三角（`chevron.right`，9pt semibold，展开转 90°）只占独立命中区，
+  点三角展开/收起、点行其它区域打开会话；展开后子行缩进 38pt、11pt secondary、4pt 状态色圆点、行高 24，
+  点击打开父会话；不计入统计。展开/收起后面板高度自动重新适配。
+- 「打开 DSH」：有会话时**不显示**；连接正常但无会话、或未连接时，在空状态居中给原生 bordered 小按钮。
 - hover：仅整行底色（主文字色 8%/6%，6pt continuous 圆角，0.08s），不改变文字颜色。
-- 子智能体：缩进 38pt、11pt secondary、4pt 状态色圆点、行高 24；点击打开父会话；不计入分组计数。
-- 空状态（高 132）：鲸鱼 24pt tertiary +「全部空闲」13 semibold +「没有需要关注的会话」11 secondary。
-- 未连接（高 148）：`exclamationmark.circle` 16 secondary +「DSH 未连接」13 semibold + 说明 + 原生 bordered 小按钮。
-- 分组之间与动作行前为发丝分隔线（`separatorColor`），左右内缩 12pt（视觉）。
+- 空状态（高 164）：鲸鱼 24pt tertiary +「全部空闲」13 semibold +「没有需要关注的会话」11 secondary + 「打开 DSH」按钮。
+- 未连接（高 168）：`exclamationmark.circle` 16 secondary +「DSH 未连接」13 semibold + 说明 + 原生 bordered 小按钮。
+- 通知未授权时，内容上方仍有一行 32pt 可点提示（未决定 → 请求授权；已拒绝 → 打开系统设置）。
+
 
 ## 4. 设置窗口（NSWindow + 原生 grouped Form）
 
@@ -147,6 +139,7 @@
 | 显示 | 待回答 / 运行中 / 已完成 / 已停止 | 关掉的状态不在面板出现，也不进圆环与数字 |
 | 项目显示 | 按 workspace 逐个开关 | 关掉即隐藏该项目（会话本身不受影响） |
 | 通知 | 系统通知状态 | 已开启 / 允许通知 / 打开系统设置 |
+| | 勿扰模式 | 总开关：静音全部系统通知（保留下面三项）；面板底部月亮同步 |
 | | 待回答（推荐）/ 已完成 / 已停止 | 默认只开待回答 |
 | 面板 | 材质 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 |
 | 通用 | 退出前确认 | 点面板电源键或右键「退出」时先弹确认框 |
@@ -162,13 +155,13 @@
 - **颜色**：文字一律系统语义色（label / secondaryLabel / tertiaryLabel）；界面状态色用系统调色板
   （systemYellow/Blue/Green/Red），彩色只出现在状态 glyph、设置图标块、连接点。
   菜单栏图标另有 22pt 专用调色板（需要更大对比度），见 `Theme.statusNSColor`。
-- **字号**：面板行标题 13 semibold、副标题 11、分组标题 11 semibold；设置行标题 13、副标题 11、
+- **字号**：面板行标题 13 semibold、副标题 11；设置行标题 13、副标题 11、
   分区 footnote 11；页脚 12/11。最小可读 10pt。
-- **圆角**：面板 20、hover 行 6、设置图标块 6（卡片/控件圆角由系统 Form 决定，约 10–12）。
-- **间距**：面板：header 40 / 行 44 / 子行 24 / 分组标题 26 / footer 38 / 内容内边距 6（视觉 12）；
+- **圆角**：面板 16、hover 行 6、设置图标块 6（卡片/控件圆角由系统 Form 决定，约 10–12）。
+- **间距**：面板：行 44 / 子行 24 / footer 38 / 内容内边距 6（视觉 14）；无 header、无分组标题行；
   设置：系统 Form 默认（约 20pt 外边距、48pt 图标行）。
-- **分隔线**：`separatorColor`；面板分组分隔线左右内缩 12；工具栏/卡片分层用系统 elevated 背景。
-- **动效**：出现 0.16s ease-out；hover 0.08s；状态切换 0.45s；全部可关闭/尊重 Reduce Motion。
+- **分隔线**：`separatorColor`；面板仅在通知提示下方与 footer 上方各一条全宽分隔线；工具栏/卡片分层用系统 elevated 背景。
+- **动效**：出现 0.06s ease-out / 关闭 0.12s ease-in；hover 0.08s；状态切换 0.45s；全部可关闭/尊重 Reduce Motion。
 
 ## 6. 通知
 
@@ -179,7 +172,7 @@
   - 未授权（notDetermined）：面板顶部提示「通知未开启，任务结束不会提醒 · 去开启」，点击后
     `NSApp.activate` + `requestAuthorization`（避免 App 在后台时系统框被静默拒绝）；
   - 已拒绝（denied）：提示变为「去开启」，点击打开系统设置「通知」面板；
-  - 已授权：面板正常，铃铛可切换待回答通知。
+  - 已授权：面板正常；面板底部月亮按钮是「勿扰」总开关，单项通知开关在设置页。
 - **通知图标缓存（重要）**：macOS 按「App 身份（bundle id + .app 路径）」缓存通知横幅里的图标，
   改了图标/颜色但身份不变时会一直显示旧图标。需要刷新时：换新 bundle id **并且**换 .app 路径。
 - App 图标使用与菜单栏空闲态同款的鲸鱼 glyph：**透明底、无圆角方块、主色 `#416EFB`**
@@ -190,6 +183,8 @@
 
 - 默认**只对「进入待回答」发通知**（title = 会话标题，body = 待回答摘要，点击 → 打开对应会话）。
 - 已完成/已停止默认不发；待回答通知 30s 内同会话去重。
+- **勿扰模式**（面板月亮 / 设置页开关，持久化）：开启时不弹任何系统通知，单项开关配置原样保留，
+  关闭后按原配置恢复。菜单栏图标与面板列表不受勿扰影响。
 
 ## 7. App 结构（Swift Package，无第三方依赖）
 

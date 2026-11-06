@@ -11,8 +11,8 @@
 1. **系统提供的东西不自己画**：能交给 SwiftUI/AppKit 原生控件与语义色（`labelColor` / `secondaryLabelColor` /
    `separatorColor` / system 状态色）的，不自造颜色和控件。
 2. **颜色只表达状态**：界面文字一律语义色；彩色只出现在状态 glyph、设置页图标块、连接点。
-3. **排版用系统字号**：13pt 正文行标题 / 11pt 次级说明 / 11pt semibold 分组标题；不出现 10pt 以下文字。
-4. **间距走 2pt 网格**：面板外边距 12、行内边距 6、行高 44、分组标题上方 8；设置页交给原生 grouped Form。
+3. **排版用系统字号**：13pt 正文行标题 / 11pt 次级说明；不出现 10pt 以下文字。
+4. **间距走 2pt 网格**：面板外边距 14、行内边距 6、行高 44；设置页交给原生 grouped Form。
 5. **动效克制**：只有出现/消失（≤0.12s 淡入）与 hover（≤0.1s）；尊重「减弱动态效果」。
 6. **一致性优先于个性**：宁可少一点装饰，也不要出现系统里不存在的视觉语汇。
 
@@ -23,47 +23,47 @@
 | 面板宽度 | **330pt**（同 Status Trio） |
 | 面板圆角 | **16pt** continuous（实测原生天气模块 ≈15–16pt） |
 | 面板边距 | 水平 10pt（滚动容器）+ 行内 6pt = 文字距面板边 16pt（对齐原生天气模块） |
-| 行高 | 会话行 **44pt**；子智能体行 **24pt**；分组标题行 26pt；footer **38pt**；header **40pt** |
-| 字号 | 行标题 13pt semibold；行副标题 11pt regular；分组标题 11pt semibold；footer 12pt regular；连接状态 11pt |
-| 图标 | 行首状态 glyph 16pt（filled circle 系列）；footer 按钮 13pt（24×24 命中区）；chevron 9pt semibold |
-| 分隔线 | `separatorColor`（动态）；分组之间用全宽 1px；设置卡片内分隔线从文字列开始 |
+| 行高 | 会话行 **44pt**；子智能体行 **24pt**；footer **38pt** |
+| 字号 | 行标题 13pt semibold；行副标题 11pt regular；footer 按钮 13pt 图标 |
+| 图标 | 行首状态圆点 8pt（实心）；子智能体圆点 4pt；footer 按钮 13pt（24×24 命中区）；chevron 9pt semibold |
+| 分隔线 | `separatorColor`（动态）；仅通知提示下方与 footer 上方各一条全宽 1px；设置卡片内分隔线从文字列开始 |
 | hover 底色 | 主文字色 8%（深色）/ 6%（浅色），圆角 6pt，0.08s |
 | 状态色 | `systemYellow`（待回答）/ `systemBlue`（运行中）/ `systemGreen`（已完成）/ `systemRed`（已停止）；
-| | 未连接 = `secondaryLabelColor`；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
-| 圆角 | 面板 20；行 hover 6；设置卡片/控件交给系统（约 10/6） |
-| 阴影 | 面板**自绘图层阴影**（黑 50% / blur 18 / 向下 9），不用系统窗口阴影（会在玻璃边缘画深色描边）；另加 1px 白 32% 内描边模拟玻璃高光边 |
+| | 未连接 = `secondaryLabelColor`（footer 连接点、空状态）；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
+| 圆角 | 面板 16；行 hover 6；设置卡片/控件交给系统（约 10/6） |
+| 阴影 | 面板用**系统窗口阴影**（`hasShadow`），不自绘阴影/内描边（会破坏 Liquid Glass 折射与高光） |
 
 ## 2. 弹出面板（StatusPanelView + StatusPanelController）
 
 ### 2.1 结构（自上而下）
 
 ```
-┌ header 40px ─────────────────────────────┐  鲸鱼 13pt secondary + 「DSH 会话」13 semibold + Spacer + 连接点/文字
-├ 通知提示 32px（仅未授权时显示）─────────┤  bell.slash(12pt, systemYellow) + 11pt secondary 文案 + 「去开启」+ chevron
-├ 内容（滚动，最大高度 480，随屏幕收缩）──┤
-│  运行中 · 1                              │  分组标题 11 semibold secondary，leading 6，上 8 / 下 3
-│  ▸ 会话行（44）                          │  16pt filled 状态 glyph + 13 semibold 标题 + 11 secondary 副标题 + 10 chevron
-│    ◦ 子智能体行（24）                    │  leading 38，4pt 状态圆点 + 11pt secondary
-│  ── 全宽分隔线 ──                        │
-│  打开 DSH（40）                          │  15pt secondary arrow.up.forward.app + 13 regular 标题；无 chevron
-├ footer 38px ─────────────────────────────┤  左：gearshape 11 + 「设置…」12 secondary；右：bell/power 13pt 图标按钮（22×22 命中区）
+┌ 内容（滚动，最大高度 480，随屏幕收缩）──┤  无 header，打开面板直接是会话列表
+│  ● 会话行（44）                          │  行首 8pt 状态圆点 + 13 semibold 标题 + 11 secondary 副标题 + 10 chevron
+│    ▸ 子智能体行（24，默认折叠）            │  leading 38，4pt 状态圆点 + 11pt secondary（点行首披露三角展开）
+├ footer 38px ─────────────────────────────┤  左：7pt 连接状态圆点（无文字，hover 有 tooltip）
+└──────────────────────────────────────────┘  右：设置 / 勿扰（月亮）/ 退出（电源）13pt 图标按钮（24×24 命中区）
 ```
 
-- 空状态：高 132；鲸鱼 24pt tertiary + 「全部空闲」13 semibold + 「没有需要关注的会话」11 secondary。
-- 未连接：高 148；`exclamationmark.circle` 16pt secondary + 「DSH 未连接」13 semibold + 11 secondary 说明 +
+- 会话不分组：按 `since`（进入当前状态时刻）倒序，最近一次状态变化在最上；圆点颜色 = 状态。
+- 空状态：高 164；鲸鱼 24pt tertiary + 「全部空闲」13 semibold + 「没有需要关注的会话」11 secondary + 「打开 DSH」按钮。
+- 未连接：高 168；`exclamationmark.circle` 16pt secondary + 「DSH 未连接」13 semibold + 11 secondary 说明 +
   原生 bordered 小按钮「打开 DSH」。
 - 通知提示整行可点，点击行为保持：未决定 → 请求授权；已拒绝 → 打开系统设置通知面板。
 
 ### 2.2 视觉与交互
 
-- 会话行：`questionmark.circle.fill` / `play.circle.fill` / `checkmark.circle.fill` / `stop.circle.fill`，
-  16pt、系统状态色；标题 13 semibold `labelColor`，副标题 11 regular `secondaryLabelColor`；
-  trailing `chevron.right` 10pt semibold `tertiaryLabelColor`。
+- 会话行：行首 8pt 实心状态圆点（`systemYellow`/`systemBlue`/`systemGreen`/`systemRed`），
+  标题 13 semibold `labelColor`，副标题 11 regular `secondaryLabelColor`；
+  trailing `chevron.right` 9pt semibold `tertiaryLabelColor`（提示「点击打开会话」）。
 - 行 hover 仅底色（圆角 6，0.08s）+ 指针；整行可点，命中区覆盖行宽；hover 时不改变文字颜色。
-- 子智能体行：不参与统计/角标；点击打开父会话；`help` 保留。
-- 「打开 DSH」行：动作行，放在全宽分隔线之后；hover 同样有底色；不加 chevron。
-- footer：左「设置…」文本按钮；右侧铃铛（通知开关，tooltip 说明）与电源（退出，二次确认）图标按钮；
-  图标按钮 24×24 命中区、hover 底色圆角 5；禁用彩色 hover。
+- 子智能体行：**默认折叠**；父行最左侧 18pt Finder 风格披露三角（独立命中区）负责展开/收起，
+  点行其余区域仍然打开会话；展开后子行缩进 38pt、4pt 状态圆点、11pt secondary；点击打开父会话；
+  不计入统计/角标。展开/收起后由 `AppModel.onPanelLayoutChange` 请求面板重新适配高度。
+- 「打开 DSH」：有会话时**不显示**；连接正常但无会话 / 未连接时，在空状态居中给原生 bordered 按钮。
+- footer：左连接状态点（7pt，绿=已连接 / 灰=未连接，无文字，hover 显示 tooltip）；
+  右侧 设置（gearshape）、勿扰（`moon` / `moon.fill`，开启时用系统强调色）、退出（power，二次确认）三个图标按钮；
+  图标按钮 24×24 命中区、hover 底色圆角 5；除勿扰开启态外不用彩色。
 - 面板出现/关闭：**0.06s ease-out 淡入 / 0.12s ease-in 淡出**（Reduce Motion 时瞬时）；
   关闭时先淡出再关窗，内容高度变化不打断交互。
 - 面板打开期间状态项显示**系统原生高亮**：不再自绘；用一个 1×1、alpha=0 的 `NSPopover`
@@ -75,7 +75,7 @@
 ### 2.3 面板窗口（StatusPanelController）
 
 - 保持自定义 `NSPanel`（无箭头、`.statusBar` 层级、跨 Space、非激活面板但 `makeKey` 保证 active 渲染），
-  圆角 20pt；材质三档保持：Liquid Glass（`NSGlassEffectView`，macOS 26+）/ 经典磨砂（`.popover`）/ 实色；
+  圆角 16pt；材质三档保持：Liquid Glass（`NSGlassEffectView`，macOS 26+）/ 经典磨砂（`.popover`）/ 实色；
   「降低透明度」→ 实色。
 - 面板材质直接采用开源 **Status Trio**（Apache-2.0）的实现：`NSGlassEffectView(style: .regular)` **不设 tint**、
   系统窗口阴影、16pt 圆角；内容宿主放在 `glass.contentView` 内（避免玻璃直接接管 SwiftUI 的 intrinsic size）。
@@ -110,6 +110,7 @@
 | 显示 | 待回答 / 运行中 / 已完成 / 已停止 | Switch（副标题显示当前数量） |
 | | 项目显示（逐项目） | Switch（无项目时显示「暂无已知项目（连接 DSH 后出现）」） |
 | 通知 | 系统通知状态 | 状态文字 / 「允许通知」/「打开系统设置」按钮 |
+| | 勿扰模式 | Switch（总开关：静音全部通知；下面三项保留） |
 | | 待回答（推荐）/ 已完成 / 已停止 | Switch |
 | 面板 | 材质 | Picker（液态玻璃 / 经典磨砂 / 实色；低版本自动隐藏液态玻璃） |
 | 通用 | 退出前确认 | Switch |
@@ -137,7 +138,7 @@
 | --- | --- | --- | --- |
 | 弹出面板内边距 | 12pt | 12pt | 已对齐（滚动容器 6 + 行内 6） |
 | 面板行高 | 菜单项 24 / 设置行 38–48 | 会话行 44 / 子行 24 | 双行列表用 44pt 更接近原生「Now Playing」类列表；不套用菜单项 24 |
-| 面板分组字号 | 11pt semibold | 11pt semibold | 已对齐 |
+| 面板行首状态点 | 8pt 实心圆 | 8pt 实心圆 | 与菜单栏/控制中心的状态点尺寸一致 |
 | 设置窗口结构 | 工具栏 52 + 侧边栏 pane | 标准 titlebar + 单页 grouped Form | 单页设置内容量不足以拆分 pane；保留原生 Form（系统自带行高 48/图标 24/开关尺寸） |
 | 设置行图标 | 24×24 | 24×24 | 已对齐 |
 | 窗口标题 | 「设置」 | 「DSH Status 设置」 | 保留 App 名，避免与系统设置混淆（原生 App 亦常用「<App> Settings」） |
@@ -146,8 +147,10 @@
 ## 6. 验收
 
 1. `cd app && swift build -c release` 0 error/warning（新增 warning 需说明）。
-2. `--render-previews` 正常出图：面板三态（深/浅）、设置页（深/浅），无排版溢出/截断。
+2. `--render-previews` 正常出图：面板四态（默认折叠 / 展开子智能体 / 全部空闲 / 未连接，深/浅）、设置页（深/浅），
+   无排版溢出/截断。
 3. 真机截图：面板在彩色壁纸上深色模式观感与 Control Center 同代；设置窗口为标准 titlebar + 原生分组样式，
    不出现自定义底栏/自绘描边。
-4. 交互回归：点击会话行跳转、Esc/外部点击关闭、通知提示、子智能体缩进、footer 设置/铃铛/电源、
+4. 交互回归：点击会话行跳转、Esc/外部点击关闭、通知提示、子智能体默认折叠/展开且面板高度自适应、
+   footer 状态点/设置/勿扰/退出、
    设置项即时生效、重置确认、窗口大小记忆。

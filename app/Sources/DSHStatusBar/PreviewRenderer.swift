@@ -305,8 +305,12 @@ enum PreviewRenderer {
                                          pageBackground: NSColor,
                                          title: String,
                                          to url: URL) throws {
+        let demo = AppModel.demo()
+        let demoExpanded = AppModel.demo()
+        demoExpanded.toggleSubagents(for: "session-dsh")
         let models: [(String, AppModel)] = [
-            ("有会话", AppModel.demo()),
+            ("有会话（子智能体默认折叠）", demo),
+            ("展开子智能体", demoExpanded),
             ("全部空闲", emptyModel()),
             ("未连接", AppModel.demoDisconnected()),
         ]
@@ -320,7 +324,7 @@ enum PreviewRenderer {
             renderPanel(model: model, width: panelWidth, appearance: appearance, colorScheme: colorScheme)
         }
         let maxHeight = images.map(\.size.height).max() ?? 200
-        let width = margin * 2 + panelWidth * 3 + gap * 2
+        let width = margin * 2 + panelWidth * CGFloat(models.count) + gap * CGFloat(models.count - 1)
         let height = titleHeight + maxHeight + labelHeight + margin
 
         try savePNG(width: width, height: height, appearance: appearance, to: url) { rect in
@@ -329,7 +333,7 @@ enum PreviewRenderer {
             rect.fill()
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("click 会话行跳转 · 子智能体缩进显示（不计入统计）",
+            drawText("点击会话行跳转 · 圆点 = 状态（红停止 / 黄待答 / 蓝运行 / 绿完成）· 子智能体默认折叠，点左侧三角展开",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

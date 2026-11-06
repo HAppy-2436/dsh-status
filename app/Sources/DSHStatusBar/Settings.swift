@@ -99,6 +99,8 @@ final class AppSettings: ObservableObject {
     @Published var notifyWaiting: Bool { didSet { save("notifyWaiting", notifyWaiting) } }
     @Published var notifyCompleted: Bool { didSet { save("notifyCompleted", notifyCompleted) } }
     @Published var notifyStopped: Bool { didSet { save("notifyStopped", notifyStopped) } }
+    /// 勿扰：总开关式静音全部系统通知（保留上面三项单项设置）。
+    @Published var doNotDisturb: Bool { didSet { save("doNotDisturb", doNotDisturb) } }
     @Published var confirmBeforeQuit: Bool { didSet { save("confirmBeforeQuit", confirmBeforeQuit) } }
     @Published var panelBackgroundStyle: PanelBackgroundStyle {
         didSet { save("panelBackgroundStyle", panelBackgroundStyle.rawValue) }
@@ -119,7 +121,7 @@ final class AppSettings: ObservableObject {
             guard let legacy = UserDefaults(suiteName: domain),
                   legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
             for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation",
-                        "notifyWaiting", "notifyCompleted", "notifyStopped", "confirmBeforeQuit",
+                        "notifyWaiting", "notifyCompleted", "notifyStopped", "doNotDisturb", "confirmBeforeQuit",
                         "panelBackgroundStyle"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
                     defaults.set(value, forKey: "dshStatus.\(key)")
@@ -149,6 +151,7 @@ final class AppSettings: ObservableObject {
         notifyWaiting = defaults.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
         notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
         notifyStopped = defaults.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
+        doNotDisturb = defaults.object(forKey: "dshStatus.doNotDisturb") as? Bool ?? false
         confirmBeforeQuit = defaults.object(forKey: "dshStatus.confirmBeforeQuit") as? Bool ?? true
         let storedPanel = PanelBackgroundStyle(rawValue: defaults.string(forKey: "dshStatus.panelBackgroundStyle") ?? "")
         panelBackgroundStyle = storedPanel ?? PanelBackgroundStyle.systemDefault
@@ -168,6 +171,7 @@ final class AppSettings: ObservableObject {
         notifyWaiting = true
         notifyCompleted = false
         notifyStopped = false
+        doNotDisturb = false
         confirmBeforeQuit = true
         panelBackgroundStyle = PanelBackgroundStyle.systemDefault
     }
@@ -319,6 +323,14 @@ struct SettingsView: View {
                         subtitle: notificationSubtitle) {
                 notificationAction
             }
+            SettingsRow(symbol: settings.doNotDisturb ? "moon.fill" : "moon",
+                        color: .systemIndigo,
+                        title: "勿扰模式",
+                        subtitle: "关闭全部系统通知；下面的单项开关会保留") {
+                Toggle("勿扰模式", isOn: $settings.doNotDisturb)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
             SettingsRow(symbol: "bell.badge.fill",
                         color: Theme.uiNSColor(.waiting),
                         title: "待回答（推荐）") {
@@ -343,7 +355,7 @@ struct SettingsView: View {
         } header: {
             Text("通知")
         } footer: {
-            SettingsFootnote("点击通知会打开对应会话；同一会话 30 秒内不重复提醒。")
+            SettingsFootnote("点击通知会打开对应会话；同一会话 30 秒内不重复提醒。勿扰模式开启时以上所有通知都不弹（单项设置保留）。")
         }
     }
 

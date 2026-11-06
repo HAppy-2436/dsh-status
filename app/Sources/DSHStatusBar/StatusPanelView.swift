@@ -2,9 +2,12 @@ import SwiftUI
 
 /// 弹出面板：macOS 26/27 原生浮层观感（见 docs/ui-redesign-spec.md §2）。
 ///
-/// 结构：header（鲸鱼 + 标题 + 连接状态）/ 通知提示 / 分组会话列表 / 动作行 / footer。
-/// 视觉：320pt 宽、20pt 圆角（由 NSPanel 提供材质）、13pt 行标题 + 11pt 副标题、
-/// 系统语义色 + 系统状态色、全宽分隔线、hover 仅轻微底色。
+/// 结构：通知提示（仅未授权时）/ 扁平会话列表 / footer（状态点 + 设置 + 勿扰 + 退出）。
+/// - 会话不再按状态分组：按 `since`（最近一次状态变化）倒序，最近变化的在最上面；
+/// - 行首 8pt 状态圆点：红=已停止、黄=待回答、蓝=运行中、绿=已完成；
+/// - 子智能体默认折叠，父行最左侧 Finder 风格披露三角展开；
+/// - 有会话时不出现「打开 DSH」行，空闲 / 未连接时在空状态给按钮。
+/// 视觉：330pt 宽、16pt 圆角（由 NSPanel 提供材质）、13pt 行标题 + 11pt 副标题、系统语义色。
 struct StatusPanelView: View {
     @ObservedObject var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
@@ -14,8 +17,6 @@ struct StatusPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Divider()
             if showsNotificationHint {
                 notificationHint
                 Divider()
@@ -28,37 +29,7 @@ struct StatusPanelView: View {
         .background(usesMaterial ? Color.clear : Theme.panelFallbackBackground)
     }
 
-    // MARK: - 头部
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(nsImage: WhaleLogo.templateImage(height: 13))
-                .renderingMode(.template)
-                .foregroundStyle(.secondary)
-            Text("DSH 会话")
-                .font(.system(size: 13, weight: .semibold))
-            Spacer(minLength: 8)
-            connectionBadge
-        }
-        .padding(.horizontal, Theme.Metrics.panelHorizontalPadding)
-        .frame(height: Theme.Metrics.headerHeight)
-    }
-
-    private var connectionBadge: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(model.connected
-                      ? Theme.uiColor(.completed)
-                      : Color(nsColor: .tertiaryLabelColor))
-                .frame(width: 6, height: 6)
-            Text(model.connected ? "实时" : "未连接")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-        }
-        .help(model.connected ? "与 DeepSeek Harness 实时同步" : "等待 DeepSeek Harness 连接")
-    }
-
-    // MARK: - 通知提示（未授权时）
+    // MARK: - 通知提示（未授权时；仅此一处占一行）
 
     private var showsNotificationHint: Bool {
         guard model.connected else { return false }
@@ -102,17 +73,14 @@ struct StatusPanelView: View {
     private var content: some View {
         if !model.connected {
             disconnected
-        } else if model.sections.isEmpty {
+        } else if model.orderedSessions.isEmpty {
             empty
         } else {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(model.sections.enumerated()), id: \.element.status) { index, section in
-                        if index > 0 { groupSeparator }
-                        sectionView(status: section.status, rows: section.rows)
+                    ForEach(model.orderedSessions) { row in
+                        sessionBlock(row)
                     }
-                    groupSeparator
-                    openDSHRow
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
@@ -121,65 +89,35 @@ struct StatusPanelView: View {
         }
     }
 
-    private var groupSeparator: some View {
-        Divider()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-    }
-
-    private func sectionView(status: SessionStatus, rows: [SessionRow]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("\(status.label) · \(rows.count)")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 6)
-                .frame(height: Theme.Metrics.sectionHeaderHeight, alignment: .bottomLeading)
-                .padding(.bottom, 2)
-            ForEach(rows) { row in
-                SessionRowView(row: row,
-                               onOpen: { model.onOpenSession?(row.id) })
-                ForEach(model.subagents(for: row.id)) { sub in
-                    SubagentRowView(subagent: sub,
-                                    onOpen: { model.onOpenSession?(row.id) })
-                }
+    @ViewBuilder
+    private func sessionBlock(_ row: SessionRow) -> some View {
+        let subagents = model.subagents(for: row.id)
+        SessionRowView(row: row,
+                       subagentCount: subagents.count,
+                       expanded: model.isSubagentsExpanded(row.id),
+                       onToggleSubagents: { model.toggleSubagents(for: row.id) },
+                       onOpen: { model.onOpenSession?(row.id) })
+        if model.isSubagentsExpanded(row.id) {
+            ForEach(subagents) { sub in
+                SubagentRowView(subagent: sub,
+                                onOpen: { model.onOpenSession?(row.id) })
             }
         }
-    }
-
-    private var openDSHRow: some View {
-        PanelRowButton(action: { model.onOpenDSH?() }, height: Theme.Metrics.actionRowHeight) {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.up.forward.app")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18, height: 18)
-                Text("打开 DSH")
-                    .font(.system(size: 13))
-                Spacer(minLength: 6)
-            }
-        }
-        .help("打开 DeepSeek Harness 主窗口")
     }
 
     /// 与上面布局常量保持一致的高度估算（ScrollView 需要显式高度）。
     private var contentHeight: CGFloat {
-        let m = Theme.Metrics.self
-        let rows = model.sections.reduce(0) { $0 + $1.rows.count }
-        let subRows = model.sections.reduce(0) { total, section in
-            total + section.rows.reduce(0) { $0 + model.subagents(for: $1.id).count }
+        var height: CGFloat = 12
+        for row in model.orderedSessions {
+            height += Theme.Metrics.rowHeight
+            if model.isSubagentsExpanded(row.id) {
+                height += CGFloat(model.subagents(for: row.id).count) * Theme.Metrics.subagentRowHeight
+            }
         }
-        let sections = model.sections.count
-        let separators = sections // 组间 + 动作行前
-        let height = CGFloat(rows) * m.rowHeight
-            + CGFloat(subRows) * m.subagentRowHeight
-            + CGFloat(sections) * (m.sectionHeaderHeight + 2)
-            + CGFloat(separators) * 9
-            + m.actionRowHeight
-            + 12
-        return min(max(height, 96), m.maxContentHeight)
+        return min(max(height, Theme.Metrics.rowHeight + 12), Theme.Metrics.maxContentHeight)
     }
 
-    // MARK: - 空 / 未连接
+    // MARK: - 空 / 未连接（此时才出现「打开 DSH」）
 
     private var empty: some View {
         VStack(spacing: 6) {
@@ -191,9 +129,13 @@ struct StatusPanelView: View {
             Text("没有需要关注的会话")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+            Button("打开 DSH") { model.onOpenDSH?() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 132)
+        .frame(height: 164)
     }
 
     private var disconnected: some View {
@@ -214,44 +156,35 @@ struct StatusPanelView: View {
                 .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 148)
+        .frame(height: 168)
     }
 
-    // MARK: - 底部
+    // MARK: - 底部一行：状态点 · 设置 · 勿扰 · 退出
 
     private var footer: some View {
-        HStack(spacing: 4) {
-            FooterButton(action: { model.onOpenSettings?() },
-                         help: "设置…（⌘,）") {
-                HStack(spacing: 5) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 11))
-                    Text("设置…")
-                        .font(.system(size: 12))
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .frame(height: 24)
-                .contentShape(Rectangle())
-            }
+        HStack(spacing: 2) {
+            Circle()
+                .fill(model.connected
+                      ? Theme.uiColor(.completed)
+                      : Color(nsColor: .tertiaryLabelColor))
+                .frame(width: 7, height: 7)
+                .padding(.leading, 6)
+                .help(model.connected ? "已连接 DeepSeek Harness（实时同步）" : "等待 DeepSeek Harness 连接")
+                .accessibilityLabel(model.connected ? "已连接" : "未连接")
 
             Spacer(minLength: 0)
 
-            if model.notificationPermission == .authorized {
-                FooterButton(action: { model.settings.notifyWaiting.toggle() },
-                             help: "待回答通知（更多设置见设置页）") {
-                    footerIcon(model.settings.notifyWaiting ? "bell" : "bell.slash")
-                }
-            } else {
-                FooterButton(action: {
-                    if model.notificationPermission == .notDetermined {
-                        model.onRequestNotificationPermission?()
-                    } else {
-                        model.onOpenNotificationSettings?()
-                    }
-                }, help: "通知未开启，点此开启") {
-                    footerIcon("bell.slash")
-                }
+            FooterButton(action: { model.onOpenSettings?() },
+                         help: "设置…（⌘,）") {
+                footerIcon("gearshape")
+            }
+
+            FooterButton(action: { model.settings.doNotDisturb.toggle() },
+                         help: model.settings.doNotDisturb
+                            ? "勿扰模式已开启（点击关闭）"
+                            : "勿扰模式：关闭所有系统通知") {
+                footerIcon(model.settings.doNotDisturb ? "moon.fill" : "moon",
+                           tint: model.settings.doNotDisturb ? Color.accentColor : nil)
             }
 
             FooterButton(action: { model.onQuit?() }, help: "退出 DSH Status") {
@@ -262,10 +195,10 @@ struct StatusPanelView: View {
         .frame(height: Theme.Metrics.footerHeight)
     }
 
-    private func footerIcon(_ name: String) -> some View {
+    private func footerIcon(_ name: String, tint: Color? = nil) -> some View {
         Image(systemName: name)
             .font(.system(size: 13))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(tint ?? Color.secondary)
             .frame(width: 24, height: 24)
             .contentShape(Rectangle())
     }
@@ -378,61 +311,75 @@ private struct SubagentRowView: View {
     }
 }
 
-// MARK: - 会话行
+// MARK: - 会话行（行首状态圆点 + Finder 风格披露三角）
 
 private struct SessionRowView: View {
     let row: SessionRow
+    let subagentCount: Int
+    let expanded: Bool
+    let onToggleSubagents: () -> Void
     let onOpen: () -> Void
     @State private var hovering = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Button(action: onOpen) {
-            HStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.uiColor(row.statusKind))
-                    .frame(width: 18, height: 18)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(row.displayTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+        ZStack(alignment: .leading) {
+            Button(action: onOpen) {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Theme.uiColor(row.statusKind))
+                        .frame(width: 8, height: 8)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.displayTitle)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
                 }
-                Spacer(minLength: 6)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                .padding(.leading, disclosureColumn)
+                .padding(.trailing, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: Theme.Metrics.rowHeight)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 6)
-            .frame(height: Theme.Metrics.rowHeight)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
-            )
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if subagentCount > 0 {
+                Button(action: onToggleSubagents) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .frame(width: disclosureColumn, height: Theme.Metrics.rowHeight)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(expanded ? "收起 \(subagentCount) 个子智能体"
+                               : "展开 \(subagentCount) 个子智能体")
+            }
         }
-        .buttonStyle(.plain)
+        .frame(height: Theme.Metrics.rowHeight)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
+        )
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.08), value: hovering)
         .help(row.pendingSummary ?? row.displayTitle)
     }
 
-    private var symbol: String {
-        switch row.statusKind {
-        case .waiting: return "questionmark.circle.fill"
-        case .running: return "play.circle.fill"
-        case .completed: return "checkmark.circle.fill"
-        case .stopped: return "stop.circle.fill"
-        case .idle: return "circle"
-        }
-    }
+    /// 披露三角占位列宽：所有行的状态圆点因此左对齐。
+    private let disclosureColumn: CGFloat = 18
 
     private var subtitle: String {
         switch row.statusKind {

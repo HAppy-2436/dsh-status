@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.confirmQuit()
         }
         model.onStatusTransition = { [weak self] row, status in
-            guard let self else { return }
+            guard let self, !self.settings.doNotDisturb else { return }
             switch status {
             case .waiting:
                 if self.settings.notifyWaiting { self.notifications.notify(row, status: .waiting) }
@@ -58,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem, settings: settings)
         settingsWindow = SettingsWindowController(settings: settings, model: model)
+
+        // 展开/收起子智能体后内容高度变化：等 SwiftUI 完成一轮布局再重新适配面板。
+        model.onPanelLayoutChange = { [weak self] in
+            DispatchQueue.main.async { self?.panelController.fitIfVisible() }
+        }
 
         // 设置变化 → 立即重绘图标
         settings.objectWillChange

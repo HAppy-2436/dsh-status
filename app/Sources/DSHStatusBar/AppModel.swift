@@ -18,6 +18,11 @@ final class AppModel: ObservableObject {
     var onOpenSession: ((String) -> Void)?
     var onOpenDSH: (() -> Void)?
     var onQuit: (() -> Void)?
+    /// 面板内容高度变化（如展开/收起子智能体）时请求重新适配窗口。
+    var onPanelLayoutChange: (() -> Void)?
+
+    /// 面板里已展开子智能体的父会话（默认折叠；仅内存态，重启回到折叠）。
+    @Published private(set) var expandedSubagentParents: Set<String> = []
 
     private var previousStatus: [String: String] = [:]
     private var hasBaseline = false
@@ -52,14 +57,16 @@ final class AppModel: ObservableObject {
         )
     }
 
-    var sections: [(status: SessionStatus, rows: [SessionRow])] {
-        let visible = visibleSessions
-        var grouped: [SessionStatus: [SessionRow]] = [:]
-        for row in visible { grouped[row.statusKind, default: []].append(row) }
-        return [SessionStatus.waiting, .running, .completed, .stopped].compactMap { status in
-            guard let rows = grouped[status], !rows.isEmpty else { return nil }
-            let sorted = rows.sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
-            return (status, sorted)
+    /// 面板列表：不按状态分组，最近一次状态变化（`since`）越新越靠上。
+    var orderedSessions: [SessionRow] {
+        visibleSessions.sorted { lhs, rhs in
+            let lhsChanged = lhs.since ?? lhs.updatedAt ?? 0
+            let rhsChanged = rhs.since ?? rhs.updatedAt ?? 0
+            if lhsChanged != rhsChanged { return lhsChanged > rhsChanged }
+            let lhsUpdated = lhs.updatedAt ?? 0
+            let rhsUpdated = rhs.updatedAt ?? 0
+            if lhsUpdated != rhsUpdated { return lhsUpdated > rhsUpdated }
+            return lhs.id < rhs.id
         }
     }
 
@@ -74,6 +81,20 @@ final class AppModel: ObservableObject {
 
     func hasSubagents(_ parentId: String) -> Bool {
         !subagents(for: parentId).isEmpty
+    }
+
+    func isSubagentsExpanded(_ parentId: String) -> Bool {
+        expandedSubagentParents.contains(parentId)
+    }
+
+    /// Finder 风格披露三角：展开/收起某父会话的子智能体。
+    func toggleSubagents(for parentId: String) {
+        if expandedSubagentParents.contains(parentId) {
+            expandedSubagentParents.remove(parentId)
+        } else {
+            expandedSubagentParents.insert(parentId)
+        }
+        onPanelLayoutChange?()
     }
 
     func apply(state: BridgeState) {

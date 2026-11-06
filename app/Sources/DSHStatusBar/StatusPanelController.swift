@@ -94,7 +94,7 @@ final class StatusPanelController: NSObject {
                 return
             }
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.12
+                context.duration = 0.06
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 context.allowsImplicitAnimation = true
                 self.panel.animator().alphaValue = 1

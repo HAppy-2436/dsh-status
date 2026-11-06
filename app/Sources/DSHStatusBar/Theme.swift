@@ -18,11 +18,19 @@ enum Theme {
         /// 实测参考：原生天气模块 ≈15–16pt；macOS 26 应用窗口为超椭圆曲线（`cornerCurve = .continuous`）。
         static let panelCornerRadius: CGFloat = 16
         static let rowHeight: CGFloat = 44
+        /// 空闲态内容区高度：比会话行（44）再高一点，整块面板就是一个大按钮，点起来「大气」。
+        static let idleContentHeight: CGFloat = 52
         static let subagentRowHeight: CGFloat = 24
         static let maxContentHeight: CGFloat = 480
 
         // 面板内的统一圆角阶梯（全部 continuous，避免「三个圆角各讲各的」）
-        /// 会话行 hover 底色 / 子智能体行 hover 底色。
+        /// 会话行 / 空闲整块的 hover 与按下高亮圆角。
+        ///
+        /// 严格「同心嵌套」值应为 `16 − 内距 8 = 8`，但实测 8pt 在高 44/52pt 的行上显得「方中带圆」，
+        /// 观感偏硬；按视觉偏好放大到 **12**（用户明确要求「更圆、10–12」）。
+        /// 代价：内层圆角略大于同心值，四角与外壳的缝隙比正中间略宽——实际观感更柔和，是有意为之。
+        static let rowHighlightCornerRadius: CGFloat = 12
+        /// 子智能体行（24pt 矮行）的 hover 底色：矮行用 12 会变胶囊，保持 8。
         static let rowCornerRadius: CGFloat = 8
         /// 行尾披露按钮（数量 + 箭头）的悬停胶囊 —— 与系统菜单项里的行内按钮同款。
         static let inlineControlCornerRadius: CGFloat = 5

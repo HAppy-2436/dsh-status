@@ -7,7 +7,8 @@ import SwiftUI
 /// - 行尾（trailing）统一是导航提示：没有子会话 = `chevron.right`（点卡片任意位置跳转会话）；
 ///   有子会话 = 「子智能体数量 + `chevron.down`」披露按钮（点它展开/收起，展开时下箭头旋转成上箭头）；
 /// - 没有 header / footer：设置、勿扰、退出、打开 DSH 都在状态项**右键菜单**里；
-/// - 有会话时不出现「打开 DSH」，全部空闲 / 未连接时在空状态给按钮。
+/// - **空闲态（全部空闲 / 未连接）只显示「Logo + 全部空闲」一行**，整块可点 → 直接打开 DSH；
+///   有会话时才显示列表。
 struct StatusPanelView: View {
     @ObservedObject var model: AppModel
     @Environment(\.panelUsesMaterial) private var usesMaterial
@@ -25,12 +26,39 @@ struct StatusPanelView: View {
     @ViewBuilder
     private var content: some View {
         if !model.connected {
-            disconnected
+            idleCompact(connected: false)
         } else if model.orderedSessions.isEmpty {
-            empty
+            idleCompact(connected: true)
         } else {
             sessionList
         }
+    }
+
+    /// 空闲 / 未连接：**整块面板就是一个按钮**——中间是「鲸鱼 Logo + 状态文字」，
+    /// 点面板任意位置都打开 DSH（不再只有文字那一小块可点）。
+    ///
+    /// 内容区比会话行（44pt）再高一档（52pt）：整块面板 = 8 + 52 + 8 = 68pt，
+    /// 悬停/按下底色铺满整块内容区，点哪里都能打开 DSH，不是一条细长的小胶囊。
+    private func idleCompact(connected: Bool) -> some View {
+        Button { model.onOpenDSH?() } label: {
+            HStack(spacing: 11) {
+                Image(nsImage: WhaleLogo.templateImage(height: 22))
+                    .renderingMode(.template)
+                    .foregroundStyle(connected ? AnyShapeStyle(.primary)
+                                               : AnyShapeStyle(.secondary))
+                Text(connected ? "全部空闲" : "未连接")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(connected ? AnyShapeStyle(.primary)
+                                               : AnyShapeStyle(.secondary))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(IdleOpenButtonStyle())
+        .help(connected ? "DSH 已连接 · 点面板任意位置打开 DSH"
+                        : "DSH 未连接 · 点面板任意位置打开 DSH")
+        .padding(Theme.Metrics.panelContentInset)
+        .frame(height: Theme.Metrics.idleContentHeight + Theme.Metrics.panelContentInset * 2)
     }
 
     private var sessionList: some View {
@@ -41,7 +69,9 @@ struct StatusPanelView: View {
                 }
             }
             .padding(.horizontal, Theme.Metrics.panelContentInset)
-            .padding(.vertical, 6)
+            // 上下内距与左右一致（8）：行 hover 底色的圆角（8）= 面板圆角（16）− 内距（8），
+            // 两个方向的内距必须相同，内外圆角才是同一条 continuous 曲线的同心嵌套。
+            .padding(.vertical, Theme.Metrics.panelContentInset)
         }
         .frame(height: contentHeight)
         .clipped()
@@ -74,56 +104,15 @@ struct StatusPanelView: View {
 
     /// 与上面布局常量保持一致的高度估算（ScrollView 需要显式高度）。
     private var contentHeight: CGFloat {
-        var height: CGFloat = 12
+        var height: CGFloat = Theme.Metrics.panelContentInset * 2
         for row in model.orderedSessions {
             height += Theme.Metrics.rowHeight
             if model.isSubagentsExpanded(row.id) {
                 height += CGFloat(model.subagents(for: row.id).count) * Theme.Metrics.subagentRowHeight
             }
         }
-        return min(max(height, Theme.Metrics.rowHeight + 12), Theme.Metrics.maxContentHeight)
-    }
-
-    // MARK: - 空 / 未连接（此时才出现「打开 DSH」）
-
-    private var empty: some View {
-        VStack(spacing: 6) {
-            Image(nsImage: WhaleLogo.templateImage(height: 24))
-                .renderingMode(.template)
-                .foregroundStyle(.tertiary)
-            Text("全部空闲")
-                .font(.system(size: 13, weight: .semibold))
-            Text("没有需要关注的会话")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Button("打开 DSH") { model.onOpenDSH?() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 150)
-    }
-
-    private var disconnected: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.circle")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.secondary)
-                Text("DSH 未连接")
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            Text("等待 DeepSeek Harness 启动…")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Button("打开 DSH") { model.onOpenDSH?() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .padding(.top, 2)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 160)
+        return min(max(height, Theme.Metrics.rowHeight + Theme.Metrics.panelContentInset * 2),
+                   Theme.Metrics.maxContentHeight)
     }
 }
 
@@ -213,7 +202,7 @@ private struct SessionRowView: View {
                 .frame(height: Theme.Metrics.rowHeight)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(PanelRowButtonStyle(cornerRadius: Theme.Metrics.rowCornerRadius))
+            .buttonStyle(PanelRowButtonStyle(cornerRadius: Theme.Metrics.rowHighlightCornerRadius))
 
             if hasSubagents {
                 subagentToggle
@@ -236,7 +225,7 @@ private struct SessionRowView: View {
         }
         .frame(height: Theme.Metrics.rowHeight)
         .background(
-            RoundedRectangle(cornerRadius: Theme.Metrics.rowCornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Metrics.rowHighlightCornerRadius, style: .continuous)
                 .fill(hovering ? Theme.hoverFill(colorScheme) : Color.clear)
         )
         .onHover { hoverRow = $0 }
@@ -304,6 +293,35 @@ private struct SessionRowView: View {
 }
 
 // MARK: - 行按钮样式（按住时轻微压暗/下沉，接近 macOS 原生列表行）
+
+/// 空闲态的整块「Logo + 全部空闲」：默认无底色，悬停出现与行同款的 8pt 圆角底色，
+/// 按下再深一档 —— 三种状态都用菜单面板里唯一的行形状，观感与会话行一致。
+private struct IdleOpenButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        IdleOpenLabel(configuration: configuration, colorScheme: colorScheme)
+    }
+
+    private struct IdleOpenLabel: View {
+        let configuration: ButtonStyleConfiguration
+        let colorScheme: ColorScheme
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.Metrics.rowHighlightCornerRadius, style: .continuous)
+                        .fill(configuration.isPressed
+                              ? Theme.pressedFill(colorScheme)
+                              : (hovering ? Theme.hoverFill(colorScheme) : Color.clear))
+                )
+                .onHover { hovering = $0 }
+                .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: hovering)
+                .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: configuration.isPressed)
+        }
+    }
+}
 
 /// 行卡片：按下时整体轻微变暗（系统列表行也是按住即反馈），松开交给 action。
 private struct PanelRowButtonStyle: ButtonStyle {

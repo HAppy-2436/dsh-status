@@ -202,9 +202,10 @@ final class StatusPanelController: NSObject {
         guard let content = contentController else { return }
         content.loadViewIfNeededCompat()
         content.view.layoutSubtreeIfNeeded()
-        let size = content.intrinsicContentSize
-        guard size.width > 0, size.height > 0 else { return }
-        let target = NSSize(width: ceil(size.width), height: ceil(size.height))
+        // 宽度由 SwiftUI 根视图固定（`Theme.Metrics.panelWidth`），这里只量高度：
+        // 面板内容从列表切到「全部空闲」时窗口只会变矮，不会先撑出旧宽度再回缩。
+        let target = NSSize(width: Theme.Metrics.panelWidth,
+                            height: ceil(max(content.intrinsicContentSize.height, 1)))
         if abs(panel.frame.width - target.width) > 0.5 || abs(panel.frame.height - target.height) > 0.5 {
             panel.setContentSize(target)
         }

@@ -27,10 +27,10 @@
 | 字号 | 行标题 13pt semibold；行副标题 11pt regular；footer 按钮 13pt 图标 |
 | 图标 | 行首状态圆点 8pt（实心）；子智能体圆点 4pt；footer 按钮 13pt（24×24 命中区）；chevron 9pt semibold |
 | 分隔线 | `separatorColor`（动态）；仅通知提示下方与 footer 上方各一条全宽 1px；设置卡片内分隔线从文字列开始 |
-| hover 底色 | 行：主文字色 8%（深色）/ 6%（浅色），圆角 8pt；行尾按钮再深一档（16%/10%），圆角 5pt |
+| hover 底色 | 行/整块：主文字色 8%（深色）/ 6%（浅色），圆角 **12pt**；子行 8pt；行尾按钮再深一档（16%/10%），圆角 5pt |
 | 状态色 | `systemYellow`（待回答）/ `systemBlue`（运行中）/ `systemGreen`（已完成）/ `systemRed`（已停止）；
 | | 未连接 = `secondaryLabelColor`（footer 连接点、空状态）；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
-| 圆角（统一阶梯） | 面板 **16** → 行 hover / 子智能体行 **8**（= 16 − 内容内距 8）→ 行尾披露胶囊 **5**（= 8 − 行内距 3）；全 continuous，满足「内层 = 外层 − 内边距」时曲率才连续，否则对着看会出现「外圆内方」的违和感；设置卡片/控件交给系统 |
+| 圆角（阶梯） | 面板 **16** → 行/整块高亮 **12** → 子智能体行 **8** → 行尾披露胶囊 **5**；全 continuous。严格同心值是 8（16 − 内距 8），但 8 在 44/52pt 高的行上偏硬，按用户偏好放大到 12（内层略大于同心值，四角缝隙比中间略宽，观感更柔）；设置卡片/控件交给系统 |
 | 动效（`Theme.Motion`） | hover/press 0.12s easeOut；披露箭头 + 面板高度 0.22–0.24s easeInOut；子行错班 0.035s/条、0.18s easeOut；全部尊重「减弱动态效果」（瞬时） |
 | 阴影 | 面板用**系统窗口阴影**（`hasShadow`），不自绘阴影/内描边（会破坏 Liquid Glass 折射与高光） |
 
@@ -47,9 +47,8 @@
 ```
 
 - 会话不分组：按 `since`（进入当前状态时刻）倒序，最近一次状态变化在最上；圆点颜色 = 状态。
-- 空状态：高 164；鲸鱼 24pt tertiary + 「全部空闲」13 semibold + 「没有需要关注的会话」11 secondary + 「打开 DSH」按钮。
-- 未连接：高 168；`exclamationmark.circle` 16pt secondary + 「DSH 未连接」13 semibold + 11 secondary 说明 +
-  原生 bordered 小按钮「打开 DSH」。
+- **空闲 / 未连接：整块面板就是一个大按钮**（高 68 = 8 + 52 + 8）：居中鲸鱼 22pt + 16pt semibold
+  「全部空闲」（未连接时同位置灰色「未连接」），点任意位置打开 DSH；hover/按下底色铺满整块。
 - 通知提示整行可点，点击行为保持：未决定 → 请求授权；已拒绝 → 打开系统设置通知面板。
 
 ### 2.2 视觉与交互
@@ -58,12 +57,12 @@
   标题 13 semibold `labelColor`，副标题 11 regular `secondaryLabelColor`；
   trailing 统一为导航/披露区：无子会话 = `chevron.right`（9pt semibold `tertiaryLabelColor`，纯提示，不可单独点）；
   有子会话 = 「数量 11pt medium 等宽数字 secondary + `chevron.down` 9pt semibold tertiary」披露按钮。
-- 行 hover 仅底色（圆角 6，0.08s）+ 指针；整行可点，命中区覆盖行宽；hover 时不改变文字颜色。
+- 行 hover 仅底色（圆角 12，0.12s）+ 指针；整行可点，命中区覆盖行宽；hover 时不改变文字颜色。
 - 子智能体行：**默认折叠**；父行**行尾**的「数量 + 下箭头」是独立命中区，负责展开/收起
   （展开时箭头 `rotationEffect` 180° 变成上箭头，0.16s ease-out），点行其余区域仍然打开会话；
   展开后子行缩进 18pt、4pt 状态圆点、11pt secondary；点击打开父会话；
   不计入统计/角标。展开/收起后由 `AppModel.onPanelLayoutChange` 请求面板重新适配高度。
-- 「打开 DSH」：有会话时**不显示**；连接正常但无会话 / 未连接时，在空状态居中给原生 bordered 按钮。
+- 「打开 DSH」：有会话时不显示；空闲 / 未连接时**整块面板**可点 = 打开 DSH（无额外按钮）。
 - footer：左连接状态点（7pt，绿=已连接 / 灰=未连接，无文字，hover 显示 tooltip）；
   右侧 设置（gearshape）、勿扰（`moon` / `moon.fill`，开启时用系统强调色）、退出（power，二次确认）三个图标按钮；
   图标按钮 24×24 命中区、hover 底色圆角 5；除勿扰开启态外不用彩色。

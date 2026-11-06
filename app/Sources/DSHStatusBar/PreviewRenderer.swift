@@ -410,12 +410,15 @@ enum PreviewRenderer {
         let root = StatusPanelView(model: model)
             .environment(\.colorScheme, colorScheme)
             .environment(\.panelUsesMaterial, false)
+        // 用独立 hosting 量「理想高度」：同一个 NSHostingView 改尺寸后会缓存旧高度，
+        // 一把 reuse 会把「全部空闲」量成上一个模型的高度。
+        let probe = NSHostingView(rootView: root)
+        probe.appearance = appearance
+        probe.layoutSubtreeIfNeeded()
+        let height = max(42, probe.fittingSize.height)
+
         let hosting = NSHostingView(rootView: root)
         hosting.appearance = appearance
-        hosting.frame = NSRect(x: 0, y: 0, width: width, height: 220)
-        hosting.layoutSubtreeIfNeeded()
-        let fitting = hosting.fittingSize
-        let height = max(120, fitting.height)
         hosting.frame = NSRect(x: 0, y: 0, width: width, height: height)
         hosting.layoutSubtreeIfNeeded()
 

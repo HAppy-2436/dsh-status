@@ -191,9 +191,11 @@ final class StatusPanelController: NSObject {
         let anchorRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         anchorScreenRect = anchorRect
         let size = panel.frame.size
-        let gap: CGFloat = 6
-        var x = anchorRect.midX - size.width / 2
-        var y = anchorRect.minY - gap - size.height
+        // 左对齐：系统按下态高亮 = item 宽 + 4（左右各外扩 2），所以高亮左缘 = 按钮左缘 - 2。
+        var x = anchorRect.minX - 2
+        // 上移：面板顶边完全贴住菜单栏下沿（visibleFrame.maxY 就是菜单栏下沿）。
+        var y = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame.maxY ?? anchorRect.minY
+        y -= size.height
 
         if let screen = buttonWindow.screen ?? NSScreen.main {
             let visible = screen.visibleFrame

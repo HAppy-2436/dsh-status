@@ -80,7 +80,8 @@
 - 面板材质直接采用开源 **Status Trio**（Apache-2.0）的实现：`NSGlassEffectView(style: .regular)` **不设 tint**、
   系统窗口阴影、16pt 圆角；内容宿主放在 `glass.contentView` 内（避免玻璃直接接管 SwiftUI 的 intrinsic size）。
   **不要再给玻璃加 tint / 自绘阴影 / 内描边**：那会破坏液态玻璃的折射与高光，且容易出现"实色卡片/粗描边"。
-- 定位：锚定状态项下方 6pt；屏幕可见区域夹取（左右 8pt、底部 8pt）；高度随内容，最大 480。
+- 定位：顶边贴住菜单栏下沿（0 间隙）；左缘对齐状态项高亮左缘（按钮左缘 - 2pt）；
+  屏幕可见区域夹取（左右 8pt、底部 8pt）；高度随内容。
 - 阴影用系统窗口阴影，不额外自绘。
 
 ## 3. 设置窗口（SettingsView + SettingsWindowController）

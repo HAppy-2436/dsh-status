@@ -249,7 +249,8 @@ final class StatusItemHighlightWindow: NSPanel {
             defer: false
         )
         isFloatingPanel = true
-        level = .statusBar
+        // 必须比菜单栏窗口（.statusBar）更高一层，否则有时会被菜单栏盖住。
+        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear

@@ -74,8 +74,9 @@
 - 保持自定义 `NSPanel`（无箭头、`.statusBar` 层级、跨 Space、非激活面板但 `makeKey` 保证 active 渲染），
   圆角 20pt；材质三档保持：Liquid Glass（`NSGlassEffectView`，macOS 26+）/ 经典磨砂（`.popover`）/ 实色；
   「降低透明度」→ 实色。
-- Liquid Glass 必须设 `tintColor = Theme.panelGlassTint`（深色中性灰 ≈ `#333338`、浅色浅灰白）：
-  不设 tint 会被高饱和壁纸过曝；用 `.windowBackgroundColor` 会压成近黑。目标是「灰色玻璃卡片」。
+- Liquid Glass 的 tint 必须是**低透明度**（`NSColor(white:1, alpha:0.12)`）：
+  不透明 tint（`.windowBackgroundColor`/不透明灰）在窗口为 key 时会被 `NSGlassEffectView` 渲染成实色卡片；
+  低透明度 tint 才能让焦点态保持半透明液态玻璃（与未聚焦观感一致）。
 - 定位：锚定状态项下方 6pt；屏幕可见区域夹取（左右 8pt、底部 8pt）；高度随内容，最大 480。
 - 阴影用系统窗口阴影，不额外自绘。
 

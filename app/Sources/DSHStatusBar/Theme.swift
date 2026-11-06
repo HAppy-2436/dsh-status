@@ -92,10 +92,12 @@ enum Theme {
 
     // MARK: - 面板（卡片式浮层）
 
-    /// 面板玻璃的 tint：深色用中性灰（用户要求「灰色卡片」而不是近黑），浅色用浅灰白，
-    /// 保留玻璃对背景的模糊/折射。不要用 `.windowBackgroundColor`——它在 Liquid Glass 下会把面板压成近黑。
+    /// 面板玻璃的 tint：保持「半透明液态玻璃」。
+    /// - 不能用 `.windowBackgroundColor` 等不透明深色：NSGlassEffectView 在窗口为 key 时会把它渲染成实色（近黑/灰）。
+    /// - 不能用不透明灰：同理，焦点态会变成灰色纯色卡片。
+    /// - 用低透明度的白色 tint：焦点态仍是半透明玻璃，同时比无 tint 更接近系统未聚焦时的观感。
     static var panelGlassTint: NSColor {
-        dynamicNSColor(dark: (0.20, 0.20, 0.22), light: (0.95, 0.95, 0.97))
+        NSColor(white: 1.0, alpha: 0.12)
     }
 
     /// 离屏预览（无材质）时的面板底色，近似真实灰玻璃在常见深色背景上的观感。

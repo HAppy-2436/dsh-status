@@ -71,9 +71,10 @@
   `.statusBar` 层级、跨 Space、不抢焦点；**20pt continuous 圆角**、系统窗口阴影。
 - 材质（设置页「面板背景」可切，默认液态玻璃）：
   - macOS 26+：`NSGlassEffectView(style: .regular)`，`cornerRadius = 20`；
-    **`tintColor = Theme.panelGlassTint`**——深色用中性灰（约 `#333338`），得到「灰色玻璃卡片」而不是近黑，
-    同时保留壁纸的模糊/折射；浅色用浅灰白磨砂。不要用 `.windowBackgroundColor`：它会把面板压成近黑；
-    也不要不设 tint：玻璃会随高饱和壁纸过曝、白字压不住。
+    tint 用 **低透明度白色**（`NSColor(white: 1, alpha: 0.12)`）：焦点态保持**半透明液态玻璃**，
+    与未聚焦时（切到别的菜单栏菜单时）的观感一致。
+    关键：`NSGlassEffectView` 在窗口为 key 时会把**不透明 tint**（如 `.windowBackgroundColor`、不透明灰）
+    渲染成实色卡片；只有低透明度 tint 才能保持玻璃的模糊/折射。
   - 旧系统：`NSVisualEffectView(.popover)` 经典磨砂；
   - 显式选「实色」或系统开启「降低透明度」时用不透明填充。
 - 定位：状态项下方 **6pt**，按屏幕可见区域夹取（左右/底部 8pt）；宽度固定 **320pt**。

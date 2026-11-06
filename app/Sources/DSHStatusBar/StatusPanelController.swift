@@ -68,7 +68,7 @@ final class StatusPanelController: NSObject {
         panel.orderFrontRegardless()
         // 与原生菜单栏项一致：面板展示期间图标保持高亮（系统 highlight() 在非激活面板下不生效）
         setStatusItemHighlighted(true)
-        // 非激活面板也让它成为 key window，内容才按 active 状态渲染（颜色不被去饱和）
+        // 非激活面板也让它成为 key window：Esc/键盘可用（玻璃材质用低透明度 tint 保持半透明）
         panel.makeKey()
         positionPanel(button: button)
         panel.invalidateShadow()
@@ -364,7 +364,7 @@ final class StatusPanelContentViewController: NSViewController {
                 // Liquid Glass 默认取色会随壁纸颜色过曝（深色模式下白字压不住高饱和背景）。
                 // 用系统窗口背景色做 tint：深色模式得到 Apple 原生 Control Center 那种
                 // 深色玻璃，浅色模式得到浅色磨砂，同时保留玻璃的模糊与折射。
-                // 中性灰 tint：既有玻璃的模糊/折射，又不会像 windowBackgroundColor 那样压成近黑。
+                // 低透明度白色 tint：焦点态保持半透明液态玻璃（不用不透明色，否则会渲染成实色卡片）。
                 glass.tintColor = Theme.panelGlassTint
                 if #available(macOS 27.0, *) {
                     glass.effectIsInteractive = true

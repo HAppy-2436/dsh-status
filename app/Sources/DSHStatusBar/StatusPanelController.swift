@@ -4,12 +4,12 @@ import SwiftUI
 
 /// 状态面板：无边框 `NSPanel`（不画 NSPopover 的箭头）。
 ///
-/// 关键结构（对齐 macOS 26/27 原生菜单栏模块，如「天气」）：
-/// - 窗口比可见面板四周大 `shadowMargin`，透明边距用来放**自绘阴影**（系统窗口阴影会在玻璃边缘
-///   勒出一圈深色描边，看起来"边框很粗"）；
-/// - `NSGlassEffectView` 放在**可成为 key 的窗口**里（官方 Liquid Glass 的折射/高光只有在这种
-///   渲染状态下才完整）——之前把它放到非 key 子窗口会导致玻璃变成"平的模糊"，没有液态玻璃质感；
-/// - 圆角/内边距/描边/阴影按原生天气模块实测值调校。
+/// 结构与 macOS 26/27 原生菜单栏模块一致，参考 Apache-2.0 开源的 **Status Trio**
+/// （`AnchoredStatusPanel` / `StatusPanelContentViewController`，Copyright 2026 lingyired）：
+/// - 无边框 `NSPanel`，`hasShadow = true`，圆角 16，`level = .statusBar`；
+/// - macOS 26+ 用 `NSGlassEffectView(style: .regular)` 做背景，**不设 tint**（保留原生折射/高光），
+///   SwiftUI 内容放在 `glass.contentView` 内的一层普通容器里；
+/// - 旧系统退回 `NSVisualEffectView(.popover)`；「降低透明度」或用户选实色时用不透明底。
 final class StatusPanelController: NSObject {
     private let panel = AnchoredStatusPanel()
     private let model: AppModel
@@ -19,14 +19,10 @@ final class StatusPanelController: NSObject {
     private var themeObserver: NSObjectProtocol?
     private var hostingController: NSHostingController<StatusPanelView>?
     private var contentController: StatusPanelContentViewController?
-    private var outsideMonitor: Any?
     private var localMonitor: Any?
     private var localMouseMonitor: Any?
     private var globalMonitor: Any?
     private var anchorScreenRect: NSRect = .zero
-
-    /// 窗口四周留给阴影的透明边距（可见面板外侧）。
-    private static var shadowMargin: CGFloat { StatusPanelContentViewController.shadowMargin }
 
     init(model: AppModel, statusItem: NSStatusItem, settings: AppSettings) {
         self.model = model
@@ -34,8 +30,10 @@ final class StatusPanelController: NSObject {
         self.settings = settings
         super.init()
         let hosting = NSHostingController(rootView: StatusPanelView(model: model))
-        let content = StatusPanelContentViewController(hostingController: hosting,
-                                                      backgroundStyle: settings.panelBackgroundStyle)
+        let content = StatusPanelContentViewController(
+            hostingController: hosting,
+            backgroundStyle: settings.panelBackgroundStyle
+        )
         hostingController = hosting
         contentController = content
         panel.contentViewController = content
@@ -77,15 +75,20 @@ final class StatusPanelController: NSObject {
         panel.invalidateShadow()
         installEventMonitors()
 
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            panel.alphaValue = 1
-            return
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.16
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            context.allowsImplicitAnimation = true
-            self.panel.animator().alphaValue = 1
+        // 先透明上屏，等一次布局把尺寸校正完再淡入（避免开面板瞬间跳高度）。
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.panel.isVisible else { return }
+            self.contentController?.view.layoutSubtreeIfNeeded()
+            self.fitToContent()
+            guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                self.panel.alphaValue = 1
+                return
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.08
+                context.allowsImplicitAnimation = true
+                self.panel.animator().alphaValue = 1
+            }
         }
     }
 
@@ -136,35 +139,23 @@ final class StatusPanelController: NSObject {
 
     // MARK: 尺寸与位置
 
-    private var visiblePanelSize: NSSize {
-        guard let content = contentController else { return .zero }
+    private func fitToContent() {
+        guard let content = contentController else { return }
         content.loadViewIfNeededCompat()
         content.view.layoutSubtreeIfNeeded()
         let size = content.intrinsicContentSize
-        return NSSize(width: ceil(size.width), height: ceil(size.height))
-    }
-
-    private func fitToContent() {
-        let size = visiblePanelSize
         guard size.width > 0, size.height > 0 else { return }
-        let m = Self.shadowMargin
-        let target = NSSize(width: size.width + m * 2, height: size.height + m * 2)
+        let target = NSSize(width: ceil(size.width), height: ceil(size.height))
         if abs(panel.frame.width - target.width) > 0.5 || abs(panel.frame.height - target.height) > 0.5 {
             panel.setContentSize(target)
         }
-    }
-
-    /// 可见面板在屏幕上的 rect（窗口 frame 去掉阴影边距）。
-    private func visiblePanelRect() -> NSRect {
-        panel.frame.insetBy(dx: Self.shadowMargin, dy: Self.shadowMargin)
     }
 
     private func positionPanel(button: NSStatusBarButton) {
         guard let buttonWindow = button.window else { return }
         let anchorRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         anchorScreenRect = anchorRect
-        let size = visiblePanelSize
-        let m = Self.shadowMargin
+        let size = panel.frame.size
         let gap: CGFloat = 6
         var x = anchorRect.midX - size.width / 2
         var y = anchorRect.minY - gap - size.height
@@ -175,7 +166,7 @@ final class StatusPanelController: NSObject {
             if y < visible.minY + 8 { y = visible.minY + 8 }
             if y + size.height > visible.maxY { y = visible.maxY - size.height }
         }
-        panel.setFrameOrigin(NSPoint(x: x - m, y: y - m))
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
     // MARK: 事件
@@ -199,20 +190,12 @@ final class StatusPanelController: NSObject {
             }
             return event
         }
-        // 点击面板外（含本 App 其它窗口、以及面板窗口的透明阴影边距）时关闭
+        // 点击 DSH 主窗口等本应用内其他窗口时也要关闭面板
         localMouseMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] event in
             guard let self, self.panel.isVisible else { return event }
-            if event.window === self.panel {
-                let point = event.locationInWindow
-                if self.visiblePanelRect().contains(NSPoint(x: point.x + self.panel.frame.minX,
-                                                            y: point.y + self.panel.frame.minY)) {
-                    return event
-                }
-                self.close()
-                return event
-            }
+            if event.window === self.panel { return event }
             if event.window === self.statusItem.button?.window { return event }
             let location = NSEvent.mouseLocation
             if self.isMenuBarPoint(location) { return event }
@@ -256,6 +239,7 @@ private final class PassthroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
+/// 与 Status Trio 的 `AnchoredStatusPanel` 同构：无边框、非激活、可成为 key、系统窗口阴影、圆角 16。
 final class AnchoredStatusPanel: NSPanel {
     static let cornerRadius: CGFloat = Theme.Metrics.panelCornerRadius
     var onClose: (() -> Void)?
@@ -272,12 +256,13 @@ final class AnchoredStatusPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
-        // 阴影由内容视图自绘（系统窗口阴影会在玻璃边缘产生深色描边）。
-        hasShadow = false
+        hasShadow = true
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
-        isMovable = false
+        becomesKeyOnlyIfNeeded = false
         animationBehavior = .none
+        isMovable = false
+        isMovableByWindowBackground = false
     }
 
     override var canBecomeKey: Bool { true }
@@ -302,17 +287,12 @@ final class AnchoredStatusPanel: NSPanel {
     }
 }
 
-// MARK: - 内容容器（玻璃 + SwiftUI，留出阴影边距）
+// MARK: - 内容容器（材质 + SwiftUI，结构同 Status Trio）
 
-/// 可见面板 = 窗口内容 inset `shadowMargin`；四周透明边距用于图层自绘阴影。
 final class StatusPanelContentViewController: NSViewController {
-    static let shadowMargin: CGFloat = 24
-
     private let hostingController: NSViewController
     private var backgroundStyle: PanelBackgroundStyle
     private var backgroundView: NSView?
-    private var rimView: NSView?
-    private var glassContainer: NSView?
 
     init(hostingController: NSViewController, backgroundStyle: PanelBackgroundStyle) {
         self.hostingController = hostingController
@@ -326,54 +306,14 @@ final class StatusPanelContentViewController: NSViewController {
     }
 
     override func loadView() {
-        let root = NSView(frame: .zero)
-        root.wantsLayer = true
-        view = root
-
         let container = NSView(frame: .zero)
         container.wantsLayer = true
         container.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
-        container.layer?.cornerCurve = .continuous
-        // 参考原生天气面板实测的阴影衰减（2pt 处约暗 4%，15pt 内归零）
-        container.layer?.shadowColor = NSColor.black.cgColor
-        container.layer?.shadowOpacity = 0.50
-        container.layer?.shadowRadius = 18
-        container.layer?.shadowOffset = CGSize(width: 0, height: -9)
-        root.addSubview(container)
-        glassContainer = container
-
-        installBackground(in: container)
+        container.layer?.masksToBounds = true
+        view = container
 
         addChild(hostingController)
-        hostingController.view.frame = container.bounds
-        hostingController.view.autoresizingMask = [.width, .height]
-        container.addSubview(hostingController.view)
-
-        // 原生玻璃边缘有一圈 1px 的高光描边（实测天气面板顶边亮度比内部高 ~56/255）。
-        let rim = NSView(frame: container.bounds)
-        rim.wantsLayer = true
-        rim.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
-        rim.layer?.cornerCurve = .continuous
-        rim.layer?.borderWidth = 0.5
-        rim.layer?.borderColor = NSColor.white.withAlphaComponent(0.32).cgColor
-        rim.autoresizingMask = [.width, .height]
-        container.addSubview(rim)
-        rimView = rim
-    }
-
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        guard let container = glassContainer else { return }
-        let m = Self.shadowMargin
-        container.frame = view.bounds.insetBy(dx: m, dy: m)
-        let radius = AnchoredStatusPanel.cornerRadius
-        container.layer?.shadowPath = CGPath(roundedRect: container.bounds,
-                                             cornerWidth: radius,
-                                             cornerHeight: radius,
-                                             transform: nil)
-        backgroundView?.frame = container.bounds
-        rimView?.frame = container.bounds
-        hostingController.view.frame = container.bounds
+        installBackground(in: container)
     }
 
     func loadViewIfNeededCompat() {
@@ -396,50 +336,55 @@ final class StatusPanelContentViewController: NSViewController {
         installBackground(in: view)
     }
 
+    private var effectiveBackgroundStyle: PanelBackgroundStyle {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+            ? .solid
+            : backgroundStyle
+    }
+
     private func installBackground(in container: NSView) {
         backgroundView?.removeFromSuperview()
         backgroundView = nil
+        hostingController.view.removeFromSuperview()
+
         let background = makeBackgroundView(in: container)
         background.autoresizingMask = [.width, .height]
-        background.frame = container.bounds
-        if let first = container.subviews.first {
-            container.addSubview(background, positioned: .below, relativeTo: first)
-        } else {
-            container.addSubview(background)
-        }
+        container.addSubview(background)
         backgroundView = background
-        rimView?.frame = container.bounds
+
+        // 玻璃路径已把内容嵌进自己的普通容器；其它路径把内容直接放在背景之上。
+        if hostingController.view.superview == nil {
+            hostingController.view.frame = container.bounds
+            hostingController.view.autoresizingMask = [.width, .height]
+            container.addSubview(hostingController.view)
+        }
     }
 
     private func makeBackgroundView(in container: NSView) -> NSView {
-        let style = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-            ? PanelBackgroundStyle.solid
-            : backgroundStyle
-        switch style {
-        case .solid:
-            return solidBackground(in: container)
-        case .classicMaterial:
-            return classicMaterialBackground(in: container)
+        switch effectiveBackgroundStyle {
         case .liquidGlass:
             if #available(macOS 26.0, *) {
                 let glass = NSGlassEffectView(frame: container.bounds)
                 glass.style = .regular
                 glass.cornerRadius = AnchoredStatusPanel.cornerRadius
-                glass.tintColor = Theme.panelGlassTint
-                if #available(macOS 27.0, *) {
-                    // 保留交互式玻璃（原生模块同款的高光/折射反馈）
-                    glass.effectIsInteractive = true
-                }
+                // 不设 tintColor：保留 Liquid Glass 的原生折射与高光（这是"液态玻璃质感"的来源）。
                 let glassContent = NSView(frame: glass.bounds)
                 glassContent.autoresizingMask = [.width, .height]
+                hostingController.view.frame = glassContent.bounds
+                hostingController.view.autoresizingMask = [.width, .height]
+                glassContent.addSubview(hostingController.view)
                 glass.contentView = glassContent
                 return glass
             }
-            return classicMaterialBackground(in: container)
+            return makeClassicMaterialBackground(in: container)
+        case .classicMaterial:
+            return makeClassicMaterialBackground(in: container)
+        case .solid:
+            return makeSolidBackground(in: container)
         }
     }
 
-    private func classicMaterialBackground(in container: NSView) -> NSView {
+    private func makeClassicMaterialBackground(in container: NSView) -> NSView {
         let effect = NSVisualEffectView(frame: container.bounds)
         effect.material = .popover
         effect.blendingMode = .behindWindow
@@ -450,13 +395,23 @@ final class StatusPanelContentViewController: NSViewController {
         return effect
     }
 
-    private func solidBackground(in container: NSView) -> NSView {
+    private func makeSolidBackground(in container: NSView) -> NSView {
         let solid = NSView(frame: container.bounds)
         solid.wantsLayer = true
         solid.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         solid.layer?.cornerRadius = AnchoredStatusPanel.cornerRadius
         solid.layer?.masksToBounds = true
-        solid.autoresizingMask = [.width, .height]
         return solid
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        let container: NSView
+        if #available(macOS 26.0, *), let glass = backgroundView as? NSGlassEffectView {
+            container = hostingController.view.superview ?? glass
+        } else {
+            container = view
+        }
+        hostingController.view.frame = container.bounds
     }
 }

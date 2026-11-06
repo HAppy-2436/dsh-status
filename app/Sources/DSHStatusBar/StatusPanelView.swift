@@ -114,7 +114,7 @@ struct StatusPanelView: View {
                     groupSeparator
                     openDSHRow
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .padding(.vertical, 6)
             }
             .frame(height: contentHeight)
@@ -258,7 +258,7 @@ struct StatusPanelView: View {
                 footerIcon("power")
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .frame(height: Theme.Metrics.footerHeight)
     }
 

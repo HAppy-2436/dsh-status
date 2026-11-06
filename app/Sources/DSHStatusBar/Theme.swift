@@ -12,9 +12,9 @@ enum Theme {
     /// 面板/设置页视觉尺寸（pt）。改动会影响真机观感，改前先看 docs/ui-redesign-spec.md。
     enum Metrics {
         // 弹出面板
-        static let panelWidth: CGFloat = 320
+        static let panelWidth: CGFloat = 330
         static let panelCornerRadius: CGFloat = 16
-        static let panelHorizontalPadding: CGFloat = 16
+        static let panelHorizontalPadding: CGFloat = 14
         static let headerHeight: CGFloat = 40
         static let rowHeight: CGFloat = 44
         static let subagentRowHeight: CGFloat = 24
@@ -91,14 +91,6 @@ enum Theme {
     }
 
     // MARK: - 面板（卡片式浮层）
-
-    /// 面板玻璃的 tint：对齐原生菜单栏天气模块的「深色半透明玻璃」。
-    /// - 不透明色（`.windowBackgroundColor` 等）在 key 窗口下会被渲染成实色卡片 —— 不能用；
-    /// - 白色 tint 会让玻璃发白发雾，没有液态玻璃的深色通透感 —— 不用；
-    /// - 用低透明度黑色 tint：保留玻璃折射/高光，同时把背景压暗到接近原生模块。
-    static var panelGlassTint: NSColor {
-        NSColor(white: 0.0, alpha: 0.25)
-    }
 
     /// 离屏预览（无材质）时的面板底色，近似真实灰玻璃在常见深色背景上的观感。
     static var panelFallbackBackground: Color {

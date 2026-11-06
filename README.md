@@ -52,6 +52,12 @@ bash scripts/install.sh       # 构建 App 到 ~/Applications，并打印插件�
 然后在 DeepSeek Harness 左侧边栏 **Plugins → Add plugin → Install a third-party plugin**，
 粘贴本仓库 `plugin/` 的绝对路径安装并启用。插件会写 `~/.dsh-status/bridge.json` 并自动拉起 App。
 
+## 开源致谢
+
+- 面板窗口/材质实现参考 [Status Trio](https://github.com/lingyired/status-trio)（Apache-2.0，
+  Copyright 2026 lingyired）：无边框 `NSPanel` + `NSGlassEffectView(.regular)`（不设 tint）+ 系统窗口阴影 + 16pt 圆角，
+  内容宿主放在 `glass.contentView` 内；本仓库按 Apache-2.0 条款保留出处与许可说明。
+
 ## 架构
 
 ```

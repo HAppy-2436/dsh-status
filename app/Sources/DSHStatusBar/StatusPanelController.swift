@@ -116,20 +116,36 @@ final class StatusPanelController: NSObject {
     private var selectionView: NSView?
 
     private func setStatusItemHighlighted(_ highlighted: Bool) {
-        guard let button = statusItem.button else { return }
+        guard let button = statusItem.button,
+              let host = button.window?.contentView ?? button.superview else { return }
         if highlighted {
-            if selectionView?.superview !== button {
-                // 原生菜单栏 extra（如天气模块）在面板打开时是「胶囊」高亮：
-                // 高度≈24（几乎占满 29pt 菜单栏的可点击区）、宽度≈item 宽、圆角=高度/2。
-                let frame = button.bounds.insetBy(dx: 1, dy: 0.5)
+            // 对齐 Status Trio / 原生菜单栏 extra 的胶囊高亮（实测 40×26.5pt、白色 15%）：
+            // 高 26.5、顶部与按钮顶部齐、底部贴菜单栏下沿；放进菜单栏窗口最底层才不会被按钮 bounds 裁掉。
+            let buttonRect = host.convert(button.bounds, from: button)
+            let height: CGFloat = 26.5
+            let width = button.bounds.width + 4.5
+            let frame = NSRect(x: buttonRect.midX - width / 2,
+                               y: buttonRect.minY - 3.5,
+                               width: width,
+                               height: height)
+            if selectionView?.superview !== host {
+                selectionView?.removeFromSuperview()
                 let view = PassthroughView(frame: frame)
                 view.wantsLayer = true
-                view.layer?.cornerRadius = frame.height / 2
-                view.layer?.cornerCurve = .continuous
-                view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.18).cgColor
-                view.autoresizingMask = [.width, .height]
-                button.addSubview(view, positioned: .below, relativeTo: nil)
+                view.layer?.cornerRadius = height / 2
+                // 用默认 circular 曲线：胶囊两端是半圆（continuous 会变成 squircle，和系统高亮不一致）
+                view.layer?.cornerCurve = .circular
+                view.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.15).cgColor
+                // 放进菜单栏窗口的最底层，避开按钮/内部视图的裁剪（胶囊要占满 29pt 菜单栏高度）。
+                if let first = host.subviews.first {
+                    host.addSubview(view, positioned: .below, relativeTo: first)
+                } else {
+                    host.addSubview(view)
+                }
                 selectionView = view
+            } else {
+                selectionView?.frame = frame
+                selectionView?.layer?.cornerRadius = height / 2
             }
             selectionView?.isHidden = false
         } else {

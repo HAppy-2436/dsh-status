@@ -39,8 +39,8 @@
 
 ```
 ┌ 内容（滚动，最大高度 480，随屏幕收缩）──┤  无 header，打开面板直接是会话列表
-│  ● 会话行（44）                          │  行首 8pt 状态圆点 + 13 semibold 标题 + 11 secondary 副标题 + 10 chevron
-│    ▸ 子智能体行（24，默认折叠）            │  leading 38，4pt 状态圆点 + 11pt secondary（点行首披露三角展开）
+│  ● 会话行（44）                   ⌄ 2    │  行首 8pt 圆点 + 13 semibold 标题 + 11 secondary 副标题 + 行尾「数量 + 箭头」
+│    ▸ 子智能体行（24，默认折叠）            │  leading 18，4pt 状态圆点 + 11pt secondary（点父行行尾箭头展开）
 ├ footer 38px ─────────────────────────────┤  左：7pt 连接状态圆点（无文字，hover 有 tooltip）
 └──────────────────────────────────────────┘  右：设置 / 勿扰（月亮）/ 退出（电源）13pt 图标按钮（24×24 命中区）
 ```
@@ -55,10 +55,12 @@
 
 - 会话行：行首 8pt 实心状态圆点（`systemYellow`/`systemBlue`/`systemGreen`/`systemRed`），
   标题 13 semibold `labelColor`，副标题 11 regular `secondaryLabelColor`；
-  trailing `chevron.right` 9pt semibold `tertiaryLabelColor`（提示「点击打开会话」）。
+  trailing 统一为导航/披露区：无子会话 = `chevron.right`（9pt semibold `tertiaryLabelColor`，纯提示，不可单独点）；
+  有子会话 = 「数量 11pt medium 等宽数字 secondary + `chevron.down` 9pt semibold tertiary」披露按钮。
 - 行 hover 仅底色（圆角 6，0.08s）+ 指针；整行可点，命中区覆盖行宽；hover 时不改变文字颜色。
-- 子智能体行：**默认折叠**；父行最左侧 18pt Finder 风格披露三角（独立命中区）负责展开/收起，
-  点行其余区域仍然打开会话；展开后子行缩进 38pt、4pt 状态圆点、11pt secondary；点击打开父会话；
+- 子智能体行：**默认折叠**；父行**行尾**的「数量 + 下箭头」是独立命中区，负责展开/收起
+  （展开时箭头 `rotationEffect` 180° 变成上箭头，0.16s ease-out），点行其余区域仍然打开会话；
+  展开后子行缩进 18pt、4pt 状态圆点、11pt secondary；点击打开父会话；
   不计入统计/角标。展开/收起后由 `AppModel.onPanelLayoutChange` 请求面板重新适配高度。
 - 「打开 DSH」：有会话时**不显示**；连接正常但无会话 / 未连接时，在空状态居中给原生 bordered 按钮。
 - footer：左连接状态点（7pt，绿=已连接 / 灰=未连接，无文字，hover 显示 tooltip）；

@@ -13,7 +13,7 @@
 | `menubar-real.png` | 真机菜单栏（8×）：运行中动态弧 + 中心运行数 |
 | `icon-real-zoom.png` | 真机菜单栏图标 10× 放大（深色模式） |
 | `panel-real-dark.png` | 真机面板（深色，Liquid Glass，330pt；扁平列表 + 已完成/运行中两态圆点；子智能体默认折叠） |
-| `panel-real-expanded-dark.png` | 同上，点父行最左侧披露三角展开子智能体后的状态（面板高度自动适配） |
+| `panel-real-expanded-dark.png` | 同上，点父行**行尾「数量 + 下箭头」**展开子智能体后的状态（下箭头转成上箭头，面板高度自动适配） |
 | `panel-preview-dark.png` / `panel-preview-light.png` | 面板四态：默认折叠 / 展开子智能体 / 全部空闲 / 未连接 |
 | `scene-preview-dark.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板） |
 | `settings-preview-dark.png` / `settings-preview-light.png` | 设置页（离屏渲染，深/浅）：原生 grouped Form 的六个分区 |

@@ -14,10 +14,8 @@ enum Theme {
         // 弹出面板
         static let panelWidth: CGFloat = 330
         static let panelCornerRadius: CGFloat = 16
-        static let panelHorizontalPadding: CGFloat = 14
         static let rowHeight: CGFloat = 44
         static let subagentRowHeight: CGFloat = 24
-        static let footerHeight: CGFloat = 38
         static let maxContentHeight: CGFloat = 480
 
         // 设置窗口

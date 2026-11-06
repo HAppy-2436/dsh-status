@@ -333,7 +333,7 @@ enum PreviewRenderer {
             rect.fill()
             drawText(title, font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: height - margin - 18))
-            drawText("点击会话行跳转 · 圆点 = 状态（红停止 / 黄待答 / 蓝运行 / 绿完成）· 子智能体默认折叠，点左侧三角展开",
+            drawText("点击会话行跳转 · 圆点 = 状态（红停止 / 黄待答 / 蓝运行 / 绿完成）· 子智能体默认折叠（行尾数量+下箭头展开）· 设置/勿扰/退出在右键菜单",
                      font: .systemFont(ofSize: 11), color: secondary,
                      at: NSPoint(x: margin, y: height - margin - 36))
 

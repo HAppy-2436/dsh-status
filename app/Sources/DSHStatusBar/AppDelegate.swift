@@ -55,6 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController.onOpenDSH = { [weak self] in self?.openDSH() }
         statusItemController.onQuit = { [weak self] in self?.confirmQuit() }
         statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
+        statusItemController.onRequestNotificationPermission = { [weak self] in self?.notifications.requestPermission() }
+        statusItemController.onOpenNotificationSettings = { [weak self] in self?.notifications.openSystemSettings() }
 
         panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem, settings: settings)
         settingsWindow = SettingsWindowController(settings: settings, model: model)
@@ -147,6 +149,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--open-settings") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
                 self?.settingsWindow.show()
+            }
+        }
+
+        // 调试/截图：展开第一个有子智能体的会话（用于出「展开态」真机截图）。
+        if CommandLine.arguments.contains("--expand-subagents") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+                guard let self else { return }
+                if let parent = self.model.orderedSessions.first(where: { self.model.hasSubagents($0.id) }) {
+                    self.model.toggleSubagents(for: parent.id)
+                }
             }
         }
 

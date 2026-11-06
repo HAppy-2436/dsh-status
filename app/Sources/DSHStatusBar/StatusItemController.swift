@@ -9,6 +9,8 @@ final class StatusItemController: NSObject {
     var onOpenDSH: (() -> Void)?
     var onQuit: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onRequestNotificationPermission: (() -> Void)?
+    var onOpenNotificationSettings: (() -> Void)?
 
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
@@ -173,6 +175,25 @@ final class StatusItemController: NSObject {
         open.target = self
         menu.addItem(open)
 
+        menu.addItem(.separator())
+
+        // 通知未开启时给一个入口（面板本身只显示会话，不再放提示条）。
+        switch model.notificationPermission {
+        case .denied, .notDetermined:
+            let notify = NSMenuItem(title: "通知未开启，点此开启…",
+                                    action: #selector(menuNotificationPermission),
+                                    keyEquivalent: "")
+            notify.target = self
+            menu.addItem(notify)
+        default:
+            break
+        }
+
+        let dnd = NSMenuItem(title: "勿扰模式", action: #selector(menuToggleDoNotDisturb), keyEquivalent: "")
+        dnd.target = self
+        dnd.state = model.settings.doNotDisturb ? .on : .off
+        menu.addItem(dnd)
+
         let settings = NSMenuItem(title: "设置…", action: #selector(menuOpenSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -191,5 +212,13 @@ final class StatusItemController: NSObject {
     @objc private func menuOpenDSH() { onOpenDSH?() }
     @objc private func menuQuit() { onQuit?() }
     @objc private func menuOpenSettings() { onOpenSettings?() }
+    @objc private func menuToggleDoNotDisturb() { model.settings.doNotDisturb.toggle() }
 
+    @objc private func menuNotificationPermission() {
+        if model.notificationPermission == .notDetermined {
+            onRequestNotificationPermission?()
+        } else {
+            onOpenNotificationSettings?()
+        }
+    }
 }

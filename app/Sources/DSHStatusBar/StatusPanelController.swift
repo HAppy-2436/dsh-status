@@ -249,8 +249,9 @@ final class StatusItemHighlightWindow: NSPanel {
             defer: false
         )
         isFloatingPanel = true
-        // 必须比菜单栏窗口（.statusBar）更高一层，否则有时会被菜单栏盖住。
-        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+        // 关键：高亮必须画在状态项图标「下面」（.mainMenu 层低于状态项窗口），
+        // 否则半透明层会压暗/覆盖图标——这正是之前"效果完全不一样"的原因。
+        level = .mainMenu
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
@@ -261,7 +262,8 @@ final class StatusItemHighlightWindow: NSPanel {
         animationBehavior = .none
         ignoresMouseEvents = true
 
-        // 与系统按下态一致：42×26.5、圆角 13.25 continuous、白色 26%（实测按下态填充 114/255）。
+        // 系统按下态：42×26.5、圆角 13.25 continuous、白色 26%（实测按下填充 114/255#）。
+        // 画在图标下面，玻璃/图标都不受影响。
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 42, height: 26.5))
         view.wantsLayer = true
         view.layer?.cornerRadius = 13.25

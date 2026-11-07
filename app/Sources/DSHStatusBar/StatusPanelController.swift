@@ -180,32 +180,43 @@ final class StatusPanelController: NSObject {
 
     private func fitToContent() {
         let previous = panel.frame
-        applyContentSize()
-        let current = panel.frame
-        // 面板高度随内容变化（展开/收起子智能体、列表增减）时做原生窗口高度动画：
-        // 顶边钉在菜单栏下沿、只动底边；窗口本体不缩放内容，文字不会变形。
+        guard let target = measuredContentSize() else { return }
+        guard abs(previous.width - target.width) > 0.5 || abs(previous.height - target.height) > 0.5 else { return }
+        // **只有窗口在动**：顶边钉在菜单栏下沿，只让底边向下/向上长，底边位移做 0.22s 动画。
+        // 内容侧不参与高度动画（`StatusPanelView` 里已移除 ScrollView 的高度动画、根视图顶部对齐），
+        // 否则「窗口瞬间变高 + 内容自己在 0.24s 里长高」两套时间线打架，内容会在窗口里上下漂。
+        contentController?.pinContentHeight(target.height)
+        let rect = NSRect(x: previous.minX,
+                          y: previous.minY + previous.height - target.height,
+                          width: target.width,
+                          height: target.height)
         guard animateResize,
-              abs(current.width - previous.width) < 0.5,
-              abs(current.height - previous.height) > 0.5,
-              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        let rect = NSRect(x: current.minX, y: current.minY,
-                          width: current.width, height: current.height)
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            panel.setFrame(rect, display: true)
+            return
+        }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.22
+            context.duration = Theme.Motion.panelResizeDuration * AppConfig.animationScale
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             context.allowsImplicitAnimation = true
             panel.animator().setFrame(rect, display: true)
         }
     }
 
-    private func applyContentSize() {
-        guard let content = contentController else { return }
+    /// 量内容尺寸：宽度由 SwiftUI 根视图固定（`Theme.Metrics.panelWidth`），这里只关心高度。
+    private func measuredContentSize() -> NSSize? {
+        guard let content = contentController else { return nil }
         content.loadViewIfNeededCompat()
         content.view.layoutSubtreeIfNeeded()
-        // 宽度由 SwiftUI 根视图固定（`Theme.Metrics.panelWidth`），这里只量高度：
-        // 面板内容从列表切到「全部空闲」时窗口只会变矮，不会先撑出旧宽度再回缩。
-        let target = NSSize(width: Theme.Metrics.panelWidth,
-                            height: ceil(max(content.intrinsicContentSize.height, 1)))
+        let height = ceil(max(content.intrinsicContentSize.height, 1))
+        guard height > 0 else { return nil }
+        return NSSize(width: Theme.Metrics.panelWidth, height: height)
+    }
+
+    /// 首次上屏前（还没显示过）直接把窗口设成目标尺寸，不做动画。
+    private func applyContentSize() {
+        guard let target = measuredContentSize() else { return }
+        contentController?.pinContentHeight(target.height)
         if abs(panel.frame.width - target.width) > 0.5 || abs(panel.frame.height - target.height) > 0.5 {
             panel.setContentSize(target)
         }
@@ -396,11 +407,27 @@ final class StatusPanelContentViewController: NSViewController {
         view = container
 
         addChild(hostingController)
+        contentHost.attach(hostingController.view)
         installBackground(in: container)
     }
 
+    /// 内容宿主：**顶部对齐、按目标高度摆放、超出部分裁切**。
+    /// 面板高度做窗口动画时内容本身不动，窗口只负责「向下揭幕」；
+    /// 若让 hosting view 直接铺满窗口，SwiftUI 会把固定高度的根视图在窗口里垂直居中，
+    /// 窗口长高时内容会先被顶上、再滑下来（这就是「一会下一会上」的观感）。
+    private let contentHost = TopAlignedContentHost()
+
     func loadViewIfNeededCompat() {
         _ = view
+    }
+
+    /// 内容的目标高度（由 `StatusPanelController` 量出来后写进来）。
+    private(set) var pinnedContentHeight: CGFloat?
+
+    func pinContentHeight(_ height: CGFloat) {
+        guard pinnedContentHeight != height else { return }
+        pinnedContentHeight = height
+        contentHost.contentHeight = height
     }
 
     var intrinsicContentSize: NSSize {
@@ -428,19 +455,25 @@ final class StatusPanelContentViewController: NSViewController {
     private func installBackground(in container: NSView) {
         backgroundView?.removeFromSuperview()
         backgroundView = nil
-        hostingController.view.removeFromSuperview()
+        contentHost.removeFromSuperview()
 
         let background = makeBackgroundView(in: container)
         background.autoresizingMask = [.width, .height]
         container.addSubview(background)
         backgroundView = background
 
-        // 玻璃路径已把内容嵌进自己的普通容器；其它路径把内容直接放在背景之上。
-        if hostingController.view.superview == nil {
-            hostingController.view.frame = container.bounds
-            hostingController.view.autoresizingMask = [.width, .height]
-            container.addSubview(hostingController.view)
+        // 玻璃路径把内容装进 glass.contentView；其它材质直接叠在背景之上。
+        let host: NSView
+        if #available(macOS 26.0, *), let glass = background as? NSGlassEffectView,
+           let glassContent = glass.contentView {
+            host = glassContent
+        } else {
+            host = container
         }
+        contentHost.autoresizingMask = [.width, .height]
+        contentHost.frame = host.bounds
+        host.addSubview(contentHost)
+        contentHost.contentHeight = pinnedContentHeight
     }
 
     private func makeBackgroundView(in container: NSView) -> NSView {
@@ -456,9 +489,6 @@ final class StatusPanelContentViewController: NSViewController {
                 // 不设 tintColor：保留 Liquid Glass 的原生折射与高光（这是"液态玻璃质感"的来源）。
                 let glassContent = NSView(frame: glass.bounds)
                 glassContent.autoresizingMask = [.width, .height]
-                hostingController.view.frame = glassContent.bounds
-                hostingController.view.autoresizingMask = [.width, .height]
-                glassContent.addSubview(hostingController.view)
                 glass.contentView = glassContent
                 return glass
             }
@@ -494,12 +524,63 @@ final class StatusPanelContentViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        let container: NSView
-        if #available(macOS 26.0, *), let glass = backgroundView as? NSGlassEffectView {
-            container = hostingController.view.superview ?? glass
+        let host: NSView
+        if #available(macOS 26.0, *), let glass = backgroundView as? NSGlassEffectView,
+           let glassContent = glass.contentView {
+            host = glassContent
         } else {
-            container = view
+            host = view
         }
-        hostingController.view.frame = container.bounds
+        if let current = contentHost.superview, current !== host {
+            contentHost.removeFromSuperview()
+            host.addSubview(contentHost)
+        }
+        contentHost.frame = host.bounds
+        contentHost.contentHeight = pinnedContentHeight
+    }
+}
+
+// MARK: - 顶部对齐的内容宿主
+
+/// 把 SwiftUI 内容固定在顶部并按「目标内容高度」摆放：
+/// - 宿主本身铺满窗口（圆角裁切由外层容器负责）；
+/// - 内容比窗口高时从底部被裁掉，窗口变高时自然向下露出；
+/// - 内容比窗口矮时（收起动画中）顶部对齐，底部留空并随窗口收缩。
+final class TopAlignedContentHost: NSView {
+    /// nil / 0 表示跟随宿主高度。
+    var contentHeight: CGFloat? {
+        didSet {
+            guard contentHeight != oldValue else { return }
+            needsLayout = true
+        }
+    }
+
+    private var content: NSView?
+
+    override var isFlipped: Bool { true }
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.masksToBounds = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func attach(_ view: NSView) {
+        content?.removeFromSuperview()
+        content = view
+        addSubview(view)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        guard let content else { return }
+        let height = max(contentHeight ?? bounds.height, 1)
+        content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
     }
 }

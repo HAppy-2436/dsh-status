@@ -180,8 +180,9 @@ enum Theme {
         static let disclosure: Animation = .easeInOut(duration: 0.22)
         /// 子行逐条错开班次。
         static let stagger: Double = 0.035
-        /// 面板高度随内容变化（纯高度动画，不缩放文字）。
-        static let panelResize: Animation = .easeInOut(duration: 0.24)
+        /// 面板高度动画时长（**由窗口 frame 动画执行**，SwiftUI 侧不再对内容高度做动画；
+        /// 见 `StatusPanelController.fitToContent` 与 `TopAlignedContentHost`）。
+        static let panelResizeDuration: Double = 0.22
     }
 
     /// 「减弱动态效果」时把动画降级为瞬时（系统设置跟随 `NSWorkspace`）。

@@ -104,7 +104,11 @@
   按视觉偏好放大到 12（四角与外壳的缝隙比正中间略宽，观感更柔和）；上下内距与左右统一为 8。
 - **动效**（`Theme.Motion`，全部尊重「减弱动态效果」）：行 hover 0.12s 底色渐显、按住再深一档且轻微下沉 1.5%；
   行尾按钮 hover 出现独立胶囊底色、按下更深；披露箭头 0.22s easeInOut 旋转 180°；
-  子行 0.18s 淡入 + 4pt 上浮，逐条错开 0.035s；面板窗口高度 0.22s easeInOut 跟随内容变化（顶边钉住菜单栏）。
+  子行 0.18s 淡入 + 4pt 上浮，逐条错开 0.035s；
+  **面板高度动画只有窗口在动**：顶边钉住菜单栏，底边 0.22s easeInOut 向下/向上移动；
+  SwiftUI 内容固定顶部对齐（`TopAlignedContentHost`）、按目标高度摆放，多出来的部分由窗口裁切逐步揭幕。
+  早先「窗口一次变高 + 内容自己在 0.24s 里长高」是两套时间线，内容会被 SwiftUI 在窗口里垂直居中，
+  展开时先被顶上再滑下来（观感就是「一会下一会上」），现已去掉内容侧高度动画。
 - 子智能体：默认折叠；**行尾**是导航/披露区：
   - 没有子会话 → `chevron.right`（9pt semibold tertiary），只作导航提示，点卡片任意位置打开会话；
   - 有子会话 → 「子智能体数量（11pt medium，等宽数字，secondary）+ `chevron.down`」按钮，独立命中区：
@@ -211,7 +215,7 @@ app/
     BridgeClient.swift          // bridge.json 轮询 + SSE + 命令 POST + 重连
     Models.swift                // BridgeState / SessionRow / Command（Codable）
     AppModel.swift              // UI 状态模型（过滤 / 分组 / 状态跃迁）
-    StatusPanelController.swift // 自定义 NSPanel + Liquid Glass 材质 + 定位/关闭
+    StatusPanelController.swift // 自定义 NSPanel + Liquid Glass 材质 + 定位/关闭 + 高度动画（TopAlignedContentHost）
     StatusPanelView.swift       // 面板 SwiftUI 内容
     Settings.swift              // AppSettings（UserDefaults）+ 设置页 SwiftUI（grouped Form）
     SettingsWindow.swift        // 设置窗口 chrome（标准 NSWindow / frame autosave）
@@ -224,6 +228,8 @@ app/
   - `--render-previews <outDir>`：生成图标矩阵、面板三态、场景示意、设置页（深/浅）。
   - `--bridge-file <path>` / `DSH_STATUS_BRIDGE_FILE=<path>`：覆盖 bridge.json 路径。
   - `--open-panel` / `--open-settings`：启动后自动打开面板/设置（截图/调试）。
+  - `--animate-subagents`：打开面板 → 展开 → 收起第一个有子智能体的会话，用于逐帧核对高度动画。
+  - `DSH_STATUS_ANIM_SCALE=<倍数>`：面板高度动画放慢 N 倍（默认 1），配合外部截屏循环抓中间帧。
   - `DSH_STATUS_APPEARANCE=light|dark`：强制界面外观（仅调试/出图，不改系统设置）。
   - `--render-app-icon <path>`：生成 App 图标 PNG。
 - `scripts/build-app.sh`：`swift build -c release` → `dist/DSHStatusBar.app`（Info.plist + ad-hoc 签名）。

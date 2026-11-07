@@ -152,6 +152,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // 调试：打开面板 → 展开 → 收起 第一个有子智能体的会话，用于逐帧核对高度动画。
+        // 配合 DSH_STATUS_ANIM_SCALE=10 放慢 10 倍，外部 screencapture 循环就能抓到中间帧。
+        if CommandLine.arguments.contains("--animate-subagents") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+                self?.panelController.show()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [weak self] in
+                guard let self else { return }
+                if let parent = self.model.orderedSessions.first(where: { self.model.hasSubagents($0.id) }) {
+                    self.model.toggleSubagents(for: parent.id)
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
+                guard let self else { return }
+                if let parent = self.model.orderedSessions.first(where: { self.model.isSubagentsExpanded($0.id) }) {
+                    self.model.toggleSubagents(for: parent.id)
+                }
+            }
+        }
+
         // 调试/截图：展开第一个有子智能体的会话（用于出「展开态」真机截图）。
         if CommandLine.arguments.contains("--expand-subagents") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in

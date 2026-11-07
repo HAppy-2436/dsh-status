@@ -73,11 +73,8 @@ struct StatusPanelView: View {
             // 两个方向的内距必须相同，内外圆角才是同一条 continuous 曲线的同心嵌套。
             .padding(.vertical, Theme.Metrics.panelContentInset)
         }
-        .frame(height: contentHeight)
+        .frame(height: contentHeight, alignment: .top)
         .clipped()
-        // 展开/收起时纯高度动画（不缩放文字），与面板窗口的高度跟随同一曲线。
-        .animation(Theme.respectingReduceMotion(Theme.Motion.panelResize),
-                   value: model.expandedSubagentParents)
     }
 
     @ViewBuilder

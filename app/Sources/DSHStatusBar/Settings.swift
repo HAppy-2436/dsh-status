@@ -240,7 +240,7 @@ struct SettingsView: View {
             SettingsRow(symbol: "circle.dashed",
                         color: Theme.uiNSColor(.completed),
                         title: "状态切换动效",
-                        subtitle: "状态变化时外环扫一圈并渐变过渡") {
+                        subtitle: "状态变化时内容淡化、外环扫入、数字滚动") {
                 Toggle("状态切换动效", isOn: $settings.transitionAnimation)
                     .labelsHidden()
                     .toggleStyle(.switch)

@@ -109,6 +109,7 @@ final class StatusPanelController: NSObject {
     func close() {
         guard panel.isVisible, !isClosing else { return }
         isClosing = true
+        stopHeightAnimation()
         let generation = closeGeneration
         removeEventMonitors()
         // 高亮随关闭立即消失（与原生菜单一致），面板本体做淡出。
@@ -137,6 +138,10 @@ final class StatusPanelController: NSObject {
     func fitIfVisible() {
         guard panel.isVisible, let button = statusItem.button else { return }
         fitToContent()
+        // 逐帧高度动画期间不要移动窗口/刷新阴影：每次 setFrameOrigin 都会打断正在跑的
+        // 逐帧 resize，invalidateShadow 还会让窗口在动画中途整屏重绘（看起来就是闪）。
+        // 收尾统一在 `finishHeightChange()` 里做。
+        guard !isAnimatingHeight else { return }
         positionPanel(button: button)
         panel.invalidateShadow()
     }
@@ -193,14 +198,71 @@ final class StatusPanelController: NSObject {
         guard animateResize,
               !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.setFrame(rect, display: true)
+            finishHeightChange()
             return
         }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Theme.Motion.panelResizeDuration * AppConfig.animationScale
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            context.allowsImplicitAnimation = true
-            panel.animator().setFrame(rect, display: true)
+        // 自己按 60fps 逐帧 setFrame，而不是 `animator().setFrame`：
+        // AppKit 的窗口 frame 动画走「快照缩放」快路径，动画期间窗口内容/阴影是被拉伸的位图，
+        // 玻璃与圆角在拉伸时会在左右两侧投出「抖动/闪烁」的重影。
+        // 逐帧真实 resize（display: true）每次都重新渲染，代价是 13 帧 × 一次重绘，观感更干净。
+        startHeightAnimation(from: previous, to: rect)
+    }
+
+    // MARK: 高度动画（自绘 60fps 逐帧 resize）
+
+    private var heightTimer: Timer?
+    private var heightStart: CFTimeInterval = 0
+    private var heightFrom: NSRect = .zero
+    private var heightTo: NSRect = .zero
+    /// 动画期间跳过 `positionPanel` / `invalidateShadow`（会打断逐帧 resize 并可能闪一帧）。
+    private var isAnimatingHeight: Bool { heightTimer != nil }
+
+    private func startHeightAnimation(from: NSRect, to: NSRect) {
+        stopHeightAnimation()
+        heightFrom = from
+        heightTo = to
+        heightStart = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            self?.stepHeightAnimation()
         }
+        timer.tolerance = 0
+        RunLoop.main.add(timer, forMode: .common)
+        heightTimer = timer
+        stepHeightAnimation()
+    }
+
+    private func stepHeightAnimation() {
+        guard let timer = heightTimer else { return }
+        let duration = max(Theme.Motion.panelResizeDuration * AppConfig.animationScale, 0.05)
+        let progress = min(1, (CACurrentMediaTime() - heightStart) / duration)
+        let eased = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - pow(-2 * progress + 2, 2) / 2      // easeInOutQuad
+        let rect = NSRect(
+            x: heightFrom.minX,
+            y: heightFrom.minY + (heightTo.minY - heightFrom.minY) * eased,
+            width: heightFrom.width + (heightTo.width - heightFrom.width) * eased,
+            height: heightFrom.height + (heightTo.height - heightFrom.height) * eased
+        )
+        panel.setFrame(rect, display: true)
+        if progress >= 1 {
+            timer.invalidate()
+            heightTimer = nil
+            panel.setFrame(heightTo, display: true)
+            finishHeightChange()
+        }
+    }
+
+    private func stopHeightAnimation() {
+        heightTimer?.invalidate()
+        heightTimer = nil
+    }
+
+    /// 高度动画结束（或瞬时尺寸变化）后统一收尾：重新对齐锚点 + 刷新阴影，只做一次。
+    private func finishHeightChange() {
+        guard panel.isVisible, let button = statusItem.button else { return }
+        positionPanel(button: button)
+        panel.invalidateShadow()
     }
 
     /// 量内容尺寸：宽度由 SwiftUI 根视图固定（`Theme.Metrics.panelWidth`），这里只关心高度。

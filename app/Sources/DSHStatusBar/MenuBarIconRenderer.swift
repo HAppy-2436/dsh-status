@@ -39,6 +39,14 @@ struct IconModel: Equatable {
         return nil
     }
 
+    /// 实际画在图标中心的数字（nil = 不显示）。
+    /// 未连接/空闲不画；双层环（外环 + 内层彗星）时 22pt 放不下第三层，也不画。
+    var visibleCenterNumber: Int? {
+        guard connected, !isEmpty else { return nil }
+        if topPriorityStatus != nil && runningCount > 0 { return nil }
+        return centerNumber
+    }
+
     /// 中心数字（nil = 不显示）。双层环时由渲染层省略。
     var centerNumber: Int? {
         guard !statuses.isEmpty else { return nil }
@@ -82,13 +90,31 @@ enum MenuBarIconRenderer {
     }
 
     /// 只渲染静态层（外环/轨道/数字/鲸鱼/虚线），供 Core Animation 图层复用。
-    /// `includeRing == false` 时不画外层彩色环（状态切换过渡用：先藏环再扫入）。
+    /// `includeRing == false` 时不画外层彩色环（状态切换过渡用：环由独立图层扫入/收回）。
+    /// `includeNumber == false` 时不画中心数字（数字切换用独立图层做滚动）。
     static func staticImage(for model: IconModel, appearance: NSAppearance,
-                            includeRing: Bool = true) -> NSImage {
+                            includeRing: Bool = true,
+                            includeNumber: Bool = true,
+                            includeComet: Bool = false) -> NSImage {
         render(width: canvas, height: canvas, appearance: appearance) { _ in
-            draw(model: model, appearance: appearance, includeComet: false, cometSweep: nil,
-                 includeRing: includeRing)
+            draw(model: model, appearance: appearance, includeComet: includeComet, cometSweep: nil,
+                 includeRing: includeRing, includeNumber: includeNumber)
         }
+    }
+
+    /// 只画中心数字（透明底），供数字滚动过渡单独做图层。
+    static func numberImage(for model: IconModel, appearance: NSAppearance) -> NSImage? {
+        guard let number = model.visibleCenterNumber else { return nil }
+        return render(width: canvas, height: canvas, appearance: appearance) { _ in
+            drawCount(number, dark: isDark(appearance))
+        }
+    }
+
+    /// 完全透明的占位图：过渡期间临时替换 `button.image`，保持状态项宽度不变
+    /// （真正的画面由 Core Animation 图层合成；结束后换回完整静态图）。
+    static func blankImage() -> NSImage {
+        render(width: canvas, height: canvas,
+               appearance: NSAppearance(named: .darkAqua)!) { _ in }
     }
 
     /// 彗星弧的几何参数（半径/线宽）与颜色。返回 nil 表示当前状态没有运行中动画。
@@ -135,7 +161,8 @@ enum MenuBarIconRenderer {
     private static func draw(model: IconModel, appearance: NSAppearance,
                              includeComet: Bool,
                              cometSweep: (start: CGFloat, sweep: CGFloat)?,
-                             includeRing: Bool = true) {
+                             includeRing: Bool = true,
+                             includeNumber: Bool = true) {
         let dark = isDark(appearance)
 
         guard model.connected else {
@@ -182,7 +209,7 @@ enum MenuBarIconRenderer {
         }
 
         // 中心数字：双层时省略（22pt 放不下第三层）
-        if !(hasOuter && model.runningCount > 0), let number = model.centerNumber {
+        if includeNumber, !(hasOuter && model.runningCount > 0), let number = model.centerNumber {
             drawCount(number, dark: dark)
         }
     }

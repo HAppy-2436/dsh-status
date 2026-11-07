@@ -112,10 +112,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         bridge.start()
 
-        // 调试：启动后自动打开面板（便于截图/验收）
-        if CommandLine.arguments.contains("--test-ring-transition") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                self?.statusItemController.debugPlayRingTransition()
+        // 调试：脚本化回放全部图标状态迁移（配合 DSH_STATUS_ANIM_SCALE 放慢逐帧核对）。
+        // 可选参数：`--test-icon-transitions=<起始步>,<步数>`，只回放其中一段。
+        if let raw = CommandLine.arguments.first(where: { $0.hasPrefix("--test-icon-transitions") }) {
+            var startIndex = 0
+            var count: Int?
+            if let equals = raw.firstIndex(of: "=") {
+                let parts = raw[raw.index(after: equals)...].split(separator: ",")
+                if let first = parts.first, let value = Int(first) { startIndex = value }
+                if parts.count > 1, let value = Int(parts[1]) { count = value }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.statusItemController.debugRunIconTransitionScript(startIndex: startIndex,
+                                                                        count: count)
             }
         }
         if CommandLine.arguments.contains("--open-panel") {

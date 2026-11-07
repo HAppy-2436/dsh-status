@@ -109,6 +109,11 @@
   SwiftUI 内容固定顶部对齐（`TopAlignedContentHost`）、按目标高度摆放，多出来的部分由窗口裁切逐步揭幕。
   早先「窗口一次变高 + 内容自己在 0.24s 里长高」是两套时间线，内容会被 SwiftUI 在窗口里垂直居中，
   展开时先被顶上再滑下来（观感就是「一会下一会上」），现已去掉内容侧高度动画。
+  **高度动画由 60fps 的 `Timer` 逐帧 `setFrame(display: true)` 驱动**（`startHeightAnimation` /
+  `stepHeightAnimation`，easeInOutQuad）：不用 `animator().setFrame` 是因为 AppKit 的窗口 frame 动画走
+  「快照缩放」快路径，动画期间窗口内容与阴影是拉伸的位图，Liquid Glass 与圆角在这种非等比拉伸下会在左右两侧
+  投出重影（观感＝左右抖动闪烁）；逐帧真实 resize 每帧都重新渲染，边缘干净。动画期间不移动窗口、不刷阴影，
+  结束后统一 `positionPanel` + `invalidateShadow` 一次。
 - 子智能体：默认折叠；**行尾**是导航/披露区：
   - 没有子会话 → `chevron.right`（9pt semibold tertiary），只作导航提示，点卡片任意位置打开会话；
   - 有子会话 → 「子智能体数量（11pt medium，等宽数字，secondary）+ `chevron.down`」按钮，独立命中区：

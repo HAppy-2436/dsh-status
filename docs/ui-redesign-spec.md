@@ -31,7 +31,7 @@
 | 状态色 | `systemYellow`（待回答）/ `systemBlue`（运行中）/ `systemGreen`（已完成）/ `systemRed`（已停止）；
 | | 未连接 = `secondaryLabelColor`（footer 连接点、空状态）；不使用自造 RGB（菜单栏图标除外，图标调色板保持现状） |
 | 圆角（阶梯） | 面板 **16** → 行/整块高亮 **12** → 子智能体行 **8** → 行尾披露胶囊 **5**；全 continuous。严格同心值是 8（16 − 内距 8），但 8 在 44/52pt 高的行上偏硬，按用户偏好放大到 12（内层略大于同心值，四角缝隙比中间略宽，观感更柔）；设置卡片/控件交给系统 |
-| 动效（`Theme.Motion`） | hover/press 0.12s easeOut；披露箭头 0.22s、面板高度 0.22s easeInOut（**仅窗口底边在动**，内容顶部对齐不动）；子行错班 0.035s/条、0.18s easeOut；全部尊重「减弱动态效果」（瞬时） |
+| 动效（`Theme.Motion`） | hover/press 0.12s easeOut；披露箭头 0.22s、面板高度 0.22s easeInOut（**仅窗口底边在动**，内容顶部对齐不动；**60fps 逐帧真实 resize**，不用 AppKit 窗口动画快路径，避免动画期间玻璃/阴影被拉伸成左右重影）；子行错班 0.035s/条、0.18s easeOut；全部尊重「减弱动态效果」（瞬时） |
 | 阴影 | 面板用**系统窗口阴影**（`hasShadow`），不自绘阴影/内描边（会破坏 Liquid Glass 折射与高光） |
 
 ## 2. 弹出面板（StatusPanelView + StatusPanelController）

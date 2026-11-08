@@ -46,10 +46,6 @@
   - 与环颜色一致的数量：只数当前环色对应状态；
   - 不显示。
 - 内外环同时存在时不显示数字（22pt 放不下第三层）。
-- **中心数字的视觉居中（2026-11-08 修正）**：水平 + 垂直都按字形轮廓**面积质心**对齐画布中心 (11,11)；
-  数字阴影改为**原地对称扩散**（offset 0）。此前垂直用墨迹 bbox 居中 + 阴影向下偏移 0.3pt，两者叠加使环内
-  「视觉质量」偏下约 0.5–1pt，外环看起来像偏上 1–2px（用户反馈「红色的环偏上」即此）。
-  复现/核对：`--render-icon-states <dir>` 输出 2×/8× 静态位图；对照图 [previews/icon-centering-before-after.png](previews/icon-centering-before-after.png)。
 
 ### 2.3 动画（Core Animation，GPU）
 
@@ -247,7 +243,6 @@ app/
   - `--test-icon-transitions[=<起始步>,<步数>]`：脚本化回放全部图标状态迁移（每步打印时间线并自动退出）。
   - `DSH_STATUS_ANIM_SCALE=<倍数>`：面板高度动画与图标状态过渡放慢 N 倍（默认 1），配合截屏逐帧核对。
   - `DSH_STATUS_DISABLE_TRANSITIONS=1` / `DSH_STATUS_DISABLE_RUN_ANIMATION=1`：强制降级路径（验收用）。
-  - `--render-icon-states <dir>`：输出各状态静态图标的 2×/8× PNG（逐像素审计阴影、环心与数字锚点）。
   - `DSH_STATUS_APPEARANCE=light|dark`：强制界面外观（仅调试/出图，不改系统设置）。
   - `--render-app-icon <path>`：生成 App 图标 PNG。
 - `scripts/build-app.sh`：`swift build -c release` → `dist/DSHStatusBar.app`（Info.plist + ad-hoc 签名）。

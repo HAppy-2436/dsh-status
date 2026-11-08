@@ -434,49 +434,6 @@ enum PreviewRenderer {
 
     // MARK: - 绘制工具
 
-    // MARK: - 图标静态位图审计（逐像素核查用）
-
-    /// 输出各状态静态图标的 2×/8× PNG（透明底）：`--render-icon-states <dir>`。
-    /// 2× 与菜单栏屏幕位图一致；8× 用于逐像素核查阴影、环心与数字锚点。
-    static func renderIconStateAudit(to directory: URL) throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let dark = NSAppearance(named: .darkAqua) ?? NSAppearance.currentDrawing()
-        let light = NSAppearance(named: .aqua) ?? NSAppearance.currentDrawing()
-        let states: [(String, IconModel)] = [
-            ("idle", IconModel(statuses: [])),
-            ("attention-waiting", IconModel(statuses: [.waiting])),
-            ("attention-stopped", IconModel(statuses: [.stopped])),
-            ("attention-completed", IconModel(statuses: [.completed])),
-            ("attention-count2", IconModel(statuses: [.completed, .completed])),
-            ("attention-count3", IconModel(statuses: [.completed, .completed, .completed])),
-            ("attention-count8", IconModel(statuses: Array(repeating: .completed, count: 8))),
-            ("running", IconModel(statuses: [.running])),
-            ("both", IconModel(statuses: [.running, .waiting])),
-            ("both-stopped", IconModel(statuses: [.running, .stopped])),
-            ("disconnected", IconModel(statuses: [], connected: false)),
-        ]
-        for (name, model) in states {
-            for (suffix, appearance) in [("dark", dark), ("light", light)] {
-                for scale in [CGFloat(2), CGFloat(8)] {
-                    let image = MenuBarIconRenderer.auditImage(for: model, appearance: appearance,
-                                                               scale: scale)
-                    let url = directory.appendingPathComponent("\(name)-\(suffix)@\(Int(scale))x.png")
-                    try savePNG(image: image, to: url)
-                }
-            }
-        }
-    }
-
-    private static func savePNG(image: NSImage, to url: URL) throws {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]) else {
-            throw NSError(domain: "PreviewRenderer", code: 4,
-                          userInfo: [NSLocalizedDescriptionKey: "icon png encode failed"])
-        }
-        try png.write(to: url)
-    }
-
     private static func savePNG(width: CGFloat, height: CGFloat,
                                 appearance: NSAppearance,
                                 to url: URL,

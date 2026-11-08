@@ -89,14 +89,6 @@ enum MenuBarIconRenderer {
         }
     }
 
-    /// 审计用：以任意倍率输出完整静态图标（默认 2× 与屏幕位图一致；8× 用于逐像素核查）。
-    static func auditImage(for model: IconModel, appearance: NSAppearance,
-                           scale: CGFloat) -> NSImage {
-        render(width: canvas, height: canvas, appearance: appearance, scale: scale) { _ in
-            draw(model: model, appearance: appearance, includeComet: true, cometSweep: nil)
-        }
-    }
-
     /// 只渲染静态层（外环/轨道/数字/鲸鱼/虚线），供 Core Animation 图层复用。
     /// `includeRing == false` 时不画外层彩色环（状态切换过渡用：环由独立图层扫入/收回）。
     /// `includeNumber == false` 时不画中心数字（数字切换用独立图层做滚动）。
@@ -302,7 +294,7 @@ enum MenuBarIconRenderer {
         let attributed = NSAttributedString(string: text, attributes: attrs)
         let line = CTLineCreateWithAttributedString(attributed)
         let ink = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
-        let centroid = lineAreaCentroid(line)
+        let centroidX = lineAreaCentroidX(line)
         guard let context = NSGraphicsContext.current?.cgContext else {
             let textSize = attributed.size()
             attributed.draw(at: NSPoint(x: center.x - textSize.width / 2,
@@ -310,15 +302,11 @@ enum MenuBarIconRenderer {
             return
         }
         context.saveGState()
-        // 阴影必须对称：旧版 offset (0,-0.3) 会在数字下方额外压暗，环内「暗部重心」下移约 1pt，
-        // 视觉上外环就会显得偏上 1–2px（用户反馈「红色的环偏上」的根因）。改为原地扩散光晕。
-        context.setShadow(offset: .zero, blur: 1.2,
-                          color: (dark ? NSColor.black.withAlphaComponent(0.30)
-                                       : NSColor.black.withAlphaComponent(0.14)).cgColor)
-        // 垂直也按字形「面积质心」居中：不同数字（1/3/8…）的墨迹重心相对 bbox 中心有 ±0.4pt 偏差，
-        // 只按 bbox 居中会让环内视觉质量偏上/偏下，外环看起来就像偏了 1–2px。
-        context.textPosition = CGPoint(x: center.x - (centroid?.x ?? ink.midX),
-                                       y: center.y - (centroid?.y ?? ink.midY))
+        context.setShadow(offset: CGSize(width: 0, height: -0.3), blur: 1.0,
+                          color: (dark ? NSColor.black.withAlphaComponent(0.35)
+                                       : NSColor.black.withAlphaComponent(0.16)).cgColor)
+        context.textPosition = CGPoint(x: center.x - (centroidX ?? ink.midX),
+                                       y: center.y - ink.midY)
         CTLineDraw(line, context)
         context.restoreGState()
     }
@@ -327,12 +315,11 @@ enum MenuBarIconRenderer {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
     }
 
-    /// 按字形轮廓面积质心计算视觉中心（对「1」这类重心偏右/偏上的字形做视觉居中）。
-    private static func lineAreaCentroid(_ line: CTLine) -> (x: CGFloat, y: CGFloat)? {
+    /// 按字形轮廓面积质心计算水平中心（对「1」这类重心偏右的字形做视觉居中）。
+    private static func lineAreaCentroidX(_ line: CTLine) -> CGFloat? {
         let runs = CTLineGetGlyphRuns(line) as! [CTRun]
         var totalArea: CGFloat = 0
-        var totalMomentX: CGFloat = 0
-        var totalMomentY: CGFloat = 0
+        var totalMoment: CGFloat = 0
         for run in runs {
             let count = CTRunGetGlyphCount(run)
             guard count > 0 else { continue }
@@ -343,42 +330,37 @@ enum MenuBarIconRenderer {
             let runFont = (CTRunGetAttributes(run) as NSDictionary)[kCTFontAttributeName] as! CTFont
             for i in 0..<count {
                 guard let path = CTFontCreatePathForGlyph(runFont, glyphs[i], nil) else { continue }
-                let (area, momentX, momentY) = pathAreaMoments(path, offsetX: positions[i].x)
+                let (area, moment) = pathAreaMomentX(path, offsetX: positions[i].x)
                 totalArea += area
-                totalMomentX += momentX
-                totalMomentY += momentY
+                totalMoment += moment
             }
         }
         guard abs(totalArea) > 0.0001 else { return nil }
-        return (totalMomentX / totalArea, totalMomentY / totalArea)
+        return totalMoment / totalArea
     }
 
-    /// 返回 (有向面积, ∫x dA, ∫y dA)；轮廓按 0.05 步长采样，精度足够 icon 尺寸。
-    private static func pathAreaMoments(_ path: CGPath, offsetX: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
+    /// 返回 (有向面积, ∫x dA)；轮廓按 0.05 步长采样，精度足够 icon 尺寸。
+    private static func pathAreaMomentX(_ path: CGPath, offsetX: CGFloat) -> (CGFloat, CGFloat) {
         var totalArea: CGFloat = 0
-        var totalMomentX: CGFloat = 0
-        var totalMomentY: CGFloat = 0
+        var totalMoment: CGFloat = 0
         var points: [CGPoint] = []
 
         func flush() {
             guard points.count > 2 else { points = []; return }
             var area: CGFloat = 0
-            var momentX: CGFloat = 0
-            var momentY: CGFloat = 0
+            var moment: CGFloat = 0
             var j = points.count - 1
             for i in 0..<points.count {
                 let a = points[j], b = points[i]
                 let cross = a.x * b.y - b.x * a.y
                 area += cross
-                momentX += (a.x + b.x) * cross
-                momentY += (a.y + b.y) * cross
+                moment += (a.x + b.x) * cross
                 j = i
             }
             area *= 0.5
             if abs(area) > 0.000001 {
                 totalArea += area
-                totalMomentX += momentX / 6
-                totalMomentY += momentY / 6
+                totalMoment += moment / 6
             }
             points = []
         }
@@ -419,7 +401,7 @@ enum MenuBarIconRenderer {
             }
         }
         flush()
-        return (totalArea, totalMomentX, totalMomentY)
+        return (totalArea, totalMoment)
     }
 
     private static func roundedFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {
@@ -432,8 +414,8 @@ enum MenuBarIconRenderer {
     }
 
     static func render(width: CGFloat, height: CGFloat, appearance: NSAppearance,
-                       scale: CGFloat = 2,
                        draw: (NSRect) -> Void) -> NSImage {
+        let scale: CGFloat = 2
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: max(1, Int(ceil(width * scale))),

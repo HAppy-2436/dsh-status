@@ -15,20 +15,6 @@ if let index = arguments.firstIndex(of: "--render-previews") {
     }
 }
 
-// --render-icon-states <dir>：审计用，输出各状态静态图标的 2×/8× 位图（PNG）
-if let index = arguments.firstIndex(of: "--render-icon-states") {
-    let output = index + 1 < arguments.count ? arguments[index + 1] : "/tmp/icon-state-audit"
-    _ = NSApplication.shared
-    do {
-        try PreviewRenderer.renderIconStateAudit(to: URL(fileURLWithPath: output))
-        print("icon state audit written to \(output)")
-        exit(0)
-    } catch {
-        FileHandle.standardError.write(Data(("render-icon-states failed: \(error)\n").utf8))
-        exit(1)
-    }
-}
-
 // --render-app-icon <path>：生成 1024pt App 图标 PNG（构建 .icns 用）
 if let index = arguments.firstIndex(of: "--render-app-icon") {
     let path = index + 1 < arguments.count ? arguments[index + 1] : "/tmp/DSHStatus-app-icon.png"

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import UniformTypeIdentifiers
 
 // MARK: - 设置模型
 
@@ -106,6 +107,21 @@ final class AppSettings: ObservableObject {
         didSet { save("panelBackgroundStyle", panelBackgroundStyle.rawValue) }
     }
 
+    // MARK: 提示音（App 内独立播放，音量与系统通知音量无关）
+
+    /// 提示音总开关：关闭后状态变化只发系统通知横幅、不发声。
+    @Published var soundEnabled: Bool { didSet { save("soundEnabled", soundEnabled) } }
+    /// 提示音音色（内置 DSH 提示音 / macOS 系统声音 / 自定义文件 / 静音）。
+    @Published var soundOption: NotificationSoundOption {
+        didSet { save("soundOption", soundOption.rawValue) }
+    }
+    /// App 内独立音量（0…1）；与系统通知音量 / 提醒音量无关，仍受系统总输出音量限制。
+    /// 范围由 Slider（0...1）与播放器（`clampedVolume`）保证，读取时在 init 里夹取；
+    /// didSet 内不写回自身，避免 `@Published` 包装器重入。
+    @Published var soundVolume: Double { didSet { save("soundVolume", soundVolume) } }
+    /// 自定义音频文件的绝对路径（`soundOption == .custom` 时使用）。
+    @Published var soundCustomPath: String { didSet { save("soundCustomPath", soundCustomPath) } }
+
     private static let legacyDefaultsDomains = [
         "com.liyitong.dshstatus", "com.liyitong.dshstatus.app",
         "com.liyitong.dshstatus.path", "com.liyitong.dsh-status"
@@ -122,7 +138,7 @@ final class AppSettings: ObservableObject {
                   legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
             for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "doNotDisturb", "confirmBeforeQuit",
-                        "panelBackgroundStyle"] {
+                        "panelBackgroundStyle", "soundEnabled", "soundOption", "soundVolume", "soundCustomPath"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
                     defaults.set(value, forKey: "dshStatus.\(key)")
                 }
@@ -135,29 +151,37 @@ final class AppSettings: ObservableObject {
         self.persist = persist
         self.defaults = persist ? defaults : nil
         if persist { AppSettings.migrateLegacyDefaultsIfNeeded(into: defaults) }
-        let storedStatuses = defaults.stringArray(forKey: "dshStatus.visibleStatuses")
+        // 预览/演示（persist == false）不读真实用户设置：离屏出图必须可复现，不受本机配置影响。
+        let store: UserDefaults? = persist ? defaults : nil
+        let storedStatuses = store?.stringArray(forKey: "dshStatus.visibleStatuses")
         let statuses = storedStatuses?.compactMap { SessionStatus(rawValue: $0) } ?? []
         visibleStatuses = Set(statuses.isEmpty ? SessionStatus.allCases.filter { $0 != .idle } : statuses)
-        hiddenWorkspaces = Set(defaults.stringArray(forKey: "dshStatus.hiddenWorkspaces") ?? [])
-        var storedCenterMode = CenterNumberMode(stored: defaults.string(forKey: "dshStatus.centerNumberMode"))
+        hiddenWorkspaces = Set(store?.stringArray(forKey: "dshStatus.hiddenWorkspaces") ?? [])
+        var storedCenterMode = CenterNumberMode(stored: store?.string(forKey: "dshStatus.centerNumberMode"))
         if persist, defaults.object(forKey: "dshStatus.centerNumberModeVersion") == nil {
             // 旧版默认是「关注数」，新版默认「全部任务数」；只有「不显示」视为用户明确选择
             if storedCenterMode != .hidden { storedCenterMode = .all }
             defaults.set(2, forKey: "dshStatus.centerNumberModeVersion")
         }
         centerNumberMode = storedCenterMode
-        runAnimation = defaults.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
-        transitionAnimation = defaults.object(forKey: "dshStatus.transitionAnimation") as? Bool ?? true
-        notifyWaiting = defaults.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
-        notifyCompleted = defaults.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
-        notifyStopped = defaults.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
-        doNotDisturb = defaults.object(forKey: "dshStatus.doNotDisturb") as? Bool ?? false
-        confirmBeforeQuit = defaults.object(forKey: "dshStatus.confirmBeforeQuit") as? Bool ?? true
-        let storedPanel = PanelBackgroundStyle(rawValue: defaults.string(forKey: "dshStatus.panelBackgroundStyle") ?? "")
+        runAnimation = store?.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
+        transitionAnimation = store?.object(forKey: "dshStatus.transitionAnimation") as? Bool ?? true
+        notifyWaiting = store?.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
+        notifyCompleted = store?.object(forKey: "dshStatus.notifyCompleted") as? Bool ?? false
+        notifyStopped = store?.object(forKey: "dshStatus.notifyStopped") as? Bool ?? false
+        doNotDisturb = store?.object(forKey: "dshStatus.doNotDisturb") as? Bool ?? false
+        confirmBeforeQuit = store?.object(forKey: "dshStatus.confirmBeforeQuit") as? Bool ?? true
+        let storedPanel = PanelBackgroundStyle(rawValue: store?.string(forKey: "dshStatus.panelBackgroundStyle") ?? "")
         panelBackgroundStyle = storedPanel ?? PanelBackgroundStyle.systemDefault
+
+        soundEnabled = store?.object(forKey: "dshStatus.soundEnabled") as? Bool ?? true
+        soundOption = NotificationSoundOption(rawValue: store?.string(forKey: "dshStatus.soundOption") ?? "") ?? .dshChime
+        let storedVolume = store?.object(forKey: "dshStatus.soundVolume") as? Double
+        soundVolume = min(max(storedVolume ?? 0.9, 0), 1)
+        soundCustomPath = store?.string(forKey: "dshStatus.soundCustomPath") ?? ""
     }
 
-    /// 预览/演示用：不落盘。
+    /// 预览/演示用：不落盘，也不读取本机真实设置（离屏出图可复现）。
     static func preview() -> AppSettings {
         AppSettings(persist: false)
     }
@@ -174,6 +198,25 @@ final class AppSettings: ObservableObject {
         doNotDisturb = false
         confirmBeforeQuit = true
         panelBackgroundStyle = PanelBackgroundStyle.systemDefault
+        soundEnabled = true
+        soundOption = .dshChime
+        soundVolume = 0.9
+        soundCustomPath = ""
+    }
+
+    /// 当前自定义音频文件 URL（未选择 / 路径为空时为 nil）。
+    var soundCustomURL: URL? {
+        let path = soundCustomPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        return path.isEmpty ? nil : URL(fileURLWithPath: path)
+    }
+
+    /// 用当前设置播放一次提示音（设置页「试听」与状态跃迁共用）。
+    @discardableResult
+    func playSound() -> Bool {
+        guard soundEnabled else { return false }
+        return NotificationSoundPlayer.shared.play(option: soundOption,
+                                                   volume: soundVolume,
+                                                   customPath: soundCustomPath)
     }
 
     /// 某状态是否在面板/图标中显示。
@@ -212,6 +255,7 @@ struct SettingsView: View {
             displaySection
             projectSection
             notificationSection
+            soundSection
             panelSection
             generalSection
             aboutSection
@@ -326,7 +370,7 @@ struct SettingsView: View {
             SettingsRow(symbol: settings.doNotDisturb ? "moon.fill" : "moon",
                         color: .systemIndigo,
                         title: "勿扰模式",
-                        subtitle: "关闭全部系统通知；下面的单项开关会保留") {
+                        subtitle: "关闭全部系统通知与提示音；下面的单项开关会保留") {
                 Toggle("勿扰模式", isOn: $settings.doNotDisturb)
                     .labelsHidden()
                     .toggleStyle(.switch)
@@ -355,8 +399,136 @@ struct SettingsView: View {
         } header: {
             Text("通知")
         } footer: {
-            SettingsFootnote("点击通知会打开对应会话；同一会话 30 秒内不重复提醒。勿扰模式开启时以上所有通知都不弹（单项设置保留）。")
+            SettingsFootnote("点击通知会打开对应会话；同一会话的横幅提醒 30 秒内不重复（提示音每次状态跃迁都会响）。上面三个状态开关同时决定是否弹横幅与是否播放提示音（声音在下方「提示音」分区单独配置）。勿扰模式开启时通知与提示音全部静音。")
         }
+    }
+
+    // MARK: 提示音
+
+    private var soundSection: some View {
+        Section {
+            SettingsRow(symbol: settings.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                        color: .systemOrange,
+                        title: "播放提示音",
+                        subtitle: "状态变化时由 App 直接播放；音量独立，不受系统通知音量影响") {
+                Toggle("播放提示音", isOn: $settings.soundEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            SettingsRow(symbol: "music.note",
+                        color: .systemPink,
+                        title: "声音") {
+                HStack(spacing: 8) {
+                    Picker("声音", selection: soundOptionBinding) {
+                        ForEach(NotificationSoundOption.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .disabled(!settings.soundEnabled)
+
+                    Button("试听") { previewSound() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(!canPreviewSound)
+                }
+            }
+            SettingsRow(symbol: "speaker.wave.1.fill",
+                        color: .systemTeal,
+                        title: "音量",
+                        subtitle: "独立于系统通知音量") {
+                HStack(spacing: 8) {
+                    Slider(value: $settings.soundVolume, in: 0...1)
+                        .frame(width: 150)
+                        .accessibilityLabel("提示音音量")
+                    Text("\(volumePercent)%")
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, alignment: .trailing)
+                }
+                .disabled(!settings.soundEnabled || settings.soundOption == .none)
+            }
+            if settings.soundOption == .custom {
+                SettingsRow(symbol: "waveform",
+                            color: .systemGray,
+                            title: "自定义音频",
+                            subtitle: customSoundSubtitle) {
+                    Button(settings.soundCustomPath.isEmpty ? "选择文件…" : "重新选择…") {
+                        chooseCustomSoundFile()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!settings.soundEnabled)
+                }
+            }
+        } header: {
+            Text("提示音")
+        } footer: {
+            SettingsFootnote("提示音由 App 直接播放，不经过系统通知：系统通知被关闭时仍会响；音量也与系统通知/提醒音量无关（仍受系统总输出音量限制）。系统「专注模式」不会静音本提示音——需要安静时请用勿扰模式或关闭提示音。")
+        }
+    }
+
+    private var volumePercent: Int {
+        Int((settings.soundVolume * 100).rounded())
+    }
+
+    private var canPreviewSound: Bool {
+        guard settings.soundEnabled, settings.soundOption.producesSound else { return false }
+        if settings.soundOption == .custom {
+            guard let url = settings.soundCustomURL else { return false }
+            return FileManager.default.fileExists(atPath: url.path)
+        }
+        return true
+    }
+
+    private var customSoundSubtitle: String {
+        guard let url = settings.soundCustomURL else {
+            return "支持 WAV / AIFF / MP3 / M4A / CAF"
+        }
+        if !FileManager.default.fileExists(atPath: url.path) {
+            return "\(url.lastPathComponent)（文件不存在，请重新选择）"
+        }
+        return url.lastPathComponent
+    }
+
+    /// 声音 Picker 的绑定：选到「自定义音频文件…」且还没有文件时直接弹选择框，
+    /// 取消则退回上一个选项（避免停在「自定义但没选文件」的半残状态）。
+    private var soundOptionBinding: Binding<NotificationSoundOption> {
+        Binding(
+            get: { settings.soundOption },
+            set: { newValue in
+                let previous = settings.soundOption
+                settings.soundOption = newValue
+                guard newValue == .custom, settings.soundCustomPath.isEmpty else { return }
+                DispatchQueue.main.async {
+                    if !chooseCustomSoundFile() { settings.soundOption = previous }
+                }
+            }
+        )
+    }
+
+    private func previewSound() {
+        settings.playSound()
+    }
+
+    /// 选择自定义提示音：写入路径后立即试听，方便判断音量/音色是否合适。
+    /// - Returns: 用户是否选定了文件（取消/关闭面板返回 false）。
+    @discardableResult
+    private func chooseCustomSoundFile() -> Bool {
+        let panel = NSOpenPanel()
+        panel.title = "选择提示音音频文件"
+        panel.message = "支持 WAV / AIFF / MP3 / M4A / CAF 等系统可解码的音频格式。"
+        panel.prompt = "选择"
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        settings.soundEnabled = true
+        settings.soundOption = .custom
+        settings.soundCustomPath = url.path
+        previewSound()
+        return true
     }
 
     // MARK: 面板

@@ -114,8 +114,12 @@
 | 显示 | 待回答 / 运行中 / 已完成 / 已停止 | Switch（副标题显示当前数量） |
 | | 项目显示（逐项目） | Switch（无项目时显示「暂无已知项目（连接 DSH 后出现）」） |
 | 通知 | 系统通知状态 | 状态文字 / 「允许通知」/「打开系统设置」按钮 |
-| | 勿扰模式 | Switch（总开关：静音全部通知；下面三项保留） |
-| | 待回答（推荐）/ 已完成 / 已停止 | Switch |
+| | 勿扰模式 | Switch（总开关：静音全部通知与提示音；下面三项保留） |
+| | 待回答（推荐）/ 已完成 / 已停止 | Switch（同时决定是否播放提示音） |
+| 提示音 | 播放提示音 | Switch（副标题说明：App 直接播放、独立音量） |
+| | 声音 | Picker（DSH 提示音 / 8 个系统声音 / 自定义音频文件… / 静音）+ 「试听」bordered 小按钮 |
+| | 音量 | Slider 0–100% + 等宽数字百分比（与系统通知音量独立） |
+| | 自定义音频 | 仅 `.custom` 时出现：文件名/缺失提示 + 「选择文件…」bordered 小按钮 |
 | 面板 | 材质 | Picker（液态玻璃 / 经典磨砂 / 实色；低版本自动隐藏液态玻璃） |
 | 通用 | 退出前确认 | Switch |
 | | （分区内）恢复所有设置… | bordered 小按钮 + NSAlert 二次确认 |
@@ -125,7 +129,10 @@
   参数与迁移矩阵见 [icon-transitions.md](icon-transitions.md)；「播放运行动画」只控制彗星旋转/呼吸。
 - 删除旧底部固定栏（「恢复默认」按钮 + checkbox + 版本）与重复副标题
   （picker 行不再同时用副标题和控件显示同一个值，说明文字放分区脚注）。
-- 所有设置项保持即时生效 + UserDefaults 持久化；`AppSettings` 公开 API 不变。
+- 所有设置项保持即时生效 + UserDefaults 持久化；`AppSettings` 公开 API 不变（2026-11-08 新增提示音属性：
+  `soundEnabled` / `soundOption` / `soundVolume` / `soundCustomPath`）。
+- 提示音分区沿用同一行结构；声音 Picker 选到「自定义音频文件…」时直接弹 `NSOpenPanel`（`UTType.audio`），
+  取消则回退到上一个音色。提示音的实现与取舍见 [app-design.md §6.2](app-design.md)。
 - **设置窗口底色必须显式**：内容 `#1F2024`（深）/`#F2F2F6`（浅）、卡片 `#26272B`/白、分隔线 `#303135`/`#E3E3E8`，
   不透明度 100%。不要依赖 `windowBackgroundColor`/系统材质（会被 Liquid Glass 环境按桌面/窗口激活态染色，
   导致「聚焦偏蓝、失焦中性」两种观感）；窗口 `isOpaque = true`、`backgroundColor` 同内容底色。

@@ -152,7 +152,7 @@
   不自绘卡片/描边/底栏。
 - 行：左侧 **24×24** continuous 圆角色块（系统状态色 + 轻微渐变，白色 SF Symbol 12pt semibold）
   + 标题 13pt + 可选副标题 11pt secondary + Spacer + 原生控件（`Toggle .switch` / `Picker .menu` / bordered 小按钮）。
-- 分区顺序：**菜单栏图标 → 显示 → 项目显示 → 通知 → 面板 → 通用**；页脚为 11pt tertiary 版本/连接脚注。
+- 分区顺序：**菜单栏图标 → 显示 → 项目显示 → 通知 → 提示音 → 面板 → 通用**；页脚为 11pt tertiary 版本/连接脚注。
 - 分区说明文字为 11pt secondary、左对齐，位于卡片下方。
 
 | 分区 | 设置 | 说明 |
@@ -163,8 +163,12 @@
 | 显示 | 待回答 / 运行中 / 已完成 / 已停止 | 关掉的状态不在面板出现，也不进圆环与数字 |
 | 项目显示 | 按 workspace 逐个开关 | 关掉即隐藏该项目（会话本身不受影响） |
 | 通知 | 系统通知状态 | 已开启 / 允许通知 / 打开系统设置 |
-| | 勿扰模式 | 总开关：静音全部系统通知（保留下面三项）；面板底部月亮同步 |
-| | 待回答（推荐）/ 已完成 / 已停止 | 默认只开待回答 |
+| | 勿扰模式 | 总开关：静音全部系统通知**与提示音**（保留下面三项）；面板底部月亮同步 |
+| | 待回答（推荐）/ 已完成 / 已停止 | 默认只开待回答；三个开关同时决定「弹横幅」与「播提示音」 |
+| 提示音 | 播放提示音 | 总开关（默认开）；关掉只发横幅、不发声 |
+| | 声音 | 默认「DSH 提示音」；另有 8 个 macOS 系统声音 / 自定义音频文件 / 静音；右侧「试听」 |
+| | 音量 | 0–100% **独立音量**（默认 90%），与系统通知/提醒音量无关 |
+| | 自定义音频 | 仅在选择「自定义音频文件…」时出现；选择后立即试听，路径持久化 |
 | 面板 | 材质 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 |
 | 通用 | 退出前确认 | 点面板电源键或右键「退出」时先弹确认框 |
 | | 恢复所有设置… | NSAlert 二次确认后恢复推荐默认值 |
@@ -197,6 +201,8 @@
     `NSApp.activate` + `requestAuthorization`（避免 App 在后台时系统框被静默拒绝）；
   - 已拒绝（denied）：提示变为「去开启」，点击打开系统设置「通知」面板；
   - 已授权：面板正常；面板底部月亮按钮是「勿扰」总开关，单项通知开关在设置页。
+- **提示音不依赖通知权限**：声音由 App 用 `NSSound` 直接播放（见 §6.2），
+  即使系统通知被关闭/拒绝，只要「提示音」开启且对应状态开关打开、勿扰关闭，仍会发声。
 - **通知图标缓存（重要）**：macOS 按「App 身份（bundle id + .app 路径）」缓存通知横幅里的图标，
   改了图标/颜色但身份不变时会一直显示旧图标。需要刷新时：换新 bundle id **并且**换 .app 路径。
 - App 图标使用与菜单栏空闲态同款的鲸鱼 glyph：**透明底、无圆角方块、主色 `#416EFB`**
@@ -207,8 +213,30 @@
 
 - 默认**只对「进入待回答」发通知**（title = 会话标题，body = 待回答摘要，点击 → 打开对应会话）。
 - 已完成/已停止默认不发；待回答通知 30s 内同会话去重。
-- **勿扰模式**（面板月亮 / 设置页开关，持久化）：开启时不弹任何系统通知，单项开关配置原样保留，
+- **勿扰模式**（面板月亮 / 设置页开关，持久化）：开启时不弹任何系统通知、也不播提示音，单项开关配置原样保留，
   关闭后按原配置恢复。菜单栏图标与面板列表不受勿扰影响。
+
+### 6.2 提示音（2026-11-08，独立于系统通知）
+
+- **为什么不用 `UNNotificationSound`**：macOS 通知音无法设音量（由系统「提醒音量/通知音量」决定），
+  系统音本身峰值也偏低（实测 Glass 峰值 ≈0.20、Hero ≈0.53），这正是用户反馈「提示音太不明显」的根因。
+- **做法**：`content.sound = nil`，由 `NotificationSoundPlayer`（新增 `NotificationSound.swift`）用
+  `NSSound` 直接播放 App 内音频，音量由 `NSSound.volume` 独立控制（0…1）。
+  - 内置默认音 **DSH 提示音**：`app/Resources/dsh-chime.wav`，A5–C#6–E6 三音上行琶音、峰值 0.92
+    （≈系统 Glass 的 4.6 倍），由 `scripts/generate-dsh-chime.py` 生成；`scripts/build-app.sh` 打进
+    `Contents/Resources`，并用 `--self-test-sound` 校验打包结果。
+  - 可选 8 个 `/System/Library/Sounds/*.aiff` 系统声音；自定义文件走 `NSOpenPanel`（`UTType.audio`），
+    路径存 UserDefaults（App 未沙盒化，直接绝对路径即可）；「静音」选项完全不发声。
+  - 音量设置独立持久化（`dshStatus.soundVolume`，默认 0.9），与系统通知音量/提醒音量无关；
+    受系统总输出音量上限约束（这是系统级物理上限，App 无法越过）。
+- **触发时机**：与通知完全相同——`onStatusTransition` 里对应状态开关打开、勿扰关闭时播放，
+  与横幅互不依赖（横幅被系统权限拦掉也照样响）；提示音不做 30s 去重（每次真实状态跃迁都提醒），
+  但 0.4s 内的多次跃迁合并成一次（同一帧多个会话一起完成时不会叠成一片）。
+- **不受系统专注模式静音**：macOS「专注」只静音系统通知，不会静音 App 直接播放的音频；
+  这是「更明显」的代价——需要安静时应使用本 App 的勿扰模式（同时静音通知与提示音）或关闭提示音。
+  不做专注模式检测：读取 Focus 状态属私有接口、且与「更明显」的产品目标冲突。
+- **验收入口**：`DSHStatusBar --self-test-sound`（资源/选项解析/音量夹取/设置持久化，构建时自动跑）、
+  `DSHStatusBar --test-sound[=<option>,<volume>]`（单独试听，播完自动退出）。
 
 ## 7. App 结构（Swift Package，无第三方依赖）
 
@@ -230,7 +258,8 @@ app/
     StatusPanelView.swift       // 面板 SwiftUI 内容
     Settings.swift              // AppSettings（UserDefaults）+ 设置页 SwiftUI（grouped Form）
     SettingsWindow.swift        // 设置窗口 chrome（标准 NSWindow / frame autosave）
-    NotificationManager.swift   // 通知权限与发送
+    NotificationManager.swift   // 通知权限与横幅发送（通知音交给 NotificationSound）
+    NotificationSound.swift     // 提示音：选项 / NSSound 播放器 / 独立音量 / --self-test-sound 自检
     Theme.swift                 // 设计 token（系统语义色 / 尺寸 / hover）
     PreviewRenderer.swift       // 离屏预览图（图标矩阵 / 面板 / 场景 / 设置页）
 ```
@@ -241,6 +270,9 @@ app/
   - `--open-panel` / `--open-settings`：启动后自动打开面板/设置（截图/调试）。
   - `--animate-subagents`：打开面板 → 展开 → 收起第一个有子智能体的会话，用于逐帧核对高度动画。
   - `--test-icon-transitions[=<起始步>,<步数>]`：脚本化回放全部图标状态迁移（每步打印时间线并自动退出）。
+  - `--test-sound[=<option>,<volume>]`：按指定选项/音量试听提示音后退出（默认用当前设置）。
+  - `--self-test-sound`：提示音自检（资源打包 / 选项解析 / 音量映射 / 设置持久化），无音频硬件依赖。
+  - `DSH_STATUS_SETTINGS_PREVIEW_HEIGHT=<pt>`：设置页离屏预览的高度覆盖（默认 640；调试出完整长页用）。
   - `DSH_STATUS_ANIM_SCALE=<倍数>`：面板高度动画与图标状态过渡放慢 N 倍（默认 1），配合截屏逐帧核对。
   - `DSH_STATUS_DISABLE_TRANSITIONS=1` / `DSH_STATUS_DISABLE_RUN_ANIMATION=1`：强制降级路径（验收用）。
   - `DSH_STATUS_APPEARANCE=light|dark`：强制界面外观（仅调试/出图，不改系统设置）。
@@ -254,6 +286,9 @@ app/
 2. `--render-previews` 产出图标矩阵、面板三态（深/浅）、场景示意图、设置页（深/浅）。
 3. 连 mock 桥时图标数字/颜色随状态变化，面板分组正确，点行会 POST 命令并打开 DSH。
 4. 断开 mock 后 6s 内进入未连接态；mock 恢复后自动重连。
+4.1 提示音：`--self-test-sound` 全 PASS（构建脚本自动跑）；设置页「试听」可听、音量滑块 0/50/100% 有明显差别；
+   关闭「播放提示音」后不发声；系统通知权限关闭时提示音仍响（勿扰开启时两者都静音）；
+   同一帧多个会话跃迁只响一次；系统专注模式不影响提示音（文档已说明取舍）。
 5. 图标状态切换：`--test-icon-transitions` 逐条回放，默认速度 60fps 无跳变；`DSH_STATUS_ANIM_SCALE=3` +
    `scripts/capture-icon-transitions.sh` 逐帧捕获后，环覆盖角/彗星半径单调、数字不横移、过渡结束帧 = 稳态帧；
    规范见 [icon-transitions.md](icon-transitions.md)。

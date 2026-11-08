@@ -20,6 +20,16 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/DSHStatusBar"
 
+# 提示音资源：内置「DSH 提示音」（scripts/generate-dsh-chime.py 生成），
+# 运行时由 NotificationSoundPlayer 从 Contents/Resources 读取（NSSound）。
+RES_SRC="$ROOT/app/Resources"
+if [[ -d "$RES_SRC" ]]; then
+  cp -R "$RES_SRC/." "$APP/Contents/Resources/"
+  echo "==> 已打包提示音资源：$(cd "$RES_SRC" && ls | tr '\n' ' ')"
+else
+  echo "警告：$RES_SRC 不存在，内置提示音将降级为系统 Glass" >&2
+fi
+
 # App 图标：菜单栏同款鲸鱼 glyph（透明底，无圆角方块），避免与 DeepSeek Harness 官方图标混淆。
 ICON_WORK="$ROOT/dist/icon-work"
 rm -rf "$ICON_WORK"; mkdir -p "$ICON_WORK"
@@ -79,4 +89,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
+
+# 自检：提示音资源是否真的进了 bundle、选项能否解析、AppSettings 默认值/持久化是否符合预期。
+echo "==> 自检：提示音资源 / 音量 / 设置持久化"
+"$APP/Contents/MacOS/DSHStatusBar" --self-test-sound
+
 echo "==> 已生成：$APP"

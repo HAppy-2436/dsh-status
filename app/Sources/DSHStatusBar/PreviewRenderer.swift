@@ -42,6 +42,19 @@ enum PreviewRenderer {
                                 to: directory.appendingPathComponent("settings-preview-dark.png"))
         try renderSettingsSheet(appearance: light, colorScheme: .light,
                                 to: directory.appendingPathComponent("settings-preview-light.png"))
+        // 提示音分区单独出图：真实 640pt 窗口内滚到「通知 → 提示音」，方便文档展示新设置。
+        try renderSettingsSheet(
+            appearance: dark, colorScheme: .dark,
+            title: "DSH Status 设置页 · 提示音（深色）",
+            subtitle: "通知 → 提示音：App 内独立播放、独立音量，系统通知被关闭时仍会响",
+            scrollOffset: 822,
+            to: directory.appendingPathComponent("settings-sound-preview-dark.png"))
+        try renderSettingsSheet(
+            appearance: light, colorScheme: .light,
+            title: "DSH Status 设置页 · 提示音（浅色）",
+            subtitle: "通知 → 提示音：App 内独立播放、独立音量，系统通知被关闭时仍会响",
+            scrollOffset: 822,
+            to: directory.appendingPathComponent("settings-sound-preview-light.png"))
     }
 
     // MARK: - 图标矩阵
@@ -273,9 +286,16 @@ enum PreviewRenderer {
 
     private static func renderSettingsSheet(appearance: NSAppearance,
                                             colorScheme: ColorScheme,
+                                            title: String? = nil,
+                                            subtitle: String? = nil,
+                                            scrollOffset: CGFloat = 0,
                                             to url: URL) throws {
         let width = Theme.Metrics.settingsWidth
-        let height = Theme.Metrics.settingsHeight
+        // 调试出图用：`DSH_STATUS_SETTINGS_PREVIEW_HEIGHT=1180` 可渲染完整长页（窗口内真实滚动查看），
+        // 默认仍按设置窗口默认内容高度（640）出图，保持与真机一致的裁切。
+        let height = ProcessInfo.processInfo.environment["DSH_STATUS_SETTINGS_PREVIEW_HEIGHT"]
+            .flatMap(Double.init)
+            .map { CGFloat($0) } ?? Theme.Metrics.settingsHeight
         let settings = AppSettings.preview()
         let model = AppModel.demo(settings: settings)
         let root = SettingsView(settings: settings, model: model)
@@ -284,6 +304,9 @@ enum PreviewRenderer {
         hosting.appearance = appearance
         hosting.frame = NSRect(x: 0, y: 0, width: width, height: height)
         hosting.layoutSubtreeIfNeeded()
+        if scrollOffset > 0 {
+            scrollSettingsPreview(hosting, by: scrollOffset)
+        }
 
         guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
             throw NSError(domain: "PreviewRenderer", code: 9, userInfo: [NSLocalizedDescriptionKey: "settings bitmap failed"])
@@ -301,10 +324,12 @@ enum PreviewRenderer {
         try savePNG(width: sheetWidth, height: sheetHeight, appearance: appearance, to: url) { rect in
             (colorScheme == .dark ? NSColor(hex: 0x0E0E10) : NSColor(hex: 0xF0F0F3)).setFill()
             rect.fill()
-            drawText("DSH Status 设置页 · " + (colorScheme == .dark ? "深色" : "浅色"),
+            let sheetTitle = title ?? ("DSH Status 设置页 · " + (colorScheme == .dark ? "深色" : "浅色"))
+            let sheetSubtitle = subtitle ?? "原生 grouped Form：菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 通用；修改即时生效"
+            drawText(sheetTitle,
                      font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: sheetHeight - margin - 18))
-            drawText("原生 grouped Form：菜单栏图标 / 显示 / 通知 / 面板 / 通用；修改即时生效",
+            drawText(sheetSubtitle,
                      font: .systemFont(ofSize: 11), color: .secondaryLabelColor,
                      at: NSPoint(x: margin, y: sheetHeight - margin - 36))
 
@@ -319,6 +344,25 @@ enum PreviewRenderer {
             image.draw(in: NSRect(x: x, y: y, width: width, height: height))
             NSGraphicsContext.restoreGraphicsState()
         }
+    }
+
+    /// 找到 SwiftUI `Form` 内部的滚动视图并滚动到指定位置（仅离屏出图用）。
+    private static func scrollSettingsPreview(_ hosting: NSView, by offset: CGFloat) {
+        guard let scrollView = firstScrollView(in: hosting) else { return }
+        scrollView.layoutSubtreeIfNeeded()
+        let clipView = scrollView.contentView
+        clipView.scroll(to: NSPoint(x: clipView.bounds.origin.x,
+                                    y: clipView.bounds.origin.y + offset))
+        scrollView.reflectScrolledClipView(clipView)
+        hosting.layoutSubtreeIfNeeded()
+    }
+
+    private static func firstScrollView(in view: NSView) -> NSScrollView? {
+        if let scrollView = view as? NSScrollView { return scrollView }
+        for subview in view.subviews {
+            if let found = firstScrollView(in: subview) { return found }
+        }
+        return nil
     }
 
     // MARK: - 面板预览

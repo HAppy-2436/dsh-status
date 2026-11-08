@@ -35,6 +35,13 @@ if let index = arguments.firstIndex(of: "--render-app-icon") {
     exit(1)
 }
 
+// --self-test-sound：提示音功能自检（资源打包 / 选项解析 / 音量映射 / 设置持久化），无音频硬件依赖。
+// 由 scripts/build-app.sh 在组装 .app 后自动执行。
+if arguments.contains("--self-test-sound") {
+    _ = NSApplication.shared
+    exit(NotificationSoundSelfTest.run())
+}
+
 let app = NSApplication.shared
 // 调试/截图：DSH_STATUS_APPEARANCE=light|dark 强制界面外观（不影响系统设置）。
 if let appearance = ProcessInfo.processInfo.environment["DSH_STATUS_APPEARANCE"] {

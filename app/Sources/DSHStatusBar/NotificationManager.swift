@@ -49,7 +49,8 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func requestPermission() {
         guard isBundled else { return }
         NSApp.activate(ignoringOtherApps: true)
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] _, _ in
+        // 只申请横幅权限：提示音由 App 自己播放（见 NotificationSound.swift），不依赖系统通知声音。
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { [weak self] _, _ in
             self?.refreshPermission()
         }
     }
@@ -82,7 +83,8 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         default:
             return
         }
-        content.sound = .default
+        // 声音由 App 自己播放（独立音量、可换音色）；这里显式不给系统声音，避免「双响」。
+        content.sound = nil
         content.userInfo = ["sessionId": row.id]
         let identifier = "\(status.rawValue)-\(row.id)-\(Int(now.timeIntervalSince1970))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
@@ -98,7 +100,8 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound])
+        // 前台时仍显示横幅并进通知中心；声音由 App 内播放器负责（不依赖系统通知音）。
+        completionHandler([.banner, .list])
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,

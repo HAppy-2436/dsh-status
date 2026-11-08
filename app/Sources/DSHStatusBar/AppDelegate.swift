@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings.shared
     private let notifications = NotificationManager()
     private var cancellables = Set<AnyCancellable>()
+    /// 提示音合并窗口：多个会话可能在同一帧里一起跃迁，只响一次避免叠音。
+    private var lastSoundAt = Date.distantPast
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -30,16 +32,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         model.onStatusTransition = { [weak self] row, status in
             guard let self, !self.settings.doNotDisturb else { return }
+            let enabled: Bool
             switch status {
             case .waiting:
-                if self.settings.notifyWaiting { self.notifications.notify(row, status: .waiting) }
+                enabled = self.settings.notifyWaiting
             case .completed:
-                if self.settings.notifyCompleted { self.notifications.notify(row, status: .completed) }
+                enabled = self.settings.notifyCompleted
             case .stopped:
-                if self.settings.notifyStopped { self.notifications.notify(row, status: .stopped) }
+                enabled = self.settings.notifyStopped
             default:
-                break
+                return
             }
+            guard enabled else { return }
+            // 提示音是独立通道：由 App 直接播放，不依赖系统通知权限/系统通知音音量。
+            // 0.4s 内的多次跃迁合并为一次提示音（否则同帧多个会话会叠成一片噪音）。
+            let now = Date()
+            if now.timeIntervalSince(self.lastSoundAt) >= 0.4 {
+                self.lastSoundAt = now
+                self.settings.playSound()
+            }
+            self.notifications.notify(row, status: status)
         }
         model.onOpenSettings = { [weak self] in
             self?.panelController.close()
@@ -142,13 +154,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let content = UNMutableNotificationContent()
                 content.title = "DSH Status 测试通知"
                 content.body = "通知链路正常：任务完成时会这样提醒你。"
-                content.sound = .default
+                content.sound = nil
                 UNUserNotificationCenter.current().add(
                     UNNotificationRequest(identifier: "test-\(UUID().uuidString)",
                                          content: content, trigger: nil)
                 )
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { NSApp.terminate(nil) }
+        }
+        // 调试：单独试听提示音（不影响通知）。`--test-sound[=<option>,<volume>]`，播完自动退出。
+        if let raw = CommandLine.arguments.first(where: { $0 == "--test-sound" || $0.hasPrefix("--test-sound=") }) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                guard let self else { return }
+                var option = self.settings.soundOption
+                var volume = self.settings.soundVolume
+                if let equals = raw.firstIndex(of: "=") {
+                    let parts = raw[raw.index(after: equals)...].split(separator: ",")
+                    if let first = parts.first,
+                       let parsed = NotificationSoundOption(rawValue: String(first)) { option = parsed }
+                    if parts.count > 1, let parsed = Double(parts[1]) { volume = parsed }
+                }
+                let player = NotificationSoundPlayer.shared
+                let ok = player.play(option: option,
+                                     volume: volume,
+                                     customPath: self.settings.soundCustomPath)
+                let url = player.lastResolvedURL?.path ?? "nil"
+                let error = player.lastError.map { " error=\($0)" } ?? ""
+                print("[dsh-status] --test-sound option=\(option.rawValue) volume=\(volume) ok=\(ok) file=\(url)\(error)")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { NSApp.terminate(nil) }
+            }
         }
         if CommandLine.arguments.contains("--preview-quit-confirm") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in

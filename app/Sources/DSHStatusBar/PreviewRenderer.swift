@@ -452,6 +452,7 @@ enum PreviewRenderer {
             ("attention-count8", IconModel(statuses: Array(repeating: .completed, count: 8))),
             ("running", IconModel(statuses: [.running])),
             ("both", IconModel(statuses: [.running, .waiting])),
+            ("both-stopped", IconModel(statuses: [.running, .stopped])),
             ("disconnected", IconModel(statuses: [], connected: false)),
         ]
         for (name, model) in states {

@@ -11,6 +11,8 @@
 
 | 文件 | 内容 |
 | --- | --- |
+| `red-specific-diagnostic.png` | **红色环专项对照**：红/黄/绿同背景（仅颜色不同），以及红色「单层 vs 双层」对比——用于排查「只有红环看起来偏」 |
+| `red-fix-candidates.png` | **红环观感候选**：现状 / 提亮红 #FF6B61 / 中性细描边 / 提亮+描边 / 黄色参照 |
 | `icon-centering-live-before-after.png` | **红环居中修正真机前后对照（2× 截图像素放大 12×）**：左=旧渲染器、右=新渲染器，两图同一时刻（red ring + 1），青色线为环心 |
 | `icon-centering-before-after.png` | **中心数字「视觉居中」修正前后对照（8× 位图，红环 + 1）**：修复前（bbox 垂直居中 + 阴影下偏）环内视觉质量偏下、外环显偏上；修复后（面积质心居中 + 对称阴影）墨迹/阴影质心相对环心 ≤0.16pt |
 | `icon-transition-dark.png` | **图标全状态切换动效逐帧对照（真机，放慢 3×）**：12 行 × 6 帧，覆盖扫入/收回/换色/彗星换道/数字滚动/断连/恢复；规范见 [../icon-transitions.md](../icon-transitions.md) |

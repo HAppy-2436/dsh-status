@@ -150,17 +150,28 @@ final class StatusItemController: NSObject {
 
     private var lowPowerMode: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }
 
-    /// 状态切换动效总开关：设置项 + 减弱动态效果 + 低电量模式；调试脚本下强制开启。
+    /// 状态切换动效总开关：设置项 + 减弱动态效果 + 低电量模式；
+    /// 调试脚本下强制开启（`DSH_STATUS_DISABLE_TRANSITIONS=1` 可强制关闭，用于验收降级路径）。
     private var transitionEnabled: Bool {
-        if debugIconOverride != nil { return !reduceMotion }
-        return model.settings.transitionAnimation && !reduceMotion && !lowPowerMode
+        if reduceMotion || lowPowerMode || debugDisableTransitions { return false }
+        if debugIconOverride != nil { return true }
+        return model.settings.transitionAnimation
     }
 
     /// 彗星弧是否处于「会动」模式（决定它是图层动画还是烘进静态图）。
     private func shouldAnimate(_ iconModel: IconModel) -> Bool {
         guard iconModel.connected, iconModel.runningCount > 0 else { return false }
-        if debugIconOverride != nil { return !reduceMotion }
-        return model.settings.runAnimation && !reduceMotion && !lowPowerMode
+        if reduceMotion || lowPowerMode || debugDisableRunAnimation { return false }
+        if debugIconOverride != nil { return true }
+        return model.settings.runAnimation
+    }
+
+    /// 调试/验收降级路径：`DSH_STATUS_DISABLE_TRANSITIONS=1` / `DSH_STATUS_DISABLE_RUN_ANIMATION=1`。
+    private var debugDisableTransitions: Bool {
+        ProcessInfo.processInfo.environment["DSH_STATUS_DISABLE_TRANSITIONS"] == "1"
+    }
+    private var debugDisableRunAnimation: Bool {
+        ProcessInfo.processInfo.environment["DSH_STATUS_DISABLE_RUN_ANIMATION"] == "1"
     }
 
     // MARK: 调试：脚本化回放全部状态迁移
@@ -272,6 +283,10 @@ final class StatusItemController: NSObject {
         DebugStep(name: "attention(waiting)→attention(stopped) 黄→红 recolor",
                   model: debugModel([.stopped])),
         DebugStep(name: "attention→running×2 环收回 + 彗星出现 + 数字 2",
+                  model: debugModel([.running, .running])),
+        DebugStep(name: "running→attention(completed) 运行中→已完成：绿环扫入 + 彗星淡出 + 数字 2→1",
+                  model: debugModel([.completed])),
+        DebugStep(name: "attention→running×2 回程：环收回 + 彗星淡入 + 数字 1→2",
                   model: debugModel([.running, .running])),
         DebugStep(name: "running→both(+completed) 绿环扫入 + 彗星外→内 + 数字隐去",
                   model: debugModel([.running, .running, .completed])),

@@ -5,7 +5,7 @@
 > 面板与设置窗口按 **macOS 26/27（Liquid Glass）原生规范**重做：无箭头自定义 NSPanel + 系统玻璃材质、
 > 系统语义色与字号；设置窗口为标准 NSWindow + 原生 grouped Form。
 
-## 当前状态（2026-11-06）
+## 当前状态（2026-11-08）
 
 - **安装位置 / Bundle ID**：`~/Applications/DSH Status.app`，`com.liyitong.dshstatus.menubar`
   （更早版本的设置域会在首次启动时自动迁移）
@@ -18,6 +18,17 @@
   - 只有运行中：动态弧直接用外环大小 + 中心运行数；内外环同时存在时不显示数字；
   - 中心数字可在设置里选：全部任务（默认）/ 需要介入 / 与环色一致 / 不显示；
   - 完全空闲时显示 DeepSeek 鲸鱼 Logo。
+  - **中心数字视觉居中（2026-11-08 修正）**：水平/垂直均按字形轮廓**面积质心**对齐环心，数字阴影改为
+    原地对称扩散——修掉「环内视觉质量偏下 → 红环看起来偏上 1–2px」的观感；8× 审计图
+    [`docs/previews/icon-centering-before-after.png`](docs/previews/icon-centering-before-after.png)。
+  - **全状态切换动效（2026-11-08）**：空闲 / 待办 / 运行中 / 双层 / 未连接之间的 18 类切换都有过渡——
+    外环 0.45s 自 12 点顺时针扫入 / 逆时针收回 / 新色覆盖旧环；内容 0.24s 交叉淡化；
+    数字 0.18s 里程表滚动（≤2.4pt、永不横移）；运行中 ↔ 双层时彗星弧半径连续变形；
+    断连 / 恢复为无方向同步淡化；同轨交接（外环与彗星同半径）让退场方先走；单次总时长 ≤0.60s。
+    全部尊重「减弱动态效果」/ 低电量 / 设置开关；实测稳态 CPU 0.0%。
+    规范与逐帧对照：[docs/icon-transitions.md](docs/icon-transitions.md) ·
+    [真机逐帧图](docs/previews/icon-transition-dark.png)；
+    复现：`--test-icon-transitions` + `scripts/capture-icon-transitions.sh`。
   - 面板：**自定义无箭头 NSPanel**（330pt 宽、16pt continuous 圆角、顶边贴住菜单栏下沿），
     Liquid Glass（`NSGlassEffectView(.regular)`，不设 tint）/ 经典磨砂 / 实色可切；
     **扁平会话列表**（不按状态分组，最近一次状态变化在上）+ 行首红/黄/蓝/绿状态圆点；

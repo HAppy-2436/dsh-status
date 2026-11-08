@@ -240,24 +240,24 @@ final class IconAnimator {
         let newLayer = imageLayer(newContent, bounds: bounds, zPosition: 11)
         addTransitionLayer(oldLayer)
         addTransitionLayer(newLayer)
-        oldLayer.opacity = 1
-        newLayer.opacity = 0
+        setModel(opacity: 0, for: oldLayer)
+        setModel(opacity: 1, for: newLayer)
         animate(oldLayer, keyPath: "opacity", from: 1, to: 0,
                 duration: contentDuration, easeInEaseOut: true)
         animate(newLayer, keyPath: "opacity", from: 0, to: 1,
                 duration: contentDuration, easeInEaseOut: true)
-        oldLayer.opacity = 0
-        newLayer.opacity = 1
 
         // ② 数字通道：旧数字上移淡出，新数字从下方浮入（里程表感）。
         if let roll = plan.numberRoll {
             addNumberRoll(roll, oldModel: oldModel, newModel: newModel,
-                          appearance: appearance, bounds: bounds)
+                          appearance: appearance, bounds: bounds,
+                          delay: scaled(plan.numberDelay))
         }
 
         // ③ 外环通道：出现 = 顺时针扫入；消散 = 逆时针收回；换色 = 旧环打底 + 新色顺时针覆盖。
         addRingTransition(plan: plan, appearance: appearance, dark: dark,
-                          bounds: bounds, duration: scaled(IconMotion.ringSweep))
+                          bounds: bounds, duration: scaled(plan.ringDuration),
+                          delay: scaled(plan.ringDelay))
 
         // ④ 彗星弧通道：淡入 / 淡出 / 内外半径变形。
         addCometTransition(plan: plan, oldModel: oldModel, newModel: newModel,
@@ -279,42 +279,62 @@ final class IconAnimator {
 
     private func addNumberRoll(_ roll: IconTransitionPlan.NumberRoll,
                                oldModel: IconModel, newModel: IconModel,
-                               appearance: NSAppearance, bounds: CGRect) {
+                               appearance: NSAppearance, bounds: CGRect,
+                               delay: CFTimeInterval) {
         let duration = scaled(IconMotion.numberRoll)
         let stagger = scaled(IconMotion.numberStagger)
         let slide = IconMotion.numberSlide
+        // CALayer 在本状态项里是 y 轴朝下（实测 +y 在屏幕上向下），因此：
+        // 增加 = 旧值向上出（-y）、新值从下方进（+y → 0）；减少反之。
+        // 字形数变化（9→10、99→99+）时槽宽同时改变：不滚动，原地交叉淡化（避免宽度变化 + 位移一起抖）。
+        let glyphCountChanged: Bool = {
+            guard let from = roll.from, let to = roll.to else { return false }
+            return String(from).count != String(to).count
+        }()
+        let direction = glyphCountChanged ? 0 : roll.direction
+        // direction: +1 增加 / -1 减少 / 0 出现、消失或字形数变化（原地淡入淡出）
+        let oldExitY = direction > 0 ? -slide : (direction < 0 ? slide : 0)
+        let newEnterY = direction > 0 ? slide : (direction < 0 ? -slide : 0)
 
         if roll.from != nil,
            let image = MenuBarIconRenderer.numberImage(for: oldModel, appearance: appearance) {
             let layer = imageLayer(image, bounds: bounds, zPosition: 20)
             addTransitionLayer(layer)
-            layer.opacity = 1
+            setModel(opacity: 0, transform: CATransform3DMakeTranslation(0, oldExitY, 0),
+                     for: layer)
             animate(layer, keyPath: "opacity", from: 1, to: 0,
-                    duration: duration, easeInEaseOut: false)
-            animate(layer, keyPath: "transform",
-                    from: CATransform3DIdentity,
-                    to: CATransform3DMakeTranslation(0, slide, 0),
-                    duration: duration, easeInEaseOut: false)
-            layer.opacity = 0
-            layer.transform = CATransform3DMakeTranslation(0, slide, 0)
+                    duration: duration, easeInEaseOut: false, delay: delay)
+            if direction != 0 {
+                animate(layer, keyPath: "transform",
+                        from: CATransform3DIdentity,
+                        to: CATransform3DMakeTranslation(0, oldExitY, 0),
+                        duration: duration, easeInEaseOut: false, delay: delay)
+            }
         }
         if roll.to != nil,
            let image = MenuBarIconRenderer.numberImage(for: newModel, appearance: appearance) {
             let layer = imageLayer(image, bounds: bounds, zPosition: 21)
             addTransitionLayer(layer)
-            layer.opacity = 1
-            layer.transform = CATransform3DIdentity
-            animate(layer, keyPath: "opacity", from: 0, to: 1,
-                    duration: duration, easeInEaseOut: false, delay: stagger)
-            animate(layer, keyPath: "transform",
-                    from: CATransform3DMakeTranslation(0, -slide, 0),
-                    to: CATransform3DIdentity,
-                    duration: duration, easeInEaseOut: false, delay: stagger)
+            setModel(opacity: 1, transform: CATransform3DIdentity, for: layer)
+            let enterDelay = delay + stagger
+            if direction != 0 {
+                animate(layer, keyPath: "opacity", from: 0, to: 1,
+                        duration: duration, easeInEaseOut: false, delay: enterDelay)
+                animate(layer, keyPath: "transform",
+                        from: CATransform3DMakeTranslation(0, newEnterY, 0),
+                        to: CATransform3DIdentity,
+                        duration: duration, easeInEaseOut: false, delay: enterDelay)
+            } else {
+                // 出现（nil → n）：原地淡入，不做位移（槽位是空的，没有「滚动」语义）。
+                animate(layer, keyPath: "opacity", from: 0, to: 1,
+                        duration: duration, easeInEaseOut: true, delay: enterDelay)
+            }
         }
     }
 
     private func addRingTransition(plan: IconTransitionPlan, appearance: NSAppearance,
-                                   dark: Bool, bounds: CGRect, duration: CFTimeInterval) {
+                                   dark: Bool, bounds: CGRect, duration: CFTimeInterval,
+                                   delay: CFTimeInterval) {
         func ringLayer(for status: SessionStatus) -> CAShapeLayer {
             let layer = CAShapeLayer()
             layer.frame = bounds
@@ -336,33 +356,30 @@ final class IconAnimator {
         case .appear:
             guard let status = plan.newRing else { return }
             let layer = ringLayer(for: status)
-            layer.strokeEnd = 0
+            setModel(strokeEnd: 1, for: layer)
             addTransitionLayer(layer)
             animate(layer, keyPath: "strokeEnd", from: 0, to: 1,
-                    duration: duration, easeInEaseOut: true)
-            layer.strokeEnd = 1
+                    duration: duration, easeInEaseOut: true, delay: delay)
 
         case .disappear:
             guard let status = plan.oldRing else { return }
             let layer = ringLayer(for: status)
-            layer.strokeEnd = 1
+            setModel(strokeEnd: 0, for: layer)
             addTransitionLayer(layer)
             animate(layer, keyPath: "strokeEnd", from: 1, to: 0,
-                    duration: duration, easeInEaseOut: true)
-            layer.strokeEnd = 0
+                    duration: duration, easeInEaseOut: true, delay: delay)
 
         case .recolor:
             guard let oldStatus = plan.oldRing, let newStatus = plan.newRing else { return }
             let base = ringLayer(for: oldStatus)
-            base.strokeEnd = 1
+            setModel(strokeEnd: 1, for: base)
             addTransitionLayer(base)
             let sweep = ringLayer(for: newStatus)
-            sweep.strokeEnd = 0
+            setModel(strokeEnd: 1, for: sweep)
             sweep.zPosition = 31
             addTransitionLayer(sweep)
             animate(sweep, keyPath: "strokeEnd", from: 0, to: 1,
-                    duration: duration, easeInEaseOut: true)
-            sweep.strokeEnd = 1
+                    duration: duration, easeInEaseOut: true, delay: delay)
 
         case .none, .crossfade:
             break
@@ -379,20 +396,20 @@ final class IconAnimator {
         case .appear:
             guard let spec = MenuBarIconRenderer.cometSpec(for: newModel, appearance: appearance) else { return }
             configureComet(spec: spec)
-            cometLayer.opacity = 1
+            setModel(opacity: 1) { cometLayer.opacity = $0 }
             startSpinIfNeeded()
             animate(cometLayer, keyPath: "opacity", from: 0, to: 1,
-                    duration: scaled(IconMotion.cometFade), easeInEaseOut: true)
-            cometLayer.opacity = 1
+                    duration: scaled(IconMotion.cometFade), easeInEaseOut: true,
+                    delay: scaled(plan.cometDelay))
 
         case .disappear:
             guard let spec = MenuBarIconRenderer.cometSpec(for: oldModel, appearance: appearance) else { return }
             configureComet(spec: spec)
-            cometLayer.opacity = 1
             startSpinIfNeeded()
             animate(cometLayer, keyPath: "opacity", from: 1, to: 0,
-                    duration: scaled(IconMotion.cometFade), easeInEaseOut: true)
-            cometLayer.opacity = 0
+                    duration: scaled(IconMotion.cometFade), easeInEaseOut: true,
+                    delay: scaled(plan.cometDelay))
+            setModel(opacity: 0) { cometLayer.opacity = $0 }
 
         case .moveInward, .moveOutward:
             guard let oldSpec = MenuBarIconRenderer.cometSpec(for: oldModel, appearance: appearance),
@@ -409,10 +426,12 @@ final class IconAnimator {
             cometLayer.lineWidth = newSpec.width * scale
             CATransaction.commit()
             animate(cometLayer, keyPath: "path", from: oldPath, to: newPath,
-                    duration: duration, easeInEaseOut: true)
+                    duration: duration, easeInEaseOut: true,
+                    delay: scaled(plan.cometDelay))
             animate(cometLayer, keyPath: "lineWidth",
                     from: oldSpec.width * scale, to: newSpec.width * scale,
-                    duration: duration, easeInEaseOut: true)
+                    duration: duration, easeInEaseOut: true,
+                    delay: scaled(plan.cometDelay))
             cometSpec = newSpec
         }
     }
@@ -431,6 +450,36 @@ final class IconAnimator {
     private func removeTransitionLayers() {
         for layer in transitionLayers { layer.removeFromSuperlayer() }
         transitionLayers.removeAll()
+    }
+
+    /// 关闭隐式动画地写模型值：避免「设置终值」触发 0.25s 隐式动画把显式动画顶掉。
+    private func setModel(opacity: Float, for layer: CALayer) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = opacity
+        CATransaction.commit()
+    }
+
+    private func setModel(opacity: Float, transform: CATransform3D, for layer: CALayer) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = opacity
+        layer.transform = transform
+        CATransaction.commit()
+    }
+
+    private func setModel(strokeEnd: CGFloat, for layer: CAShapeLayer) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.strokeEnd = strokeEnd
+        CATransaction.commit()
+    }
+
+    private func setModel(opacity: Float, _ apply: (Float) -> Void) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        apply(opacity)
+        CATransaction.commit()
     }
 
     private func imageLayer(_ image: NSImage, bounds: CGRect, zPosition: CGFloat) -> CALayer {

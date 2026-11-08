@@ -109,6 +109,12 @@ struct IconTransitionPlan {
     struct NumberRoll: Equatable {
         let from: Int?
         let to: Int?
+
+        /// 数值变化方向：+1 增加（新值从下往上滚）、-1 减少（新值从上往下滚）、0 出现/消失（原地淡入淡出）。
+        var direction: Int {
+            guard let from, let to, from != to else { return 0 }
+            return to > from ? 1 : -1
+        }
     }
 
     let ringMode: RingMode
@@ -122,6 +128,12 @@ struct IconTransitionPlan {
     let includesNumberInContent: Bool
     /// 内容形态变化 → 需要图像交叉淡化（数字/外环不变时只有数字滚动，不需要）。
     let contentCrossfade: Bool
+    /// 外环通道自身的时长（默认 0.45s；同轨交接时压缩到 0.40–0.42s，给让位方腾时间）。
+    let ringDuration: CFTimeInterval
+    /// 各通道相对主拍起跑点的延迟（秒）：用于同轨交接（外环 ↔ 彗星）和「主通道先行、数字最后」的层次。
+    let ringDelay: CFTimeInterval
+    let cometDelay: CFTimeInterval
+    let numberDelay: CFTimeInterval
 
     /// 从旧模型到新模型是否需要播放过渡；nil = 视觉上没有变化。
     /// - Parameter oldCometAnimated / newCometAnimated：两端状态是否处于「彗星弧会动」模式
@@ -170,6 +182,37 @@ struct IconTransitionPlan {
             }
         }
 
+        // 同轨交接：外环与彗星都在 r7.9 时不能同时「亮着换位」，让退场方先走，入场方等它让开。
+        // 半径迁移（running ↔ both）让环先立/先退 0.08s，读起来是「外框先动、活动弧随后换道」。
+        var cometDelay: CFTimeInterval = 0
+        var ringDelay: CFTimeInterval = 0
+        var ringDuration = IconMotion.ringSweep
+        switch (ringMode, cometMode) {
+        case (.disappear, .appear):
+            // 待办 → 运行中：红/黄/绿环先收回（压缩到 0.40s），彗星 0.30s 后再淡入。
+            ringDuration = IconMotion.ringYieldDuration
+            cometDelay = IconMotion.ringYieldCometDelay
+        case (.appear, .disappear):
+            // 运行中 → 待办：彗星先淡出（0.18s），外环 0.18s 后扫入（压缩到 0.42s）。
+            ringDuration = IconMotion.ringTakeoverDuration
+            ringDelay = IconMotion.cometFade
+        case (_, .moveInward), (_, .moveOutward):
+            cometDelay = IconMotion.laneChangeLead
+        case (.appear, .appear):
+            cometDelay = IconMotion.laneChangeLead
+        default:
+            break
+        }
+        // 数字是「结果」：有外环/彗星/内容等主通道在动时，晚于主通道起跑 0.10s 入场；
+        // 若外环本身被推迟（同轨交接时先让彗星退场），数字还要再等外环起跑，避免「数字先于环」。
+        // 纯数字变化（3→2）没有主通道，立即开始。
+        let primaryChannelActive = ringMode != .none || cometMode != .none
+        var numberDelay: CFTimeInterval = 0
+        if primaryChannelActive {
+            numberDelay = max(IconMotion.numberHierarchyDelay,
+                              ringMode != .none ? ringDelay + IconMotion.numberHierarchyDelay : 0)
+        }
+
         return IconTransitionPlan(
             ringMode: ringMode,
             oldRing: old.ringStatus,
@@ -183,6 +226,11 @@ struct IconTransitionPlan {
             includesNumberInContent: numberRoll == nil,
             contentCrossfade: old.contentKind != new.contentKind
                 || (ringMode == .crossfade && old.hasRing != new.hasRing)
+                || cometMode != .none,
+            ringDuration: ringDuration,
+            ringDelay: ringDelay,
+            cometDelay: cometDelay,
+            numberDelay: numberDelay
         )
     }
 }
@@ -203,27 +251,39 @@ enum IconMotion {
     static let cometFade: CFTimeInterval = 0.18
     /// 彗星弧内半径 ⇄ 外半径变形（与外环扫入同拍）。
     static let cometMorph: CFTimeInterval = 0.45
+    /// 同轨交接（外环 r7.9 ↔ 彗星 r7.9）时，退场方先走、入场方延迟这么多秒。
+    static let sameTrackHandoff: CFTimeInterval = 0.15
+    /// 「环让位」变体：待办 → 运行中时外环收回压缩到 0.40s。
+    static let ringYieldDuration: CFTimeInterval = 0.40
+    /// 「环接管」变体：运行中 → 待办时外环扫入压缩到 0.42s（前置 0.18s 等彗星退场）。
+    static let ringTakeoverDuration: CFTimeInterval = 0.42
+    /// 环让位后彗星入场延迟：环 0.40s 收回期间，彗星等到 0.30s 才开始淡入（仅 0.10s 交叠）。
+    static let ringYieldCometDelay: CFTimeInterval = 0.30
+    /// 半径迁移/环先立时，彗星弧稍晚起跑，避免和外环抢第一眼。
+    static let laneChangeLead: CFTimeInterval = 0.08
+    /// 有主通道动画时，中心数字（结果）晚这么多久入场。
+    static let numberHierarchyDelay: CFTimeInterval = 0.10
 
-    /// 一次过渡的总时长（所有通道同时起跑，取最长的那条）。
+    /// 一次过渡的总时长：每条通道 = 延迟 + 自身时长，取最长的一条（≤ 0.60s）。
     static func duration(for plan: IconTransitionPlan) -> CFTimeInterval {
         var duration = contentCrossfade
         switch plan.ringMode {
         case .appear, .disappear, .recolor:
-            duration = max(duration, ringSweep)
+            duration = max(duration, plan.ringDelay + plan.ringDuration)
         case .none, .crossfade:
             break
         }
         switch plan.cometMode {
         case .appear, .disappear:
-            duration = max(duration, cometFade)
+            duration = max(duration, plan.cometDelay + cometFade)
         case .moveInward, .moveOutward:
-            duration = max(duration, cometMorph)
+            duration = max(duration, plan.cometDelay + cometMorph)
         case .none:
             break
         }
         if plan.numberRoll != nil {
-            duration = max(duration, numberRoll + numberStagger)
+            duration = max(duration, plan.numberDelay + numberRoll + numberStagger)
         }
-        return duration
+        return min(duration, 0.60)
     }
 }

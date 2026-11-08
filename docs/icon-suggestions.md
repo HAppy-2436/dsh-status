@@ -100,7 +100,7 @@ HIG 要求：自定义颜色必须同时提供 light / dark / **提高对比度�
 
 **具体建议**
 - 中性层改为 `isTemplate = true` 的 `NSImage`（`WhaleLogo.templateImage(height:)` 已有现成实现，panel header 在用同一套）。数字、轨道、彗星、虚线环、鲸鱼全部画进模板图。
-- 彩色外环改由 `CAShapeLayer` 叠加（`CometAnimator` 已经有图层机制，直接复用），颜色仍来自 `Theme`。图层在模板图之上，只在环带区域有像素，不会遮住中性元素。
+- 彩色外环改由 `CAShapeLayer` 叠加（`IconAnimator` 已经有图层机制，直接复用），颜色仍来自 `Theme`。图层在模板图之上，只在环带区域有像素，不会遮住中性元素。
 - 删除渲染器里手动 `dark ? .white : #1F1F23` 的分支（保留给预览离屏渲染用的显式外观参数即可）。
 - 验收：深/浅色 + 选中态 + 「提高对比度」开启三种条件下截图对比；模板图在浅色菜单栏上应为自动深色、深色菜单栏上自动白色。
 
@@ -246,7 +246,7 @@ HIG 要求：自定义颜色必须同时提供 light / dark / **提高对比度�
 ### P1-6 运行中动效：保留，但更克制；同时修正文档参数
 
 **现状**
-`CometAnimator`：6s 转 3 圈（平均 **2s/圈**）+ ±32% 速度调制；弧长 `strokeEnd` 0.26–0.58（**94°–209°**）以 1.7s 往返（3.4s 周期）呼吸。已实现「减弱动态效果 / 低电量模式 / 设置开关」三条降级路径。`docs/app-design.md §2.2` 仍写「12fps、2.4s/圈、85°–215°、4.8s」。
+`IconAnimator`：6s 转 3 圈（平均 **2s/圈**）+ ±32% 速度调制；弧长 `strokeEnd` 0.26–0.58（**94°–209°**）以 1.7s 往返（3.4s 周期）呼吸。已实现「减弱动态效果 / 低电量模式 / 设置开关」三条降级路径。`docs/app-design.md §2.2` 仍写「12fps、2.4s/圈、85°–215°、4.8s」。
 
 **问题**
 - 菜单栏是**常驻、视野边缘**的持续运动。HIG Motion 的原则是「Add motion purposefully… Don't add motion for the sake of adding motion」；持续旋转比呼吸更容易抢注意力，2s/圈比系统里的常驻动画都快。
@@ -258,7 +258,7 @@ HIG 要求：自定义颜色必须同时提供 light / dark / **提高对比度�
 - 弧长呼吸幅度收窄：**94°–209° → 110°–170°**，周期 3.4s → 4s。
 - 颜色/透明度保持中性（现在已是白/深灰 92%），不要再引入蓝色或品牌色（见 P2-12）。
 - 保留三条降级路径；额外建议在设置里提供三档「流畅 / 呼吸（默认）/ 静态」，把「动效是否必要」的选择权交给用户。
-- 把 `app-design.md §2.2` 的参数同步为代码值（或干脆改为引用 `CometAnimator` 常量）。
+- 把 `app-design.md §2.2` 的参数同步为代码值（或干脆改为引用 `IconAnimator` 常量）。
 - 可选进阶：如果以后想更「系统化」，可以用 SF Symbols 7 的 Draw / variable color 表达进度，而不是自定义彗星弧（但会失去「环 + 数字」这套自定义语义，收益不大）。
 - 验收：连续看 10 分钟不觉得烦；录屏对比 2s/圈与 4s/圈的观感；CPU 占用仍为 0%（CA 方案已满足）。
 
@@ -347,7 +347,7 @@ v4 移除了 v3 的白色包边（commit `39e019a` 曾加过），外环颜色�
 ### P2-10 图标规格收敛到单一来源，修正文档漂移
 
 **现状**
-图标参数散落在 `MenuBarIconRenderer`（半径/线宽/字号）、`CometAnimator`（旋转/呼吸）、`Theme`（颜色）、`docs/app-design.md §2`（文字规格）、`PreviewRenderer`（3.2× 预览）。预览图由同一套渲染器生成（这点很好）。
+图标参数散落在 `MenuBarIconRenderer`（半径/线宽/字号）、`IconAnimator`（旋转/呼吸）、`Theme`（颜色）、`docs/app-design.md §2`（文字规格）、`PreviewRenderer`（3.2× 预览）。预览图由同一套渲染器生成（这点很好）。
 
 **问题**
 文档已经明显漂移，评审时无法判断哪个是「正确值」：
@@ -357,7 +357,7 @@ v4 移除了 v3 的白色包边（commit `39e019a` 曾加过），外环颜色�
 - README 说「图标已升级到 v4（双层环）」，设计文档写 v5。
 
 **具体建议**
-- 新建 `IconSpec.swift`（或 `Theme` 内 `struct IconSpec`）集中所有尺寸/颜色/动效常量，`MenuBarIconRenderer` / `CometAnimator` / `PreviewRenderer` 全部引用；颜色给出 light / dark / increased-contrast 三套。
+- 新建 `IconSpec.swift`（或 `Theme` 内 `struct IconSpec`）集中所有尺寸/颜色/动效常量，`MenuBarIconRenderer` / `IconAnimator` / `PreviewRenderer` 全部引用；颜色给出 light / dark / increased-contrast 三套。
 - `app-design.md §2` 改为「引用 IconSpec + 状态表 + 一句设计原则」，不再复制具体数字；补浅色色值。
 - 每次改参数必须重跑 `--render-previews`，并在 PR 里贴新旧预览图。
 - 验收：文档与代码参数一致（可以加一个简单脚本 grep 关键常量对比）。

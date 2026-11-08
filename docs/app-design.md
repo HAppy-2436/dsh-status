@@ -46,17 +46,26 @@
   - 与环颜色一致的数量：只数当前环色对应状态；
   - 不显示。
 - 内外环同时存在时不显示数字（22pt 放不下第三层）。
+- **中心数字的视觉居中（2026-11-08 修正）**：水平 + 垂直都按字形轮廓**面积质心**对齐画布中心 (11,11)；
+  数字阴影改为**原地对称扩散**（offset 0）。此前垂直用墨迹 bbox 居中 + 阴影向下偏移 0.3pt，两者叠加使环内
+  「视觉质量」偏下约 0.5–1pt，外环看起来像偏上 1–2px（用户反馈「红色的环偏上」即此）。
+  复现/核对：`--render-icon-states <dir>` 输出 2×/8× 静态位图；对照图 [previews/icon-centering-before-after.png](previews/icon-centering-before-after.png)。
 
 ### 2.3 动画（Core Animation，GPU）
 
-- **运行中彗星弧**：`CAShapeLayer` + `CAKeyframeAnimation`，顺时针；
+- **运行中彗星弧**：常驻 `CAShapeLayer` + `CAKeyframeAnimation`，顺时针；
   6s 一个节奏周期转 3 圈（平均 2s/圈），速度按正弦 ±32% 平滑起伏（48 个采样关键帧，首尾整数圈无缝）；
-  弧长 `strokeEnd` 0.26 ⇄ 0.58、1.7s 单程呼吸。
-- 静态部分（外环 / 轨道 / 数字 / 鲸鱼）继续走 `button.image`，切换桌面/菜单栏重建时系统总有正确静态帧，
-  不会闪黑块；动画只加在图层上，由 GPU 驱动，实测常驻 CPU 0.0%。
-- **状态切换过渡**（可关）：外环颜色/有无变化时，隐藏外环的静态图打底 → `CAShapeLayer` 用新颜色扫一圈
-  （strokeEnd 0→1，0.45s）→ 颜色渐变 → 恢复完整静态图；过渡期间暂停彗星弧（0.75s 兜底）。
-- 尊重「减弱动态效果」与低电量模式（自动降级静态）；设置页「播放运行动画」可彻底关闭。
+  弧长 `strokeEnd` 0.26 ⇄ 0.58、1.7s 单程呼吸。状态推送不会重启旋转（签名只看影响视觉的字段）。
+- **全状态切换动效**（2026-11-08，可关）：一次切换 = 内容交叉淡化（0.24s）+ 外环扫入/收回/换色（0.45s）
+  + 数字里程表滚动（0.18s、≤2.4pt、不横移）+ 彗星淡入淡出/半径变形（0.18 / 0.45s）；同轨交接（外环 ↔ 彗星同半径）
+  让退场方先走 0.18–0.30s；单次总时长 ≤0.60s，结束立刻落回完整静态帧。
+  完整参数与 18 类迁移矩阵见 [icon-transitions.md](icon-transitions.md)，真机逐帧对照见
+  [previews/icon-transition-dark.png](previews/icon-transition-dark.png)。
+  调试：`--test-icon-transitions[=<起始步>,<步数>]` 脚本化回放全部迁移，`DSH_STATUS_ANIM_SCALE` 放慢倍数，
+  `scripts/capture-icon-transitions.sh` 逐帧捕获。
+- 静态兜底：稳态 `button.image` 始终是完整静态帧（切换桌面/菜单栏重建不会闪黑块）；过渡期间用透明占位图保持状态项宽度，
+  画面由临时图层合成，结束即恢复。动画只加在图层上，由 GPU 驱动，实测常驻 CPU 0.0%。
+- 尊重「减弱动态效果」与低电量模式（自动降级静态）；设置页「状态切换动效 / 播放运行动画」可分别关闭。
 
 ### 2.4 资源
 
@@ -213,8 +222,9 @@ app/
   Sources/DSHStatusBar/
     main.swift                  // 入口；--render-previews / --render-app-icon 离屏出图
     AppDelegate.swift           // 装配：模型 / 桥 / 状态项 / 面板 / 设置 / 通知
-    StatusItemController.swift  // NSStatusItem / 右键菜单 / 图标刷新 / 过渡
-    CometAnimator.swift         // 运行动画（CA 图层）
+    StatusItemController.swift  // NSStatusItem / 右键菜单 / 图标刷新 / 过渡调度（含调试回放）
+    IconTransition.swift        // 图标视觉状态 / 迁移计划 / 动效参数（IconMotion）
+    IconAnimator.swift          // 图标动效（CA 图层：彗星弧 + 状态切换过渡）
     MenuBarIconRenderer.swift   // 图标绘制（鲸鱼 / 单色优先级环 / 数字）
     WhaleLogo.swift             // 鲸鱼矢量路径 + SVG path 解析器
     BridgeClient.swift          // bridge.json 轮询 + SSE + 命令 POST + 重连
@@ -234,7 +244,10 @@ app/
   - `--bridge-file <path>` / `DSH_STATUS_BRIDGE_FILE=<path>`：覆盖 bridge.json 路径。
   - `--open-panel` / `--open-settings`：启动后自动打开面板/设置（截图/调试）。
   - `--animate-subagents`：打开面板 → 展开 → 收起第一个有子智能体的会话，用于逐帧核对高度动画。
-  - `DSH_STATUS_ANIM_SCALE=<倍数>`：面板高度动画放慢 N 倍（默认 1），配合外部截屏循环抓中间帧。
+  - `--test-icon-transitions[=<起始步>,<步数>]`：脚本化回放全部图标状态迁移（每步打印时间线并自动退出）。
+  - `DSH_STATUS_ANIM_SCALE=<倍数>`：面板高度动画与图标状态过渡放慢 N 倍（默认 1），配合截屏逐帧核对。
+  - `DSH_STATUS_DISABLE_TRANSITIONS=1` / `DSH_STATUS_DISABLE_RUN_ANIMATION=1`：强制降级路径（验收用）。
+  - `--render-icon-states <dir>`：输出各状态静态图标的 2×/8× PNG（逐像素审计阴影、环心与数字锚点）。
   - `DSH_STATUS_APPEARANCE=light|dark`：强制界面外观（仅调试/出图，不改系统设置）。
   - `--render-app-icon <path>`：生成 App 图标 PNG。
 - `scripts/build-app.sh`：`swift build -c release` → `dist/DSHStatusBar.app`（Info.plist + ad-hoc 签名）。
@@ -246,6 +259,9 @@ app/
 2. `--render-previews` 产出图标矩阵、面板三态（深/浅）、场景示意图、设置页（深/浅）。
 3. 连 mock 桥时图标数字/颜色随状态变化，面板分组正确，点行会 POST 命令并打开 DSH。
 4. 断开 mock 后 6s 内进入未连接态；mock 恢复后自动重连。
+5. 图标状态切换：`--test-icon-transitions` 逐条回放，默认速度 60fps 无跳变；`DSH_STATUS_ANIM_SCALE=3` +
+   `scripts/capture-icon-transitions.sh` 逐帧捕获后，环覆盖角/彗星半径单调、数字不横移、过渡结束帧 = 稳态帧；
+   规范见 [icon-transitions.md](icon-transitions.md)。
 5. 设置窗口：标准 titlebar、可缩放、位置记忆、关闭不退出；所有设置即时生效。
 6. 面板：Liquid Glass 材质下深浅色文字可读；Esc/外部点击关闭；状态项高亮随面板开合。
 

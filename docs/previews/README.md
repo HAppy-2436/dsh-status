@@ -4,11 +4,15 @@
   （`*-preview-*.png`、`scene-preview-dark.png`、`scene-preview-light.png`）；
 - 真机截图：`menubar-real.png` / `icon-real-zoom.png` / `panel-real-dark.png` /
   `panel-real-expanded-dark.png` / `panel-real-idle-dark.png` / `panel-real-idle-hover-dark.png` / `settings-real-dark.png`
-  （macOS 27.2 深色模式，2x；空闲态那张用空闲 mock 桥出图）。
+  （macOS 27.2 深色模式，2x；空闲态那张用空闲 mock 桥出图）；
+- 动效逐帧：`icon-transition-dark.png`（真机动画放慢 3×，由
+  `scripts/capture-icon-transitions.sh` 捕获后按迁移拼接；每行一次迁移、从左到右为时间顺序）。
 - 面板离屏预览用实色背景（毛玻璃无法离屏渲染），真实玻璃观感以 `panel-real-dark.png` 为准。
 
 | 文件 | 内容 |
 | --- | --- |
+| `icon-centering-before-after.png` | **中心数字「视觉居中」修正前后对照（8× 位图，红环 + 1）**：修复前（bbox 垂直居中 + 阴影下偏）环内视觉质量偏下、外环显偏上；修复后（面积质心居中 + 对称阴影）墨迹/阴影质心相对环心 ≤0.16pt |
+| `icon-transition-dark.png` | **图标全状态切换动效逐帧对照（真机，放慢 3×）**：12 行 × 6 帧，覆盖扫入/收回/换色/彗星换道/数字滚动/断连/恢复；规范见 [../icon-transitions.md](../icon-transitions.md) |
 | `icon-preview-dark.png` | **图标状态矩阵（深色，主用）**：空闲鲸鱼 / 运行中动态环 / 介入渐变环 / 双层环 / 未连接；放大 3.2× + 真实 1x 一行 |
 | `icon-preview-light.png` | 同上，浅色菜单栏 |
 | `menubar-real.png` | 真机菜单栏（8×）：运行中动态弧 + 中心运行数 |

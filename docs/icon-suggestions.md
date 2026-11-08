@@ -142,6 +142,10 @@ HIG 要求：自定义颜色必须同时提供 light / dark / **提高对比度�
 - 阴影只在深色模式保留（`offset (0,−0.3)`、`blur 1.0`、黑 35%）；浅色模式去掉。
 - 验收：1↔2↔6 切换时数字中心漂移 ≤ 0.1pt；「1」单独看仍然居中。
 
+**2026-11-08 进展**：`99+` 压外环已修（3 位数字 7.6→6.4pt + ink bbox 居中，左右余量 ≥0.4pt，
+见 [icon-audit.md](icon-audit.md) §3.3）；**等宽数字 / advance box 居中未实施**——跨数字 bbox 跳动仍在
+（实测最大相邻跳 1↔2 = 0.633pt、9→10 = 0.516pt），属视觉设计变更，待确认。
+
 **依据 / 参考**
 - HIG *Icons* → optical alignment：「Some icons — especially asymmetric ones — can look unbalanced when you center them geometrically instead of optically… Adjustments for optical centering are typically very small, but they can have a big impact.」
   <https://developer.apple.com/design/human-interface-guidelines/icons>

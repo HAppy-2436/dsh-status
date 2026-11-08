@@ -59,6 +59,9 @@
   [previews/icon-transition-dark.png](previews/icon-transition-dark.png)。
   调试：`--test-icon-transitions[=<起始步>,<步数>]` 脚本化回放全部迁移，`DSH_STATUS_ANIM_SCALE` 放慢倍数，
   `scripts/capture-icon-transitions.sh` 逐帧捕获。
+- **v3 验收修复（2026-11-08）**：内容通道改为「不变原子公共静态层 + 变化原子交叉淡化」（相同像素不再被双图淡化压暗）；
+  `>99` 同文本推送不再播过渡（100→101）；屏幕参数变化 / 状态项按钮重建强制落静态帧；`99+` 改 6.4pt + ink bbox 居中
+  （旧实现压外环 1.9pt）。详见 [icon-audit.md](icon-audit.md)。
 - 静态兜底：稳态 `button.image` 始终是完整静态帧（切换桌面/菜单栏重建不会闪黑块）；过渡期间用透明占位图保持状态项宽度，
   画面由临时图层合成，结束即恢复。动画只加在图层上，由 GPU 驱动，实测常驻 CPU 0.0%。
 - 尊重「减弱动态效果」与低电量模式（自动降级静态）；设置页「状态切换动效 / 播放运行动画」可分别关闭。

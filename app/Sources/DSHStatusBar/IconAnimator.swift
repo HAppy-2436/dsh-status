@@ -13,7 +13,6 @@ import QuartzCore
 /// - 所有时长统一乘以 `AppConfig.animationScale`（调试时 `DSH_STATUS_ANIM_SCALE=10` 放慢逐帧核对）。
 final class IconAnimator {
     private weak var button: NSStatusBarButton?
-    private let designSize = MenuBarIconRenderer.canvas
 
     // MARK: 持续层：彗星弧
 
@@ -31,10 +30,13 @@ final class IconAnimator {
 
     // MARK: - 挂载 / 布局
 
-    func attach(to button: NSStatusBarButton) {
+    /// 返回是否换了新的状态项按钮（系统重建菜单栏时会发生）。换实例后调用方必须补静态图，
+    /// 否则新按钮没有 `image`，会一直空着直到下一次视觉/外观变化。
+    @discardableResult
+    func attach(to button: NSStatusBarButton) -> Bool {
         if self.button === button {
             layout()
-            return
+            return false
         }
         cometLayer.removeFromSuperlayer()
         self.button = button
@@ -50,9 +52,10 @@ final class IconAnimator {
         cometSignature = ""
         cometBounds = .zero
         layout()
+        return true
     }
 
-    /// 状态项尺寸变化（切桌面/屏幕参数变化）时同步图层；过渡中遇到尺寸变化直接取消（由控制器补静态图）。
+    /// 状态项尺寸变化（切桌面/屏幕参数变化）时同步图层；过渡中遇到尺寸变化由控制器强制落静态帧。
     func layout() {
         guard let button else { return }
         let bounds = button.bounds
@@ -70,9 +73,10 @@ final class IconAnimator {
         CATransaction.commit()
     }
 
-    private var scale: CGFloat {
-        max(0.5, min(cometBounds.height / designSize, 1.6))
-    }
+    /// 图层几何与静态图共用同一坐标系（22pt 画布，1pt = 1 单位）。
+    /// 不能用按钮高度推导缩放：`button.image` 是 22×22pt 且 `imageScaling = .scaleNone`，
+    /// 菜单栏厚度 ≠22pt 时按比例放大 CA 几何会导致过渡结束瞬间尺寸跳变。
+    private var scale: CGFloat { 1 }
 
     // MARK: - 持续层（运行中彗星弧）
 
@@ -92,7 +96,7 @@ final class IconAnimator {
             return
         }
         configureComet(spec: spec)
-        cometLayer.opacity = 1
+        setModel(opacity: 1) { cometLayer.opacity = $0 }
         startSpinIfNeeded()
     }
 
@@ -109,8 +113,11 @@ final class IconAnimator {
 
     private func stopComet() {
         cometLayer.removeAllAnimations()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         cometLayer.isHidden = true
         cometLayer.opacity = 0
+        CATransaction.commit()
         cometSpec = nil
         spinActive = false
     }
@@ -193,9 +200,14 @@ final class IconAnimator {
     }
 
     /// 取消进行中的过渡（立即移除所有过渡图层；静态图由调用方补）。
+    /// 常驻彗星层上的过渡动画（opacity / path / lineWidth）也一并清掉，
+    /// 避免取消后残留动画继续把彗星带到中间态（旋转/呼吸保留，不重启）。
     func cancelTransition() {
         transitionGeneration += 1
         removeTransitionLayers()
+        for key in ["opacity", "path", "lineWidth"] {
+            cometLayer.removeAnimation(forKey: key)
+        }
         isTransitioning = false
     }
 
@@ -224,28 +236,63 @@ final class IconAnimator {
         button.image = MenuBarIconRenderer.blankImage()
         button.imageScaling = .scaleNone
 
-        // ① 内容通道：旧帧 / 新帧整块交叉淡化。
-        //    两端都一致的像素淡化前后完全相同（不会发灰），只有鲸鱼/轨道/虚线环等变化处会显影。
-        let oldContent = MenuBarIconRenderer.staticImage(
-            for: oldModel, appearance: appearance,
-            includeRing: plan.includesRingInContent,
-            includeNumber: plan.includesNumberInContent,
-            includeComet: !plan.oldCometAnimated)
-        let newContent = MenuBarIconRenderer.staticImage(
-            for: newModel, appearance: appearance,
-            includeRing: plan.includesRingInContent,
-            includeNumber: plan.includesNumberInContent,
-            includeComet: !plan.newCometAnimated)
-        let oldLayer = imageLayer(oldContent, bounds: bounds, zPosition: 10)
-        let newLayer = imageLayer(newContent, bounds: bounds, zPosition: 11)
-        addTransitionLayer(oldLayer)
-        addTransitionLayer(newLayer)
-        setModel(opacity: 0, for: oldLayer)
-        setModel(opacity: 1, for: newLayer)
-        animate(oldLayer, keyPath: "opacity", from: 1, to: 0,
-                duration: contentDuration, easeInEaseOut: true)
-        animate(newLayer, keyPath: "opacity", from: 0, to: 1,
-                duration: contentDuration, easeInEaseOut: true)
+        // ① 内容通道：只让「变了的内容原子」交叉淡化；两端相同的内容原子走一张静态公共层。
+        //    旧做法无条件双图淡化，会让相同像素在 t=0.5 处叠成 75% 不透明度（环/数字闪一下）。
+        let cometAnimationChanged = plan.oldCometAnimated != plan.newCometAnimated
+        if !plan.contentAtomChanged && cometAnimationChanged {
+            // 罕见：仅「播放运行动画」开关变化。旧弧是旋转图层、新弧是静态弧，
+            // 用一次性交叉淡化把两者接上（其余原子本来就不动，可接受这 0.24s 的轻微淡化）。
+            let oldContent = MenuBarIconRenderer.staticImage(
+                for: oldModel, appearance: appearance,
+                includeRing: plan.includesRingInContent,
+                includeNumber: plan.includesNumberInContent,
+                includeComet: !plan.oldCometAnimated)
+            let newContent = MenuBarIconRenderer.staticImage(
+                for: newModel, appearance: appearance,
+                includeRing: plan.includesRingInContent,
+                includeNumber: plan.includesNumberInContent,
+                includeComet: !plan.newCometAnimated)
+            addContentCrossfade(old: oldContent, new: newContent,
+                                bounds: bounds, duration: contentDuration)
+        } else if !plan.contentAtomChanged {
+            // 内容原子不变：环/数字/轨道/鲸鱼/静态弧都直接静态落位，不淡化（不产生亮度凹陷）。
+            let common = MenuBarIconRenderer.staticImage(
+                for: newModel, appearance: appearance,
+                includeRing: plan.includesRingInContent,
+                includeNumber: plan.includesNumberInContent,
+                includeComet: !plan.newCometAnimated)
+            let layer = imageLayer(common, bounds: bounds, zPosition: 10)
+            addTransitionLayer(layer)
+            setModel(opacity: 1, for: layer)
+        } else {
+            // 内容原子变化：公共原子（同色环 / 未变的数字）单独一张静态层；旧/新内容原子交叉淡化。
+            if plan.ringCommon || plan.numberCommon {
+                let common = MenuBarIconRenderer.staticImage(
+                    for: newModel, appearance: appearance,
+                    includeRing: plan.ringCommon,
+                    includeNumber: plan.numberCommon,
+                    includeComet: false,
+                    includeContent: false)
+                let layer = imageLayer(common, bounds: bounds, zPosition: 10)
+                addTransitionLayer(layer)
+                setModel(opacity: 1, for: layer)
+            }
+            // 环只有「断连交叉淡化」时才随内容淡；数字只有连接性变化时才随内容淡（其余由各自通道处理）。
+            let oldDelta = MenuBarIconRenderer.staticImage(
+                for: oldModel, appearance: appearance,
+                includeRing: plan.includesRingInContent && !plan.ringCommon,
+                includeNumber: plan.connectivityChanged,
+                includeComet: !plan.oldCometAnimated,
+                includeContent: true)
+            let newDelta = MenuBarIconRenderer.staticImage(
+                for: newModel, appearance: appearance,
+                includeRing: plan.includesRingInContent && !plan.ringCommon,
+                includeNumber: plan.connectivityChanged,
+                includeComet: !plan.newCometAnimated,
+                includeContent: true)
+            addContentCrossfade(old: oldDelta, new: newDelta,
+                                bounds: bounds, duration: contentDuration)
+        }
 
         // ② 数字通道：旧数字上移淡出，新数字从下方浮入（里程表感）。
         if let roll = plan.numberRoll {
@@ -277,6 +324,21 @@ final class IconAnimator {
 
     // MARK: 通道实现
 
+    /// 内容通道：旧/新两张内容位图做交叉淡化（只用于「内容原子真的变了」的两端）。
+    private func addContentCrossfade(old: NSImage, new: NSImage,
+                                     bounds: CGRect, duration: CFTimeInterval) {
+        let oldLayer = imageLayer(old, bounds: bounds, zPosition: 10)
+        let newLayer = imageLayer(new, bounds: bounds, zPosition: 11)
+        addTransitionLayer(oldLayer)
+        addTransitionLayer(newLayer)
+        setModel(opacity: 0, for: oldLayer)
+        setModel(opacity: 1, for: newLayer)
+        animate(oldLayer, keyPath: "opacity", from: 1, to: 0,
+                duration: duration, easeInEaseOut: true)
+        animate(newLayer, keyPath: "opacity", from: 0, to: 1,
+                duration: duration, easeInEaseOut: true)
+    }
+
     private func addNumberRoll(_ roll: IconTransitionPlan.NumberRoll,
                                oldModel: IconModel, newModel: IconModel,
                                appearance: NSAppearance, bounds: CGRect,
@@ -287,9 +349,11 @@ final class IconAnimator {
         // CALayer 在本状态项里是 y 轴朝下（实测 +y 在屏幕上向下），因此：
         // 增加 = 旧值向上出（-y）、新值从下方进（+y → 0）；减少反之。
         // 字形数变化（9→10、99→99+）时槽宽同时改变：不滚动，原地交叉淡化（避免宽度变化 + 位移一起抖）。
+        // 判位数用**渲染文本**（>99 都是「99+」），避免数值位数与显示位数不一致。
         let glyphCountChanged: Bool = {
             guard let from = roll.from, let to = roll.to else { return false }
-            return String(from).count != String(to).count
+            return MenuBarIconRenderer.numberText(for: from).count
+                != MenuBarIconRenderer.numberText(for: to).count
         }()
         let direction = glyphCountChanged ? 0 : roll.direction
         // direction: +1 增加 / -1 减少 / 0 出现、消失或字形数变化（原地淡入淡出）
@@ -316,7 +380,9 @@ final class IconAnimator {
             let layer = imageLayer(image, bounds: bounds, zPosition: 21)
             addTransitionLayer(layer)
             setModel(opacity: 1, transform: CATransform3DIdentity, for: layer)
-            let enterDelay = delay + stagger
+            // 滚动（有方向）才用 0.05s 错峰；出现/消失/字形数变化是原地交叉淡化，不叠加错峰
+            //（否则新值比文档晚 0.05s 入场，M1/M18 的 0.10→0.28 会变成 0.15→0.33）。
+            let enterDelay = direction != 0 ? delay + stagger : delay
             if direction != 0 {
                 animate(layer, keyPath: "opacity", from: 0, to: 1,
                         duration: duration, easeInEaseOut: false, delay: enterDelay)
@@ -415,7 +481,7 @@ final class IconAnimator {
             guard let oldSpec = MenuBarIconRenderer.cometSpec(for: oldModel, appearance: appearance),
                   let newSpec = MenuBarIconRenderer.cometSpec(for: newModel, appearance: appearance) else { return }
             configureComet(spec: oldSpec)
-            cometLayer.opacity = 1
+            setModel(opacity: 1) { cometLayer.opacity = $0 }
             startSpinIfNeeded()
             let duration = scaled(IconMotion.cometMorph)
             let oldPath = arcPath(radius: oldSpec.radius * scale)

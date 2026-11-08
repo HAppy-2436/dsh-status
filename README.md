@@ -23,9 +23,11 @@
     数字 0.18s 里程表滚动（≤2.4pt、永不横移）；运行中 ↔ 双层时彗星弧半径连续变形；
     断连 / 恢复为无方向同步淡化；同轨交接（外环与彗星同半径）让退场方先走；单次总时长 ≤0.60s。
     全部尊重「减弱动态效果」/ 低电量 / 设置开关；实测稳态 CPU 0.0%。
+    **v3 验收修复**：不变原子改为公共静态层（不再被双图淡化压暗到 75%）；>99 同文本（100→101）不再播过渡；
+    `99+` 改 6.4pt + ink bbox 居中（不再压外环）；屏幕参数变化/菜单栏重建强制落静态帧。
     规范与逐帧对照：[docs/icon-transitions.md](docs/icon-transitions.md) ·
-    [真机逐帧图](docs/previews/icon-transition-dark.png)；
-    复现：`--test-icon-transitions` + `scripts/capture-icon-transitions.sh`。
+    [真机逐帧图](docs/previews/icon-transition-dark.png) · [验收检查报告](docs/icon-audit.md)；
+    复现：`--test-icon-transitions`（51 步）+ `scripts/capture-icon-transitions.sh`。
   - 面板：**自定义无箭头 NSPanel**（330pt 宽、16pt continuous 圆角、顶边贴住菜单栏下沿），
     Liquid Glass（`NSGlassEffectView(.regular)`，不设 tint）/ 经典磨砂 / 实色可切；
     **扁平会话列表**（不按状态分组，最近一次状态变化在上）+ 行首红/黄/蓝/绿状态圆点；
@@ -94,6 +96,25 @@
 `MenuBarIconRenderer.center / outerRadius / innerRadius`（`center` 只有一处，全部圆环共用）。
 
 
+### 动效与对齐验收检查结论（2026-11-08）
+
+用户要求逐项检查「每个动态切换的动画」与「各个数字和状态下的对齐实现」。三路独立检查
+（代码契约审计 / 真机逐帧 646 帧 / 离屏 2×·8× 亚像素测量）结论：
+
+| 项 | 结论 |
+| --- | --- |
+| 18 类迁移（M1–M18） | **全部实现**；基线真机 31 次回放 **30 PASS / 1 FAIL**（FAIL = 100→101 同一「99+」双影，已修） |
+| 时长与通道编排 | **31/31 与计划一致**（0.12–0.60s；M8 0.43–0.46s、M9 0.60s、彗星半径迁移 0.44s） |
+| 外环 / 彗星 / 数字逐帧 | 覆盖角单调、换色无闪空、彗星半径单调不重启、数字水平漂移 ≤0.11pt、M8/M9 同轨双亮 0 帧、尾帧差 0.000 |
+| 渲染质量 | **2 类实质缺陷已修**：不变原子被双图交叉淡化压暗（实测 0.77–0.81 亮度）；`99+` 压外环内缘 1.885pt |
+| 各状态几何对齐 | **全部精确同心**：环/轨/彗星/虚线环/短横/鲸鱼圆心 = (11.000, 11.000)，偏差 ≤0.0005pt，深浅一致 |
+| 各数字对齐 | 实现与文档一致（水平面积质心、垂直 ink bbox 中心均 = 11.000）；跨数字 bbox 跳动 ≤0.633pt 属面积质心方案取舍（P0-2 建议未实施） |
+| `99+` 对齐 | 旧：右缘超环内缘 1.885pt → 新：6.4pt + bbox 居中，左右余量各 0.41pt |
+| 待补 | 修复后真机逐帧复测 + 降级路径 smoke（屏幕锁定，解锁后补跑） |
+
+完整报告：[docs/icon-audit.md](docs/icon-audit.md)（含逐迁移判定、逐数字对齐表、未修复取舍、复现命令）；
+验证记录：[docs/icon-transition-verification.md](docs/icon-transition-verification.md)。
+
 ## 快速开始（P0 演示，假数据）
 
 ```bash
@@ -134,6 +155,7 @@ DSH Host ── 插件 Host 薄桥（bridge.json + 路由）────┘
 - 原生 UI 实测与 HIG 依据：[docs/research/macos-ui-conventions.md](docs/research/macos-ui-conventions.md)
 - 本次面板/设置重设计契约：[docs/ui-redesign-spec.md](docs/ui-redesign-spec.md)
 - 图标设计建议：[docs/icon-suggestions.md](docs/icon-suggestions.md)
+- 动效与对齐验收检查报告：[docs/icon-audit.md](docs/icon-audit.md)
 - P0 演示与协议自检：`scripts/demo.sh`、`scripts/test-bridge.sh`
 
 ## 目录结构

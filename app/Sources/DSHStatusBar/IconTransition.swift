@@ -29,11 +29,12 @@ struct IconVisualState: Equatable {
     let kind: IconKind
     /// 外环颜色来源（红 > 黄 > 绿）；nil = 没有外环。
     let ringStatus: SessionStatus?
-    /// 实际显示的中心数字。
+    /// 实际显示的中心数字（按渲染文本归一化：>99 一律记 100，因为画面都是 `99+`）。
+    /// 这样 100→101 这类「数值变了但渲染文本没变」的推送不会被误判成需要播放数字滚动。
     let number: Int?
 
     init(model: IconModel) {
-        number = model.visibleCenterNumber
+        number = model.visibleCenterNumber.map { min($0, 100) }
         guard model.connected else {
             kind = .disconnected
             ringStatus = nil
@@ -126,8 +127,14 @@ struct IconTransitionPlan {
     let newCometAnimated: Bool
     let includesRingInContent: Bool
     let includesNumberInContent: Bool
-    /// 内容形态变化 → 需要图像交叉淡化（数字/外环不变时只有数字滚动，不需要）。
-    let contentCrossfade: Bool
+    /// 「内容原子」（鲸鱼 / 轨道 / 未连接虚线环）是否变化。false = 两端内容完全相同，不需要交叉淡化。
+    let contentAtomChanged: Bool
+    /// 外环是否两端相同、可直接作为**公共原子**静态呈现（不参与任何通道的淡化/扫入）。
+    let ringCommon: Bool
+    /// 中心数字是否两端相同、可直接作为**公共原子**静态呈现（不参与滚动/淡化）。
+    let numberCommon: Bool
+    /// 连接性发生变化（断连 / 恢复）：数字与环作为「内容的一部分」整体淡化，不单独滚动。
+    let connectivityChanged: Bool
     /// 外环通道自身的时长（默认 0.45s；同轨交接时压缩到 0.40–0.42s，给让位方腾时间）。
     let ringDuration: CFTimeInterval
     /// 各通道相对主拍起跑点的延迟（秒）：用于同轨交接（外环 ↔ 彗星）和「主通道先行、数字最后」的层次。
@@ -213,6 +220,13 @@ struct IconTransitionPlan {
                               ringMode != .none ? ringDelay + IconMotion.numberHierarchyDelay : 0)
         }
 
+        // 所有通道都无事可做 = 视觉上没有变化（典型：>99 时 100→101 渲染文本都是「99+」）。
+        // 直接返回 nil：不建临时层、不播过渡，也不改变显示状态。
+        let contentAtomChanged = old.contentKind != new.contentKind
+        if ringMode == .none, cometMode == .none, numberRoll == nil, !contentAtomChanged {
+            return nil
+        }
+
         return IconTransitionPlan(
             ringMode: ringMode,
             oldRing: old.ringStatus,
@@ -221,12 +235,15 @@ struct IconTransitionPlan {
             cometMode: cometMode,
             oldCometAnimated: oldCometAnimated,
             newCometAnimated: newCometAnimated,
-            // 环单独做扫入/收回/换色时不能烘进内容图；其余情况内容图直接带环（两端一致，淡化不可见）。
+            // 环单独做扫入/收回/换色时不能烘进内容图；其余情况内容图直接带环（两端一致 → 走公共原子层）。
             includesRingInContent: ringMode == .none || ringMode == .crossfade,
             includesNumberInContent: numberRoll == nil,
-            contentCrossfade: old.contentKind != new.contentKind
-                || (ringMode == .crossfade && old.hasRing != new.hasRing)
-                || cometMode != .none,
+            contentAtomChanged: contentAtomChanged,
+            // 两端同色的环不需要任何环通道动画 → 作为公共原子静态呈现（避免双图淡化把它压到 75% 亮度）。
+            ringCommon: ringMode == .none && old.hasRing && new.hasRing,
+            // 数字不滚动且不随连接性整体淡化 → 公共原子。
+            numberCommon: numberRoll == nil && !connectivityChanged,
+            connectivityChanged: connectivityChanged,
             ringDuration: ringDuration,
             ringDelay: ringDelay,
             cometDelay: cometDelay,
@@ -251,8 +268,6 @@ enum IconMotion {
     static let cometFade: CFTimeInterval = 0.18
     /// 彗星弧内半径 ⇄ 外半径变形（与外环扫入同拍）。
     static let cometMorph: CFTimeInterval = 0.45
-    /// 同轨交接（外环 r7.9 ↔ 彗星 r7.9）时，退场方先走、入场方延迟这么多秒。
-    static let sameTrackHandoff: CFTimeInterval = 0.15
     /// 「环让位」变体：待办 → 运行中时外环收回压缩到 0.40s。
     static let ringYieldDuration: CFTimeInterval = 0.40
     /// 「环接管」变体：运行中 → 待办时外环扫入压缩到 0.42s（前置 0.18s 等彗星退场）。

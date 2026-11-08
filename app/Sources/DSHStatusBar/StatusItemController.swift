@@ -20,6 +20,8 @@ final class StatusItemController: NSObject {
 
     private var appearanceObserver: NSObjectProtocol?
     private var themeObserver: NSObjectProtocol?
+    private var reduceMotionObserver: NSObjectProtocol?
+    private var powerObserver: NSObjectProtocol?
     private let animator = IconAnimator()
 
     /// 当前画面上（或正在过渡到的）图标模型：过渡起点由它决定。
@@ -29,6 +31,8 @@ final class StatusItemController: NSObject {
     private var hasRenderedOnce = false
     /// 过渡期间到达的新状态：结束后再算一次（合并中间态，避免动画反复被打断）。
     private var hasQueuedUpdate = false
+    /// 下一次刷新强制「落静态帧」：屏幕参数变化/状态项按钮被系统重建时使用（不做过渡）。
+    private var forceSnapNext = false
 
     init(model: AppModel) {
         self.model = model
@@ -48,23 +52,39 @@ final class StatusItemController: NSObject {
         appearanceObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
-        ) { [weak self] _ in self?.refresh() }
+        ) { [weak self] _ in
+            // 屏幕参数变化不是状态迁移：不播过渡，直接落最新静态帧（与 docs/icon-transitions.md §5.2 一致）。
+            self?.forceSnapNext = true
+            self?.refresh()
+        }
         themeObserver = DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
             object: nil, queue: .main
+        ) { [weak self] _ in self?.refresh() }
+        // 「减弱动态效果」/「低电量」开关变化时立即降级（不必等下一次状态推送）。
+        reduceMotionObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.refresh() }
+        powerObserver = NotificationCenter.default.addObserver(
+            forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
         ) { [weak self] _ in self?.refresh() }
     }
 
     deinit {
         if let appearanceObserver { NotificationCenter.default.removeObserver(appearanceObserver) }
         if let themeObserver { DistributedNotificationCenter.default().removeObserver(themeObserver) }
+        if let reduceMotionObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(reduceMotionObserver)
+        }
+        if let powerObserver { NotificationCenter.default.removeObserver(powerObserver) }
     }
 
     // MARK: 图标刷新
 
     func refresh() {
         guard let button = statusItem.button else { return }
-        animator.attach(to: button)
+        let buttonReplaced = animator.attach(to: button)
 
         let iconModel = debugIconOverride ?? model.iconModel
         let appearance = NSApp.effectiveAppearance
@@ -74,8 +94,11 @@ final class StatusItemController: NSObject {
         button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
         button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: iconModel))
 
-        guard hasRenderedOnce, appearanceKey == lastAppearanceKey else {
-            // 首帧 / 外观切换：直接落静态图，不播过渡（深浅色变化不是状态变化）。
+        // 强制落静态帧的场景：首帧 / 外观切换 / 屏幕参数变化 / 状态项按钮被系统重建。
+        let mustSnap = !hasRenderedOnce || appearanceKey != lastAppearanceKey
+            || forceSnapNext || buttonReplaced
+        forceSnapNext = false
+        if mustSnap {
             hasRenderedOnce = true
             lastAppearanceKey = appearanceKey
             displayedModel = iconModel
@@ -86,6 +109,14 @@ final class StatusItemController: NSObject {
         }
 
         if animator.isTransitioning {
+            // 过渡途中把「状态切换动效」关掉：立即落静态帧，不等当前过渡播完（§5.1 瞬时）。
+            if !transitionEnabled {
+                displayedModel = iconModel
+                displayedCometAnimated = cometAnimated
+                hasQueuedUpdate = false
+                animator.snapTo(model: iconModel, appearance: appearance, cometAnimated: cometAnimated)
+                return
+            }
             if visualChanged(target: iconModel, cometAnimated: cometAnimated) {
                 hasQueuedUpdate = true
             }
@@ -109,7 +140,13 @@ final class StatusItemController: NSObject {
             from: current, to: target,
             oldCometAnimated: displayedCometAnimated,
             newCometAnimated: cometAnimated
-        ) else { return }
+        ) else {
+            // 视觉上没有可播的变化（如 >99 时 100→101 渲染文本相同）：仍要更新「当前画面」记录，
+            // 否则下一次比较会拿过期的数字当起点。
+            displayedModel = target
+            displayedCometAnimated = cometAnimated
+            return
+        }
 
         displayedModel = target
         displayedCometAnimated = cometAnimated
@@ -234,7 +271,7 @@ final class StatusItemController: NSObject {
                 self.refresh()
                 log("step \(index) \(step.name)")
             }
-            // 一次过渡最长 0.45s；留观察窗口，放慢倍数同步放大。
+            // 一次过渡最长 0.60s（M9）；留观察窗口，放慢倍数同步放大。
             time += 1.15 * scale
         }
 
@@ -271,50 +308,128 @@ final class StatusItemController: NSObject {
     }
 
     private static func debugModel(_ statuses: [SessionStatus],
-                                   connected: Bool = true) -> IconModel {
-        IconModel(statuses: statuses, connected: connected, numberMode: .all)
+                                   connected: Bool = true,
+                                   numberMode: CenterNumberMode = .all) -> IconModel {
+        IconModel(statuses: statuses, connected: connected, numberMode: numberMode)
     }
 
-    /// 覆盖全部语义迁移：空闲/待办/运行中/双层/换色/数字增减/断连/恢复连接。
+    /// 覆盖全部 18 类语义迁移（M1–M18，见 docs/icon-transitions.md §3）+ 数字边界：
+    /// 空闲/待办/运行中/双层之间每一种迁移、换色、数字增减、字形数变化、99+ 文本相同边界、断连/恢复。
+    /// 顺序即回放顺序；`--test-icon-transitions=<起始步>,<步数>` 可只跑其中一段。
     private static let debugTransitionSteps: [DebugStep] = [
-        DebugStep(name: "idle", model: debugModel([])),
-        DebugStep(name: "idle→attention(waiting×1) 黄环扫入 + 数字 1",
+        // —— 起点 ——
+        DebugStep(name: "idle（起点，直接落静态帧）", model: debugModel([])),
+        // —— M1/M2：空闲 ↔ 待办 ——
+        DebugStep(name: "M1 idle→attention(waiting×1) 黄环扫入 + 数字 1",
                   model: debugModel([.waiting])),
-        DebugStep(name: "attention(waiting)→attention(stopped) 黄→红 recolor",
+        // —— M7：待办内部换色 ——
+        DebugStep(name: "M7 attention(waiting)→attention(stopped) 黄→红 recolor",
                   model: debugModel([.stopped])),
-        DebugStep(name: "attention→running×2 环收回 + 彗星出现 + 数字 2",
+        // —— M8：待办 → 运行中（同轨交接）——
+        DebugStep(name: "M8 attention→running×2 环收回 + 彗星出现 + 数字 2",
                   model: debugModel([.running, .running])),
-        DebugStep(name: "running→attention(completed) 运行中→已完成：绿环扫入 + 彗星淡出 + 数字 2→1",
+        // —— M9：运行中 → 待办（最常见：任务完成）——
+        DebugStep(name: "M9 running→attention(completed) 绿环扫入 + 彗星淡出 + 数字 2→1",
                   model: debugModel([.completed])),
-        DebugStep(name: "attention→running×2 回程：环收回 + 彗星淡入 + 数字 1→2",
+        DebugStep(name: "M8 attention→running×2 回程：环收回 + 彗星淡入 + 数字 1→2",
                   model: debugModel([.running, .running])),
-        DebugStep(name: "running→both(+completed) 绿环扫入 + 彗星外→内 + 数字隐去",
+        // —— M12/M13：运行 ↔ 双层（彗星半径迁移）——
+        DebugStep(name: "M12 running→both(+completed) 绿环扫入 + 彗星外→内 + 数字隐去",
                   model: debugModel([.running, .running, .completed])),
-        DebugStep(name: "both 绿→红 recolor（运行中保持）",
+        DebugStep(name: "M7 both 绿→红 recolor（运行中保持）",
                   model: debugModel([.running, .running, .stopped])),
-        DebugStep(name: "both→attention(stopped) 环收回 + 彗星消失 + 数字 1",
+        // —— M11：双层 → 待办 ——
+        DebugStep(name: "M11 both→attention(stopped) 环收回 + 彗星消失 + 数字 1",
                   model: debugModel([.stopped])),
-        DebugStep(name: "attention(stopped)→attention(waiting) 红→黄 recolor",
+        DebugStep(name: "M7 attention(stopped)→attention(waiting) 红→黄 recolor",
                   model: debugModel([.waiting])),
-        DebugStep(name: "attention→idle 环收回 + 鲸鱼淡入",
+        // —— M2：待办 → 空闲 ——
+        DebugStep(name: "M2 attention→idle 环收回 + 鲸鱼淡入",
                   model: debugModel([])),
-        DebugStep(name: "idle→disconnected 内容淡出 + 虚线环淡入",
+        // —— M16/M17：断连与恢复 ——
+        DebugStep(name: "M16 idle→disconnected 内容淡出 + 虚线环淡入",
                   model: debugModel([], connected: false)),
-        DebugStep(name: "disconnected→idle 虚线环淡出 + 鲸鱼淡入",
+        DebugStep(name: "M17 disconnected→idle 虚线环淡出 + 鲸鱼淡入",
                   model: debugModel([])),
-        DebugStep(name: "idle→attention(completed×3) 绿环扫入 + 数字 3",
+        DebugStep(name: "M1 idle→attention(completed×3) 绿环扫入 + 数字 3",
                   model: debugModel([.completed, .completed, .completed])),
-        DebugStep(name: "attention 数字 3→2 同色滚动",
+        // —— M14/M15：数字增多、字形数变化 ——
+        DebugStep(name: "M14 attention 数字 3→2 同色滚动",
                   model: debugModel([.completed, .completed])),
-        DebugStep(name: "attention→disconnected 彩色环淡成虚线环",
+        DebugStep(name: "M16 attention→disconnected 彩色环淡成虚线环",
                   model: debugModel([], connected: false)),
-        DebugStep(name: "disconnected→both(running + waiting) 黄环扫入 + 彗星内层",
+        DebugStep(name: "M17 disconnected→both(running + waiting) 黄环扫入 + 彗星内层",
                   model: debugModel([.running, .waiting])),
-        DebugStep(name: "both→running 环收回 + 彗星内→外 + 数字 1",
+        DebugStep(name: "M13 both→running 环收回 + 彗星内→外 + 数字 1",
                   model: debugModel([.running])),
-        DebugStep(name: "running→disconnected 彗星淡出 + 彩色淡成虚线环",
+        DebugStep(name: "M16 running→disconnected 彗星淡出 + 彩色淡成虚线环",
                   model: debugModel([], connected: false)),
-        DebugStep(name: "disconnected→idle 收尾",
+        DebugStep(name: "M17 disconnected→idle 收尾",
+                  model: debugModel([])),
+        // —— 以下补齐此前回放未覆盖的迁移（M3/M4/M5/M6/M10/M15 与 99+ 边界）——
+        DebugStep(name: "M3 idle→running×1 外轨淡入 + 彗星外环淡入 + 数字 1",
+                  model: debugModel([.running])),
+        DebugStep(name: "M4 running→idle 内容交叉 + 彗星淡出 + 鲸鱼淡入",
+                  model: debugModel([])),
+        DebugStep(name: "M5 idle→both(completed + running) 绿环扫入 + 内轨 + 彗星内层",
+                  model: debugModel([.completed, .running])),
+        DebugStep(name: "M6 both→idle 环收回 + 彗星淡出 + 鲸鱼淡入",
+                  model: debugModel([])),
+        DebugStep(name: "M1 idle→attention(waiting×1)（M10 前置）",
+                  model: debugModel([.waiting])),
+        DebugStep(name: "M10 attention→both(waiting + running) 内轨/彗星 +0.08s 入场 + 数字淡出",
+                  model: debugModel([.waiting, .running])),
+        DebugStep(name: "M11 both→attention(waiting×9) 彗星淡出 + 数字 9 淡入",
+                  model: debugModel(Array(repeating: SessionStatus.waiting, count: 9))),
+        DebugStep(name: "M15 attention 数字 9→10 字形数变化（原地交叉淡化、不滚动）",
+                  model: debugModel(Array(repeating: SessionStatus.waiting, count: 10))),
+        DebugStep(name: "M2 attention→idle（数字 10 随内容淡出）",
+                  model: debugModel([])),
+        DebugStep(name: "M1 idle→attention(waiting×100)（数值 100 渲染为 99+）",
+                  model: debugModel(Array(repeating: SessionStatus.waiting, count: 100))),
+        DebugStep(name: "M14 attention 数字 99+（100→101，渲染文本相同 → 不播过渡）",
+                  model: debugModel(Array(repeating: SessionStatus.waiting, count: 101))),
+        DebugStep(name: "M2 attention→idle 收尾",
+                  model: debugModel([])),
+        // —— 补齐子变体覆盖：M18 独立迁移 / M10·M11 变色 / M14 增加 / M15 99→100 / M8 数字不变 /
+        //    M17→attention·running / M16 from both（见 docs/icon-transitions.md §3、§6.3）——
+        DebugStep(name: "M1 idle→attention(waiting×1)（M18 前置）",
+                  model: debugModel([.waiting])),
+        DebugStep(name: "M18 attention(waiting×1) 数字 1→nil（numberMode all→hidden，原地淡出）",
+                  model: debugModel([.waiting], numberMode: .hidden)),
+        DebugStep(name: "M18 attention(waiting×1) 数字 nil→1（numberMode hidden→all，原地淡入）",
+                  model: debugModel([.waiting])),
+        DebugStep(name: "M14 attention(waiting×1)→attention(waiting×2)（+1，向上滚）",
+                  model: debugModel([.waiting, .waiting])),
+        DebugStep(name: "M14 attention(waiting×2)→attention(waiting×1)（−1，向下滚）",
+                  model: debugModel([.waiting])),
+        DebugStep(name: "M15 attention 数字 1→99（1 位→2 位字形数变化）",
+                  model: debugModel(Array(repeating: SessionStatus.waiting, count: 99))),
+        DebugStep(name: "M15 attention 数字 99→100（99→99+，2 位→3 位）",
+                  model: debugModel(Array(repeating: SessionStatus.waiting, count: 100))),
+        DebugStep(name: "M14 attention 数字 100→1（3 位→1 位，原地交叉淡化）",
+                  model: debugModel([.waiting])),
+        DebugStep(name: "M10 attention(waiting)→both(stopped + running)（变色 + 彗星内径）",
+                  model: debugModel([.stopped, .running])),
+        DebugStep(name: "M7 both(stopped+running)→both(waiting+running)（黄环 recolor）",
+                  model: debugModel([.waiting, .running])),
+        DebugStep(name: "M11 both(waiting+running)→attention(stopped×1)（变色黄→红 + 数字淡入）",
+                  model: debugModel([.stopped])),
+        DebugStep(name: "M8 attention(stopped×1)→running×1（数字 1 不变，走公共原子层）",
+                  model: debugModel([.running])),
+        DebugStep(name: "M16 running×1→disconnected（彗星淡出）",
+                  model: debugModel([], connected: false)),
+        DebugStep(name: "M17 disconnected→attention(stopped×1)（数字随内容淡入）",
+                  model: debugModel([.stopped])),
+        DebugStep(name: "M16 attention(stopped×1)→disconnected",
+                  model: debugModel([], connected: false)),
+        DebugStep(name: "M17 disconnected→running×2（彗星延迟 0 变体）",
+                  model: debugModel([.running, .running])),
+        DebugStep(name: "M12 running×2→both(stopped+running)（红环扫入 + 彗星内移）",
+                  model: debugModel([.stopped, .running])),
+        DebugStep(name: "M16 both(stopped+running)→disconnected（从 both 断连）",
+                  model: debugModel([], connected: false)),
+        DebugStep(name: "M17 disconnected→idle 收尾",
                   model: debugModel([])),
     ]
 

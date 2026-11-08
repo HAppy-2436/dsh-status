@@ -95,11 +95,18 @@ enum MenuBarIconRenderer {
     static func staticImage(for model: IconModel, appearance: NSAppearance,
                             includeRing: Bool = true,
                             includeNumber: Bool = true,
-                            includeComet: Bool = false) -> NSImage {
+                            includeComet: Bool = false,
+                            includeContent: Bool = true) -> NSImage {
         render(width: canvas, height: canvas, appearance: appearance) { _ in
             draw(model: model, appearance: appearance, includeComet: includeComet, cometSweep: nil,
-                 includeRing: includeRing, includeNumber: includeNumber)
+                 includeRing: includeRing, includeNumber: includeNumber, includeContent: includeContent)
         }
+    }
+
+    /// 中心数字的渲染文本（>99 统一显示 `99+`）。绘制与过渡状态判定共用同一事实来源，
+    /// 避免「数值变了但渲染文本相同」（100→101）仍被当成数字变化播放滚动。
+    static func numberText(for count: Int) -> String {
+        count > 99 ? "99+" : "\(count)"
     }
 
     /// 只画中心数字（透明底），供数字滚动过渡单独做图层。
@@ -158,20 +165,24 @@ enum MenuBarIconRenderer {
 
     // MARK: 绘制
 
+    /// - Parameters:
+    ///   - includeContent: 是否画「内容原子」（鲸鱼 / 轨道 / 未连接虚线环）。状态过渡时用来拆出
+    ///     **不变的公共原子**（单独做静态层，避免双图交叉淡化把它压到 75% 亮度）与**变化的内容原子**。
     private static func draw(model: IconModel, appearance: NSAppearance,
                              includeComet: Bool,
                              cometSweep: (start: CGFloat, sweep: CGFloat)?,
                              includeRing: Bool = true,
-                             includeNumber: Bool = true) {
+                             includeNumber: Bool = true,
+                             includeContent: Bool = true) {
         let dark = isDark(appearance)
 
         guard model.connected else {
-            drawDisconnected(dark: dark)
+            if includeContent { drawDisconnected(dark: dark) }
             return
         }
 
         if model.isEmpty {
-            drawWhale(dark: dark)
+            if includeContent { drawWhale(dark: dark) }
             return
         }
 
@@ -192,12 +203,14 @@ enum MenuBarIconRenderer {
         }
 
         if model.runningCount > 0 {
-            if hasOuter {
-                // 双层：内层细轨道；CA 模式下彗星弧由图层绘制
-                drawSpinnerTrack(dark: dark, radius: innerRadius, width: innerWidth)
-            } else {
-                // 只有运行中：轨道 + （可选）静态彗星弧
-                drawSpinnerTrack(dark: dark, radius: outerRadius, width: outerWidth)
+            if includeContent {
+                if hasOuter {
+                    // 双层：内层细轨道；CA 模式下彗星弧由图层绘制
+                    drawSpinnerTrack(dark: dark, radius: innerRadius, width: innerWidth)
+                } else {
+                    // 只有运行中：轨道 + （可选）静态彗星弧
+                    drawSpinnerTrack(dark: dark, radius: outerRadius, width: outerWidth)
+                }
             }
             if includeComet {
                 let radius = hasOuter ? innerRadius : outerRadius
@@ -278,12 +291,12 @@ enum MenuBarIconRenderer {
     // MARK: 中心数字
 
     private static func drawCount(_ count: Int, dark: Bool) {
-        let text = count > 99 ? "99+" : "\(count)"
+        let text = numberText(for: count)
         let size: CGFloat
         switch text.count {
         case 1: size = 10.4
         case 2: size = 9.0
-        default: size = 7.6
+        default: size = 6.4
         }
         let font = roundedFont(size: size, weight: .bold)
         let attrs: [NSAttributedString.Key: Any] = [
@@ -305,8 +318,11 @@ enum MenuBarIconRenderer {
         context.setShadow(offset: CGSize(width: 0, height: -0.3), blur: 1.0,
                           color: (dark ? NSColor.black.withAlphaComponent(0.35)
                                        : NSColor.black.withAlphaComponent(0.16)).cgColor)
-        context.textPosition = CGPoint(x: center.x - (centroidX ?? ink.midX),
-                                       y: center.y - ink.midY)
+        // 1–2 位数字：按字形轮廓面积质心做水平居中（对「1」这类重心偏右的字形做视觉居中）。
+        // 3 位（只有「99+」）：带一个「+」号，面积质心会把它整体推右、压到外环内缘（实测右侧越界 1.9pt），
+        // 改用 ink bbox 居中；字号也收到 6.4pt 保证左右各留 ≥0.4pt 余量。
+        let anchorX = text.count >= 3 ? ink.midX : (centroidX ?? ink.midX)
+        context.textPosition = CGPoint(x: center.x - anchorX, y: center.y - ink.midY)
         CTLineDraw(line, context)
         context.restoreGState()
     }

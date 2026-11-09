@@ -112,11 +112,10 @@ other DeepSeek Harness source code is included.
 - The menu-bar idle state (`MenuBarIconRenderer.swift`);
 - the panel header logo (`StatusPanelView.swift`).
 
-In the revision audited for the 0.2.0 release (before the application icon was
-replaced with an original design), the same glyph was also used for the
-application icon and the quit-confirmation dialog icon
-(`AppIconRenderer.image`); the 0.2.0 application icon is an original design
-and is not covered by this notice.
+In earlier revisions (before the application icon was replaced with an original
+design), the same glyph was also used for the application icon and the
+quit-confirmation dialog icon (`AppIconRenderer.image`). The current application
+icon is an original design and is not covered by this notice.
 
 The MIT copyright and permission notice for this asset is included in
 [`LICENSES/MIT-deepseek-harness.txt`](LICENSES/MIT-deepseek-harness.txt).

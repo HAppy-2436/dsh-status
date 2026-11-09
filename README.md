@@ -32,7 +32,8 @@ current state and running time.*
 
 ### Menu bar icon
 
-- Idle with nothing to report: the DeepSeek whale glyph.
+- Idle with nothing to report: the DeepSeek whale glyph by default, or the
+  app's own dashed double-ring mark (**Settings → Menu bar icon → Idle icon**).
 - Otherwise a monochrome ring whose color is the highest-priority item:
   red (stopped) > yellow (waiting for you) > green (completed).
 - Running sessions animate an arc around the ring. The center number can show

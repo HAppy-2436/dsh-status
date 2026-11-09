@@ -62,7 +62,8 @@ final class AppModel: ObservableObject {
         return IconModel(
             statuses: connected ? statuses : [],
             connected: connected,
-            numberMode: settings.centerNumberMode
+            numberMode: settings.centerNumberMode,
+            idleStyle: settings.menuBarIdleStyle
         )
     }
 

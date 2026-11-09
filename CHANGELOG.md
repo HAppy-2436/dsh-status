@@ -8,6 +8,28 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-09
+
+### 中文
+
+#### 新增
+- **品牌「双层环」**：App / 通知 / 退出确认弹窗图标改为原创双层环（外环品牌绿 + 内环冷白），
+  对应菜单栏图标最有辨识度的「双层环」状态（外环 = 待办优先级、内层 = 运行中）。
+- **空闲时图标设置**：菜单栏在完全空闲时默认仍显示 DeepSeek 鲸鱼；设置页「菜单栏图标」新增
+  「空闲时图标」，可切换为品牌「虚线双环」（单色线稿，随菜单栏深浅色自适应）。
+
+### English
+
+#### Added
+- **Brand mark — double ring**: the app, notification and quit-dialog icon is now an original
+  double ring (green outer ring + cool-white inner ring), mirroring the app's signature
+  "double-layer ring" menu bar state (outer = pending priority, inner = running).
+- **Idle icon setting**: while idle, the menu bar still shows the DeepSeek whale by default;
+  Settings → Menu bar icon → Idle icon can switch it to the brand's dashed double-ring mark
+  (monochrome line art that follows the menu bar appearance).
+
+---
+
 ## [0.2.3] - 2026-11-09
 
 ### 中文

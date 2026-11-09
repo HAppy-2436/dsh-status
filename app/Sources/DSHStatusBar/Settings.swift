@@ -48,6 +48,23 @@ enum CenterNumberMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// 菜单栏「空闲」（没有任何非空闲任务）时可以显示的品牌图标。
+enum MenuBarIdleStyle: String, CaseIterable, Identifiable {
+    /// DeepSeek 鲸鱼（默认；借助其 MIT 许可与出处声明）。
+    case whale
+    /// 品牌「双层环」的虚线版（单色线稿，中性、不与状态色环混淆）。
+    case dashedDoubleRing
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .whale: return "鲸鱼 Logo（默认）"
+        case .dashedDoubleRing: return "虚线双环"
+        }
+    }
+}
+
 enum PanelBackgroundStyle: String, CaseIterable, Identifiable {
     case liquidGlass
     case classicMaterial
@@ -95,6 +112,10 @@ final class AppSettings: ObservableObject {
     }
     @Published var centerNumberMode: CenterNumberMode {
         didSet { save("centerNumberMode", centerNumberMode.rawValue) }
+    }
+    /// 菜单栏空闲时显示的品牌图标（默认鲸鱼；可选品牌虚线双环）。
+    @Published var menuBarIdleStyle: MenuBarIdleStyle {
+        didSet { save("menuBarIdleStyle", menuBarIdleStyle.rawValue) }
     }
     @Published var runAnimation: Bool { didSet { save("runAnimation", runAnimation) } }
     @Published var transitionAnimation: Bool { didSet { save("transitionAnimation", transitionAnimation) } }
@@ -148,7 +169,7 @@ final class AppSettings: ObservableObject {
             for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation", "soundDelivery",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "doNotDisturb", "confirmBeforeQuit",
                         "panelBackgroundStyle", "soundEnabled", "soundOption", "soundVolume", "soundCustomPath",
-                        "preventSleepWhileRunning"] {
+                        "preventSleepWhileRunning", "menuBarIdleStyle"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
                     defaults.set(value, forKey: "dshStatus.\(key)")
                 }
@@ -174,6 +195,7 @@ final class AppSettings: ObservableObject {
             defaults.set(2, forKey: "dshStatus.centerNumberModeVersion")
         }
         centerNumberMode = storedCenterMode
+        menuBarIdleStyle = MenuBarIdleStyle(rawValue: store?.string(forKey: "dshStatus.menuBarIdleStyle") ?? "") ?? .whale
         runAnimation = store?.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
         transitionAnimation = store?.object(forKey: "dshStatus.transitionAnimation") as? Bool ?? true
         notifyWaiting = store?.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
@@ -202,6 +224,7 @@ final class AppSettings: ObservableObject {
         visibleStatuses = Set(SessionStatus.allCases.filter { $0 != .idle })
         hiddenWorkspaces = []
         centerNumberMode = .all
+        menuBarIdleStyle = .whale
         runAnimation = true
         transitionAnimation = true
         notifyWaiting = true
@@ -306,6 +329,18 @@ struct SettingsView: View {
                 Picker("中心数字", selection: $settings.centerNumberMode) {
                     ForEach(CenterNumberMode.allCases) { mode in
                         Text(mode.shortLabel).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+            SettingsRow(symbol: "circle.circle",
+                        color: Theme.uiNSColor(.completed),
+                        title: "空闲时图标",
+                        subtitle: "没有任务时菜单栏显示鲸鱼，或品牌「双层环」的虚线版") {
+                Picker("空闲时图标", selection: $settings.menuBarIdleStyle) {
+                    ForEach(MenuBarIdleStyle.allCases) { style in
+                        Text(style.label).tag(style)
                     }
                 }
                 .labelsHidden()

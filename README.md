@@ -85,7 +85,8 @@ the running count in the center.*
 
 The standard grouped settings window covers the menu-bar icon, display,
 projects, notifications, sounds, panel material, background, and general
-options (including restore-to-defaults and quit confirmation).
+options (including the app icon — brand double ring or the DeepSeek blue whale —
+restore-to-defaults, and quit confirmation).
 
 ![DSH Status settings window](docs/previews/settings-real-dark.png)
 
@@ -274,7 +275,10 @@ trademarks of their respective owners. The “DSH” abbreviation in the project
 name refers to DeepSeek Harness and is used in line with DeepSeek's brand
 guidance.
 
-The application icon is an original design. The whale glyph shown in the
+The application icon can be the original brand double ring (default) or the
+DeepSeek blue whale (**Settings → General → App icon**); it also decides the icon
+shown in system notification banners, so a restart is required after switching.
+The whale glyph shown in the
 menu-bar idle state is derived from DeepSeek Harness under the MIT License.
 Status Trio–derived code is used under the Apache License 2.0. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.

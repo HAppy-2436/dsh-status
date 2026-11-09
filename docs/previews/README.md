@@ -21,6 +21,7 @@
 | `icon-transition-dark.png` | **图标全状态切换动效逐帧对照（真机，放慢 3×）**：12 行 × 6 帧，覆盖扫入/收回/换色/彗星换道/数字滚动/断连/恢复；规范见 [../icon-transitions.md](../icon-transitions.md) |
 | `icon-audit-99plus-and-fix.png` | **2026-11-08 验收检查证据**：左 = 修复前 `99+` 7.6pt+质心居中压外环（8× 离屏）；中 = 修复后 6.4pt+bbox 居中；右 = 真机基线 T30（100→101）同一「99+」双影帧；报告见 [../icon-audit.md](../icon-audit.md) |
 | `app-icon.png` | **原创 App 图标（1024 源图，透明底）**：深色圆角方底 + 品牌「双层环」（外环品牌绿 + 内环冷白），对应菜单栏双层环状态；构建 `.icns`、通知横幅与退出确认弹窗共用同一绘制代码。菜单栏空闲态默认仍为鲸鱼，也可在设置中切换为品牌「虚线双环」 |
+| `app-icon-whale.png` | 可选的「DeepSeek 蓝色鲸鱼」App 图标（1024 源图，透明底，`#416EFB`）；设置 → 通用 → 应用图标 可切换，鲸鱼矢量路径来自 DSH（MIT，见 [../../THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)） |
 | `icon-preview-dark.png` | **图标状态矩阵（深色，主用）**：空闲鲸鱼（默认）/ 空闲虚线双环（可选）/ 运行中动态环 / 介入渐变环 / 双层环 / 未连接；放大 3.2× + 真实 1x 一行 |
 | `icon-preview-light.png` | 同上，浅色菜单栏 |
 | `menubar-real.png` | 真机菜单栏（8×）：运行中动态弧 + 中心运行数 |

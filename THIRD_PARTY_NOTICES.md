@@ -110,7 +110,9 @@ other DeepSeek Harness source code is included.
 ### Where the whale glyph appears
 
 - The menu-bar idle state (`MenuBarIconRenderer.swift`);
-- the panel header logo (`StatusPanelView.swift`).
+- the panel header logo (`StatusPanelView.swift`);
+- the optional DeepSeek-blue application icon (`AppIconRenderer.whaleImage`,
+  selectable in Settings → General → App icon).
 
 In earlier revisions (before the application icon was replaced with an original
 design), the same glyph was also used for the application icon and the

@@ -8,6 +8,31 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-11-09
+
+### 中文
+
+#### 新增
+- **应用图标可切换**：设置页「通用」新增「应用图标」——品牌双层环（默认）或 DeepSeek 蓝色鲸鱼。
+  应用图标决定 Dock、Finder 与**系统通知横幅**的图标，因此切换时会把所选 `.icns` 写回 App 包并
+  重新 ad-hoc 签名；重启 App 后 Finder / 通知图标生效（设置页提供「重启 App」按钮）。
+  鲸鱼矢量路径来自 DeepSeek Harness（MIT），出处见 THIRD_PARTY_NOTICES.md。
+- 调试入口：`--render-app-icon-whale <path>`、`--test-app-icon=brand|whale`、`--dump-app-icon`。
+
+### English
+
+#### Added
+- **Switchable app icon**: Settings → General → App icon — the original brand double ring
+  (default) or the DeepSeek blue whale. The app icon drives the Dock, Finder and the
+  **system notification banner** icon, so switching writes the chosen `.icns` into the app
+  bundle and re-signs it ad-hoc; restart the app to apply (the settings row offers a
+  "Restart App" button). The whale vector path comes from DeepSeek Harness (MIT); see
+  THIRD_PARTY_NOTICES.md.
+- Debug entries: `--render-app-icon-whale <path>`, `--test-app-icon=brand|whale`,
+  `--dump-app-icon`.
+
+---
+
 ## [0.3.0] - 2026-11-09
 
 ### 中文

@@ -546,6 +546,31 @@ enum AppIconRenderer {
         }
     }
 
+    // MARK: 蓝色鲸鱼（可选的官方 Logo 图标）
+
+    /// DeepSeek 官方蓝色鲸鱼（`#416EFB`）：透明底、轻微投影，用于「应用图标」可选项
+    /// （鲸鱼矢量路径来自 DeepSeek Harness，MIT，见 THIRD_PARTY_NOTICES.md）。
+    static func whaleImage(size: CGFloat) -> NSImage {
+        let side = max(1, size)
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            let whaleWidth = side * 0.80
+            let whaleHeight = whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth
+            let rect = NSRect(x: (side - whaleWidth) / 2,
+                              y: (side - whaleHeight) / 2,
+                              width: whaleWidth,
+                              height: whaleHeight)
+            let path = WhaleLogo.path(fitting: rect)
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.26)
+            shadow.shadowBlurRadius = side * 0.030
+            shadow.shadowOffset = NSSize(width: 0, height: -side * 0.008)
+            shadow.set()
+            NSColor(hex: 0x416EFB).setFill()
+            path.fill()
+            return true
+        }
+    }
+
     // MARK: 底板
 
     private static func drawBase(in rect: NSRect, scale: CGFloat) {

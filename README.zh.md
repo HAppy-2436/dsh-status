@@ -65,7 +65,7 @@
 ### 设置
 
 标准分组设置窗口涵盖菜单栏图标、显示、项目、通知、提示音、面板材质、后台与通用选项
-（含恢复默认设置、退出前确认）。
+（含**应用图标**：品牌双层环 / DeepSeek 蓝色鲸鱼；恢复默认设置、退出前确认）。
 
 ![DSH Status 设置窗口](docs/previews/settings-real-dark.png)
 
@@ -227,6 +227,8 @@ DSH Status 是非官方独立项目，与 DeepSeek 无隶属关系，也未获�
 「DeepSeek」「DeepSeek Harness」为其各自权利人的商标。项目名中的「DSH」是
 DeepSeek Harness 的规范缩写，使用方式符合其品牌规范。
 
-App 图标为原创设计。菜单栏空闲态使用的鲸鱼图形来自 DeepSeek Harness，
+App 图标可在**设置 →「通用」→「应用图标」**中切换为原创品牌双层环（默认）或
+DeepSeek 蓝色鲸鱼；它同时决定系统通知横幅里的图标，切换后需重启 App 生效。
+菜单栏空闲态使用的鲸鱼图形来自 DeepSeek Harness，
 依 MIT 许可证使用；改编自 Status Trio 的代码依 Apache License 2.0 使用。
 详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

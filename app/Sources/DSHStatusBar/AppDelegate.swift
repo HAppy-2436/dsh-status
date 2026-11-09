@@ -146,6 +146,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                                         count: count)
             }
         }
+        AppIconController.shared.syncInstalledIconIfNeeded()
+        if let raw = CommandLine.arguments.first(where: { $0.hasPrefix("--test-app-icon") }) {
+            let style: AppIconStyle = raw.hasSuffix("=whale") ? .whale : .brand
+            AppIconController.shared.apply(style)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                let matches = AppIconController.shared.bundleIconMatches(style)
+                print("[dsh-status] app-icon style=\(style.rawValue) bundleIconMatches=\(matches) "
+                      + "needsRestart=\(AppIconController.shared.needsRestart) "
+                      + "message=\(AppIconController.shared.message ?? "")")
+                _ = self
+                NSApp.terminate(nil)
+            }
+        }
+        if CommandLine.arguments.contains("--dump-app-icon") {
+            let style = AppSettings.shared.appIconStyle
+            print("[dsh-status] app-icon persisted=\(style.rawValue) "
+                  + "bundleIconMatches=\(AppIconController.shared.bundleIconMatches(style))")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSApp.terminate(nil) }
+        }
         if let raw = CommandLine.arguments.first(where: { $0.hasPrefix("--test-launch-at-login") }) {
             let controller = LaunchAtLoginController()
             var action = "status"

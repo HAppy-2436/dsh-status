@@ -48,6 +48,23 @@ enum CenterNumberMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// 应用图标样式（Dock / Finder / 系统通知横幅）。
+enum AppIconStyle: String, CaseIterable, Identifiable {
+    /// 品牌「双层环」（默认）。
+    case brand
+    /// DeepSeek 官方蓝色鲸鱼（经 MIT 许可的鲸鱼矢量路径，配色沿用官方主色）。
+    case whale
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .brand: return "品牌双层环（默认）"
+        case .whale: return "DeepSeek 蓝色鲸鱼"
+        }
+    }
+}
+
 /// 菜单栏「空闲」（没有任何非空闲任务）时可以显示的品牌图标。
 enum MenuBarIdleStyle: String, CaseIterable, Identifiable {
     /// DeepSeek 鲸鱼（默认；借助其 MIT 许可与出处声明）。
@@ -117,6 +134,10 @@ final class AppSettings: ObservableObject {
     @Published var menuBarIdleStyle: MenuBarIdleStyle {
         didSet { save("menuBarIdleStyle", menuBarIdleStyle.rawValue) }
     }
+    /// 应用图标（Dock / Finder / 系统通知）：品牌双层环或 DeepSeek 蓝色鲸鱼。
+    @Published var appIconStyle: AppIconStyle {
+        didSet { save("appIconStyle", appIconStyle.rawValue) }
+    }
     @Published var runAnimation: Bool { didSet { save("runAnimation", runAnimation) } }
     @Published var transitionAnimation: Bool { didSet { save("transitionAnimation", transitionAnimation) } }
     @Published var notifyWaiting: Bool { didSet { save("notifyWaiting", notifyWaiting) } }
@@ -169,7 +190,7 @@ final class AppSettings: ObservableObject {
             for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation", "soundDelivery",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "doNotDisturb", "confirmBeforeQuit",
                         "panelBackgroundStyle", "soundEnabled", "soundOption", "soundVolume", "soundCustomPath",
-                        "preventSleepWhileRunning", "menuBarIdleStyle"] {
+                        "preventSleepWhileRunning", "menuBarIdleStyle", "appIconStyle"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
                     defaults.set(value, forKey: "dshStatus.\(key)")
                 }
@@ -196,6 +217,7 @@ final class AppSettings: ObservableObject {
         }
         centerNumberMode = storedCenterMode
         menuBarIdleStyle = MenuBarIdleStyle(rawValue: store?.string(forKey: "dshStatus.menuBarIdleStyle") ?? "") ?? .whale
+        appIconStyle = AppIconStyle(rawValue: store?.string(forKey: "dshStatus.appIconStyle") ?? "") ?? .brand
         runAnimation = store?.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
         transitionAnimation = store?.object(forKey: "dshStatus.transitionAnimation") as? Bool ?? true
         notifyWaiting = store?.object(forKey: "dshStatus.notifyWaiting") as? Bool ?? true
@@ -225,6 +247,7 @@ final class AppSettings: ObservableObject {
         hiddenWorkspaces = []
         centerNumberMode = .all
         menuBarIdleStyle = .whale
+        appIconStyle = .brand
         runAnimation = true
         transitionAnimation = true
         notifyWaiting = true
@@ -297,6 +320,8 @@ struct SettingsView: View {
     var onPreviewSound: (() -> Void)? = nil
     /// 登录项状态以系统 `SMAppService` 为准（见 LaunchAtLogin.swift）。
     @StateObject private var launchAtLogin = LaunchAtLoginController()
+    /// 应用图标（Dock / Finder / 通知）切换（见 AppIconController.swift）。
+    @ObservedObject private var appIcon = AppIconController.shared
 
     private let statuses: [SessionStatus] = [.waiting, .running, .completed, .stopped]
 
@@ -712,6 +737,30 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         Section {
+            SettingsRow(symbol: "app.badge.fill",
+                        color: .systemBlue,
+                        title: "应用图标",
+                        subtitle: appIcon.needsRestart
+                            ? "已切换；重启 App 后 Finder / 系统通知图标生效"
+                            : (appIcon.message ?? "影响 Dock、Finder 与系统通知横幅的图标")) {
+                HStack(spacing: 8) {
+                    Picker("应用图标", selection: Binding(
+                        get: { appIcon.style },
+                        set: { appIcon.apply($0) }
+                    )) {
+                        ForEach(AppIconStyle.allCases) { style in
+                            Text(style.label).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    if appIcon.needsRestart {
+                        Button("重启 App") { appIcon.relaunch() }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
+                }
+            }
             SettingsRow(symbol: "power",
                         color: .systemGray,
                         title: "退出前确认",

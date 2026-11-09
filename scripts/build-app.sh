@@ -30,25 +30,39 @@ else
   echo "警告：$RES_SRC 不存在，内置提示音将降级为系统 Glass" >&2
 fi
 
-# App 图标：菜单栏同款鲸鱼 glyph（透明底，无圆角方块），避免与 DeepSeek Harness 官方图标混淆。
+# App 图标：构建两个 .icns —— 品牌「双层环」（默认）与 DeepSeek 蓝色鲸鱼（可选项）。
+# 运行时由 AppIconController 按设置把所选变体写回 DSHStatus.icns（Finder/通知图标用它）。
 ICON_WORK="$ROOT/dist/icon-work"
 rm -rf "$ICON_WORK"; mkdir -p "$ICON_WORK"
-ICON_PNG="$ICON_WORK/icon-1024.png"
-"$APP/Contents/MacOS/DSHStatusBar" --render-app-icon "$ICON_PNG" >/dev/null 2>&1 || true
-if [ -f "$ICON_PNG" ]; then
-  ICONSET="$ICON_WORK/AppIcon.iconset"
-  rm -rf "$ICONSET"; mkdir -p "$ICONSET"
-  sips -z 16 16       "$ICON_PNG" --out "$ICONSET/icon_16x16.png"      >/dev/null
-  sips -z 32 32       "$ICON_PNG" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
-  sips -z 32 32       "$ICON_PNG" --out "$ICONSET/icon_32x32.png"      >/dev/null
-  sips -z 64 64       "$ICON_PNG" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null
-  sips -z 128 128     "$ICON_PNG" --out "$ICONSET/icon_128x128.png"    >/dev/null
-  sips -z 256 256     "$ICON_PNG" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
-  sips -z 256 256     "$ICON_PNG" --out "$ICONSET/icon_256x256.png"    >/dev/null
-  sips -z 512 512     "$ICON_PNG" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
-  sips -z 512 512     "$ICON_PNG" --out "$ICONSET/icon_512x512.png"    >/dev/null
-  sips -z 1024 1024   "$ICON_PNG" --out "$ICONSET/icon_512x512@2x.png" >/dev/null
-  iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/DSHStatus.icns" 2>/dev/null || true
+
+build_icns() {
+  local src_png="$1" out_icns="$2"
+  local iconset="$ICON_WORK/$(basename "$out_icns" .icns).iconset"
+  rm -rf "$iconset"; mkdir -p "$iconset"
+  sips -z 16 16       "$src_png" --out "$iconset/icon_16x16.png"      >/dev/null
+  sips -z 32 32       "$src_png" --out "$iconset/icon_16x16@2x.png"   >/dev/null
+  sips -z 32 32       "$src_png" --out "$iconset/icon_32x32.png"      >/dev/null
+  sips -z 64 64       "$src_png" --out "$iconset/icon_32x32@2x.png"   >/dev/null
+  sips -z 128 128     "$src_png" --out "$iconset/icon_128x128.png"    >/dev/null
+  sips -z 256 256     "$src_png" --out "$iconset/icon_128x128@2x.png" >/dev/null
+  sips -z 256 256     "$src_png" --out "$iconset/icon_256x256.png"    >/dev/null
+  sips -z 512 512     "$src_png" --out "$iconset/icon_256x256@2x.png" >/dev/null
+  sips -z 512 512     "$src_png" --out "$iconset/icon_512x512.png"    >/dev/null
+  sips -z 1024 1024   "$src_png" --out "$iconset/icon_512x512@2x.png" >/dev/null
+  iconutil -c icns "$iconset" -o "$out_icns" 2>/dev/null || true
+}
+
+BRAND_PNG="$ICON_WORK/app-icon-brand-1024.png"
+WHALE_PNG="$ICON_WORK/app-icon-whale-1024.png"
+"$APP/Contents/MacOS/DSHStatusBar" --render-app-icon "$BRAND_PNG" >/dev/null 2>&1 || true
+"$APP/Contents/MacOS/DSHStatusBar" --render-app-icon-whale "$WHALE_PNG" >/dev/null 2>&1 || true
+if [ -f "$BRAND_PNG" ]; then
+  build_icns "$BRAND_PNG" "$APP/Contents/Resources/DSHStatusBrand.icns"
+  # 默认安装态 = 品牌图标；用户切过鲸鱼后由 App 启动时同步写回。
+  cp "$APP/Contents/Resources/DSHStatusBrand.icns" "$APP/Contents/Resources/DSHStatus.icns"
+fi
+if [ -f "$WHALE_PNG" ]; then
+  build_icns "$WHALE_PNG" "$APP/Contents/Resources/DSHStatusWhale.icns"
 fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -71,9 +85,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.3.0</string>
+  <string>0.4.0</string>
   <key>CFBundleVersion</key>
-  <string>8</string>
+  <string>10</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>CFBundleIconFile</key>

@@ -31,7 +31,8 @@ DSH_STATUS_BRIDGE_FILE="$HOME/.dsh-status/bridge.mock.json" \
 - `DSH_STATUS_APPEARANCE=light|dark`：强制界面外观（仅调试/出图，不改系统设置）
 - `--render-previews <dir>`：离屏生成全部设计预览图
 - `--render-app-icon <path>`：生成 1024pt App 图标 PNG
-- `--test-sound[=<option>,<volume>]`：单独试听提示音后退出（`option` 如 `dshChime` / `glass` / `none`）
+- `--test-sound[=<option>,<volume>[,<customPath>]]`：单独试听提示音后退出（`option` 如 `dshChime` / `glass` / `systemDefault` / `none`）；
+  送达方式默认跟随设置，可用 `DSH_STATUS_SOUND_DELIVERY=app|system` 覆盖
 - `--self-test-sound`：提示音自检（构建脚本自动跑；无音频硬件依赖）
 
 设置入口：面板底部齿轮按钮，或右键菜单栏图标 →「设置…」（⌘,）。设置即时生效并保存在 UserDefaults。
@@ -57,6 +58,6 @@ DSH_STATUS_BRIDGE_FILE="$HOME/.dsh-status/bridge.mock.json" \
 - `SettingsWindow.swift` — 设置窗口 chrome（标准 NSWindow / frame autosave）
 - `PreviewRenderer.swift` — 离屏预览图
 - `NotificationManager.swift` — 待回答/已完成/已停止系统通知（横幅；不播放系统通知音）
-- `NotificationSound.swift` — 提示音：音色选项 / NSSound 播放器 / App 内独立音量 / `--self-test-sound`
+- `NotificationSound.swift` — 提示音：送达方式（App 直接播放 / 系统通知音）/ 音色选项 / NSSound 播放器 / 系统通知音落地 / `--self-test-sound`
 - `Theme.swift` — 设计 token：系统语义色/状态色、尺寸、hover；菜单栏图标专用调色板
 - `Settings.swift` — 设置模型（UserDefaults 持久化）+ SwiftUI 设置页（原生 grouped Form）

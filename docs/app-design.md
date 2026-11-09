@@ -169,9 +169,10 @@
 | | 勿扰模式 | 总开关：静音全部系统通知**与提示音**（保留下面三项）；面板底部月亮同步 |
 | | 待回答（推荐）/ 已完成 / 已停止 | 默认只开待回答；三个开关同时决定「弹横幅」与「播提示音」 |
 | 提示音 | 播放提示音 | 总开关（默认开）；关掉只发横幅、不发声 |
-| | 声音 | 默认「DSH 提示音」；另有 8 个 macOS 系统声音 / 自定义音频文件 / 静音；右侧「试听」 |
-| | 音量 | 0–100% **独立音量**（默认 90%），与系统通知/提醒音量无关 |
-| | 自定义音频 | 仅在选择「自定义音频文件…」时出现；选择后立即试听，路径持久化 |
+| | 播放方式 | App 直接播放（默认，独立音量）/ 系统通知音（跟随系统专注模式与通知音量）；副标题随选择说明 |
+| | 声音 | 默认「DSH 提示音」；另有系统默认通知音（仅系统方式）/ 8 个 macOS 系统声音 / 自定义音频文件 / 静音；右侧「试听」 |
+| | 音量 | App 方式：0–100% **独立音量**（默认 90%）；系统方式：禁用并显示「系统」（由系统通知音量控制） |
+| | 自定义音频 | 仅在选择「自定义音频文件…」时出现；选择后立即试听，路径持久化；系统方式下会复制到 `~/Library/Sounds` |
 | 面板 | 材质 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 |
 | 后台 | 运行时阻止睡眠 | 默认关；有会话运行中时阻止 Mac 闲置睡眠（等价 `caffeinate -i`） |
 | 通用 | 退出前确认 | 点面板电源键或右键「退出」时先弹确认框 |
@@ -226,27 +227,37 @@
 - **勿扰模式**（面板月亮 / 设置页开关，持久化）：开启时不弹任何系统通知、也不播提示音，单项开关配置原样保留，
   关闭后按原配置恢复。菜单栏图标与面板列表不受勿扰影响。
 
-### 6.2 提示音（2026-11-08，独立于系统通知）
+### 6.2 提示音（2026-11-08；2026-11-09 增加「系统通知音」送达方式）
 
-- **为什么不用 `UNNotificationSound`**：macOS 通知音无法设音量（由系统「提醒音量/通知音量」决定），
-  系统音本身峰值也偏低（实测 Glass 峰值 ≈0.20、Hero ≈0.53），这正是用户反馈「提示音太不明显」的根因。
-- **做法**：`content.sound = nil`，由 `NotificationSoundPlayer`（新增 `NotificationSound.swift`）用
-  `NSSound` 直接播放 App 内音频，音量由 `NSSound.volume` 独立控制（0…1）。
+- **背景**：用户先反馈「系统默认提示音太不明显」，需要独立音量与更明显的默认音色；随后又希望
+  「可以走系统声音、受系统勿扰模式管理，同时也能用自定义声音」。两者是不同通道，故做成**二选一**。
+- **送达方式**（`SoundDeliveryMode`，设置页「提示音 → 播放方式」，默认 `app`）：
+  - **`app`（App 直接播放，默认）**：`content.sound = nil`，由 `NotificationSoundPlayer`（`NotificationSound.swift`）
+    用 `NSSound` 直接播放；音量由 `NSSound.volume` 独立控制（`dshStatus.soundVolume`，默认 0.9）。
+    与系统通知音量无关、不受专注模式静音；系统通知被关闭时仍会响；横幅被系统权限拦掉也照样响。
+    受系统总输出音量上限约束（系统级物理上限，App 无法越过）。
+  - **`system`（系统通知音）**：`content.sound = UNNotificationSound`，声音随系统通知播放，
+    **受系统「专注模式/勿扰」与通知音量控制**（`~/Library/Sounds` 复制方案见下）；App 内音量滑杆禁用
+    （显示「系统」），设置页「试听」在系统方式下发一条真实测试通知（横幅+声音，与正式提醒一致）。
+- **音色选项**（两种方式共用，`NotificationSoundOption`）：
   - 内置默认音 **DSH 提示音**：`app/Resources/dsh-chime.wav`，A5–C#6–E6 三音上行琶音、峰值 0.92
     （≈系统 Glass 的 4.6 倍），由 `scripts/generate-dsh-chime.py` 生成；`scripts/build-app.sh` 打进
     `Contents/Resources`，并用 `--self-test-sound` 校验打包结果。
-  - 可选 8 个 `/System/Library/Sounds/*.aiff` 系统声音；自定义文件走 `NSOpenPanel`（`UTType.audio`），
-    路径存 UserDefaults（App 未沙盒化，直接绝对路径即可）；「静音」选项完全不发声。
-  - 音量设置独立持久化（`dshStatus.soundVolume`，默认 0.9），与系统通知音量/提醒音量无关；
-    受系统总输出音量上限约束（这是系统级物理上限，App 无法越过）。
-- **触发时机**：与通知完全相同——`onStatusTransition` 里对应状态开关打开、勿扰关闭时播放，
-  与横幅互不依赖（横幅被系统权限拦掉也照样响）；提示音不做 30s 去重（每次真实状态跃迁都提醒），
-  但 0.4s 内的多次跃迁合并成一次（同一帧多个会话一起完成时不会叠成一片）。
-- **不受系统专注模式静音**：macOS「专注」只静音系统通知，不会静音 App 直接播放的音频；
-  这是「更明显」的代价——需要安静时应使用本 App 的勿扰模式（同时静音通知与提示音）或关闭提示音。
-  不做专注模式检测：读取 Focus 状态属私有接口、且与「更明显」的产品目标冲突。
-- **验收入口**：`DSHStatusBar --self-test-sound`（资源/选项解析/音量夹取/设置持久化，构建时自动跑）、
-  `DSHStatusBar --test-sound[=<option>,<volume>]`（单独试听，播完自动退出）。
+  - 8 个 `/System/Library/Sounds/*.aiff` 系统声音；**系统默认通知音**（仅系统方式可选，`UNNotificationSound.default`）；
+    自定义文件走 `NSOpenPanel`（`UTType.audio`，路径存 UserDefaults，App 未沙盒化）；
+    「静音」选项完全不发声。
+- **系统方式的音频落地**：`UNNotificationSound(named:)` 只查 App bundle 与 `~/Library/Sounds`，
+  因此内置音 / 系统声音 / 自定义文件都会复制成
+  `~/Library/Sounds/dsh-status-<option>-<size>-<mtime>.<ext>` 后用文件名引用；源文件变化会自动重新落地，
+  同时清理旧的 `dsh-status-*` 文件（`SystemNotificationSound.stage`）。
+- **触发时机**：与通知完全相同——`onStatusTransition` 里对应状态开关打开、勿扰关闭时提醒；
+  App 播放方式下不做 30s 去重（每次真实状态跃迁都提醒），但 0.4s 内的多次跃迁合并成一次；
+  系统方式下声音随横幅一起由系统处理（通知 30s 去重同样作用于声音）。
+- **取舍**：App 方式「更明显」但绕过系统专注模式（需要安静时用本 App 勿扰）；系统方式统一交给系统管理，
+  但音量不可控、通知权限关闭时不响。不做 Focus 状态检测（私有接口），用送达方式让用户选择。
+- **验收入口**：`DSHStatusBar --self-test-sound`（资源/选项解析/音量夹取/两种送达方式/落地幂等/设置持久化，
+  48 项，构建时自动跑）；`DSHStatusBar --test-sound[=<option>,<volume>[,<customPath>]]` +
+  `DSH_STATUS_SOUND_DELIVERY=app|system`（单独试听并打印实际通道/落地路径，播完自动退出）。
 
 ## 7. App 结构（Swift Package，无第三方依赖）
 
@@ -269,7 +280,7 @@ app/
     Settings.swift              // AppSettings（UserDefaults）+ 设置页 SwiftUI（grouped Form）
     SettingsWindow.swift        // 设置窗口 chrome（标准 NSWindow / frame autosave）
     NotificationManager.swift   // 通知权限与横幅发送（通知音交给 NotificationSound）
-    NotificationSound.swift     // 提示音：选项 / NSSound 播放器 / 独立音量 / --self-test-sound 自检
+    NotificationSound.swift     // 提示音：送达方式 / 音色选项 / NSSound 播放器 / 系统通知音落地 / 自检
     Theme.swift                 // 设计 token（系统语义色 / 尺寸 / hover）
     PreviewRenderer.swift       // 离屏预览图（图标矩阵 / 面板 / 场景 / 设置页）
 ```
@@ -280,7 +291,9 @@ app/
   - `--open-panel` / `--open-settings`：启动后自动打开面板/设置（截图/调试）。
   - `--animate-subagents`：打开面板 → 展开 → 收起第一个有子智能体的会话，用于逐帧核对高度动画。
   - `--test-icon-transitions[=<起始步>,<步数>]`：脚本化回放全部图标状态迁移（每步打印时间线并自动退出）。
-  - `--test-sound[=<option>,<volume>]`：按指定选项/音量试听提示音后退出（默认用当前设置）。
+  - `--test-sound[=<option>,<volume>[,<customPath>]]`：按指定选项/音量试听提示音后退出（默认用当前设置）。
+  - `DSH_STATUS_SOUND_DELIVERY=app|system`：`--test-sound` 时强制送达方式（验收两种通道用）。
+  - `DSH_STATUS_SETTINGS_SOUND_DELIVERY=app|system` / `_SOUND_OPTION=<option>`：离屏设置页预览时覆盖提示音状态。
   - `--self-test-sound`：提示音自检（资源打包 / 选项解析 / 音量映射 / 设置持久化），无音频硬件依赖。
   - `DSH_STATUS_SETTINGS_PREVIEW_HEIGHT=<pt>`：设置页离屏预览的高度覆盖（默认 640；调试出完整长页用）。
   - `DSH_STATUS_ANIM_SCALE=<倍数>`：面板高度动画与图标状态过渡放慢 N 倍（默认 1），配合截屏逐帧核对。
@@ -297,8 +310,11 @@ app/
 3. 连 mock 桥时图标数字/颜色随状态变化，面板分组正确，点行会 POST 命令并打开 DSH。
 4. 断开 mock 后 6s 内进入未连接态；mock 恢复后自动重连。
 4.1 提示音：`--self-test-sound` 全 PASS（构建脚本自动跑）；设置页「试听」可听、音量滑块 0/50/100% 有明显差别；
-   关闭「播放提示音」后不发声；系统通知权限关闭时提示音仍响（勿扰开启时两者都静音）；
-   同一帧多个会话跃迁只响一次；系统专注模式不影响提示音（文档已说明取舍）。
+   关闭「播放提示音」后不发声；系统通知权限关闭时 App 方式仍响、系统方式不响（勿扰开启时两者都静音）；
+   同一帧多个会话跃迁只响一次（App 方式）；系统专注模式不影响 App 方式提示音（文档已说明取舍）。
+4.2 提示音送达方式：切到「系统通知音」后，音量行禁用并显示「系统」；选择各音色/自定义文件后
+   `~/Library/Sounds/dsh-status-*` 出现落地文件，`log stream` 可见 usernoted `hasSound:true` 与
+   NotificationCenter「Playing notification sound { nam: dsh-status-... }」；系统「专注模式」下声音被系统静音。
 5. 图标状态切换：`--test-icon-transitions` 逐条回放，默认速度 60fps 无跳变；`DSH_STATUS_ANIM_SCALE=3` +
    `scripts/capture-icon-transitions.sh` 逐帧捕获后，环覆盖角/彗星半径单调、数字不横移、过渡结束帧 = 稳态帧；
    规范见 [icon-transitions.md](icon-transitions.md)。

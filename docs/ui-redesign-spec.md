@@ -116,9 +116,10 @@
 | 通知 | 系统通知状态 | 状态文字 / 「允许通知」/「打开系统设置」按钮 |
 | | 勿扰模式 | Switch（总开关：静音全部通知与提示音；下面三项保留） |
 | | 待回答（推荐）/ 已完成 / 已停止 | Switch（同时决定是否播放提示音） |
-| 提示音 | 播放提示音 | Switch（副标题说明：App 直接播放、独立音量） |
-| | 声音 | Picker（DSH 提示音 / 8 个系统声音 / 自定义音频文件… / 静音）+ 「试听」bordered 小按钮 |
-| | 音量 | Slider 0–100% + 等宽数字百分比（与系统通知音量独立） |
+| 提示音 | 播放提示音 | Switch |
+| | 播放方式 | Picker：App 直接播放（独立音量）/ 系统通知音（跟随专注模式）；副标题随选择说明 |
+| | 声音 | Picker（DSH 提示音 / 系统默认通知音* / 8 个系统声音 / 自定义音频文件… / 静音）+ 「试听」bordered 小按钮（*仅系统通知音方式可选） |
+| | 音量 | App 方式：Slider 0–100% + 等宽百分比；系统方式：禁用并显示「系统」 |
 | | 自定义音频 | 仅 `.custom` 时出现：文件名/缺失提示 + 「选择文件…」bordered 小按钮 |
 | 面板 | 材质 | Picker（液态玻璃 / 经典磨砂 / 实色；低版本自动隐藏液态玻璃） |
 | 后台 | 运行时阻止睡眠 | Switch（默认关；有会话运行中时阻止 Mac 闲置睡眠，副标题显示当前是否生效） |
@@ -131,7 +132,7 @@
 - 删除旧底部固定栏（「恢复默认」按钮 + checkbox + 版本）与重复副标题
   （picker 行不再同时用副标题和控件显示同一个值，说明文字放分区脚注）。
 - 所有设置项保持即时生效 + UserDefaults 持久化；`AppSettings` 公开 API 不变（2026-11-08 新增提示音属性：
-  `soundEnabled` / `soundOption` / `soundVolume` / `soundCustomPath`；2026-11-09 新增
+  `soundEnabled` / `soundDelivery` / `soundOption` / `soundVolume` / `soundCustomPath`；2026-11-09 新增
   `preventSleepWhileRunning`）。
 - 提示音分区沿用同一行结构；声音 Picker 选到「自定义音频文件…」时直接弹 `NSOpenPanel`（`UTType.audio`），
   取消则回退到上一个音色。提示音的实现与取舍见 [app-design.md §6.2](app-design.md)。

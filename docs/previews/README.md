@@ -27,7 +27,7 @@
 | `panel-real-idle-hover-dark.png` | 同上，鼠标悬停态：高亮底色铺满整块内容区（圆角 12），说明点哪里都有效 |
 | `scene-preview-dark.png` / `scene-preview-light.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板；外壳圆角与真机同为 16pt continuous） |
 | `settings-preview-dark.png` / `settings-preview-light.png` | 设置页（离屏渲染，深/浅）：原生 grouped Form 的八个分区（窗口默认高度下可见前三个） |
-| `settings-sound-preview-dark.png` / `settings-sound-preview-light.png` | **提示音分区（2026-11-08 新增，离屏渲染）**：通知 → 提示音；App 内独立播放 + 独立音量、可选音色/自定义文件、勿扰同时静音 |
+| `settings-sound-preview-dark.png` / `settings-sound-preview-light.png` | **提示音分区（2026-11-08 新增；2026-11-09 加「播放方式」，离屏渲染）**：通知 → 提示音；播放方式（App 直接播放 / 系统通知音）、音色/自定义文件、音量、勿扰同时静音 |
 | `settings-background-preview-dark.png` / `settings-background-preview-light.png` | **后台分区（2026-11-09 新增，离屏渲染）**：面板 → 后台 → 通用；「运行时阻止睡眠」默认关，开启后有会话运行中时阻止 Mac 闲置睡眠 |
 | `settings-real-dark.png` | 设置窗口真机截图（深色，540×640 标准 NSWindow） |
 | `ui-before-after-dark.png` | 改版前后对照（面板 + 设置窗口，深色） |

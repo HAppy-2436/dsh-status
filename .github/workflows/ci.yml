@@ -1,0 +1,77 @@
+name: CI
+
+# 每次 push / PR 到 main：构建 release 版 App、跑提示音自检、检查 shell 语法，
+# 并做一次 DMG 打包冒烟（验证发布脚本本身没坏，真正的发布在 release.yml）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build App (macOS 26 / arm64)
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show toolchain
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Shell script syntax (bash -n)
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(scripts/*.sh)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "scripts/ 下没有 shell 脚本" >&2
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            bash -n "$f"
+            echo "OK  $f"
+          done
+
+      - name: Swift build (release)
+        working-directory: app
+        run: swift build -c release
+
+      - name: Build .app and run self-tests (--self-test-sound)
+        run: bash scripts/build-app.sh
+
+      - name: Verify app bundle
+        run: |
+          set -euo pipefail
+          app="dist/DSHStatusBar.app"
+          test -d "$app"
+          test -x "$app/Contents/MacOS/DSHStatusBar"
+          version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")"
+          echo "App version: $version"
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+      - name: Smoke test release DMG
+        run: bash scripts/release-dmg.sh
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: DSH-Status-dmg
+          path: |
+            dist/release/*.dmg
+            dist/release/*.sha256
+          if-no-files-found: error
+          retention-days: 7

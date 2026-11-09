@@ -1,0 +1,110 @@
+name: Release
+
+# 打 tag（v0.2.0 这种）并 push → 在 macOS 26 runner 上构建 DMG → 创建 GitHub Release。
+# 版本号必须与 scripts/build-app.sh 的 CFBundleShortVersionString 一致（脚本会校验）。
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build DMG and publish release
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      # 以下 secrets 全部可选：未配置时 release-dmg.sh 自动回退 ad-hoc 签名（未公证）。
+      # 配置后走 Developer ID 签名 + notarytool 公证，见 docs/RELEASE.md。
+      CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+      NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show toolchain
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Validate tag against app version and CHANGELOG
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          app_version="$(sed -n '/<key>CFBundleShortVersionString<\/key>/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' scripts/build-app.sh)"
+          echo "tag=$GITHUB_REF_NAME version=$version app_version=$app_version"
+          if [[ "$version" != "$app_version" ]]; then
+            echo "错误：tag 版本（$version）与 scripts/build-app.sh 的版本（$app_version）不一致。" >&2
+            echo "请先更新 build-app.sh 的 CFBundleShortVersionString / CFBundleVersion 再重新打 tag。" >&2
+            exit 1
+          fi
+          if ! grep -q "^## \[$version\]" CHANGELOG.md; then
+            echo "错误：CHANGELOG.md 缺少 '## [$version]' 条目，无法生成发布说明。" >&2
+            exit 1
+          fi
+
+      - name: Build DMG
+        run: bash scripts/release-dmg.sh "$GITHUB_REF_NAME"
+
+      - name: Show artifacts
+        run: |
+          set -euo pipefail
+          ls -lh dist/release
+          cat dist/release/*.sha256
+
+      - name: Publish GitHub Release
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          dmg="dist/release/DSH-Status-$version.dmg"
+          sha_file="$dmg.sha256"
+          test -f "$dmg"
+          test -f "$sha_file"
+          sha256="$(awk '{print $1}' "$sha_file")"
+
+          notes="$(mktemp)"
+          {
+            echo "## DSH Status v$version"
+            echo
+            echo "macOS 26 / Apple Silicon（arm64）菜单栏 App。"
+            echo
+            echo "- DMG：[DSH-Status-$version.dmg](https://github.com/${{ github.repository }}/releases/download/$GITHUB_REF_NAME/DSH-Status-$version.dmg)"
+            echo "- SHA256：\`$sha256\`"
+            echo
+            echo "### 安装 / Install"
+            echo
+            echo "1. 打开 DMG，把 **DSH Status** 拖进 Applications。"
+            echo "2. 首次打开若被 Gatekeeper 拦截：右键 App 图标 →「打开」，或到「系统设置 → 隐私与安全性」点「仍要打开」。"
+            echo "3. 若提示「已损坏」：\`xattr -dr com.apple.quarantine \"/Applications/DSH Status.app\"\`。"
+            echo
+            echo "> 本版本使用 ad-hoc 签名、**未公证**，因此首次打开会有安全提示；这是预期行为，不是文件损坏。"
+            echo
+            echo "### 更新内容 / What's Changed"
+            echo
+            echo "<!-- 取自 CHANGELOG.md -->"
+            awk -v ver="$version" '
+              $0 ~ "^## \\[" ver "\\]" { found = 1; next }
+              found && $0 ~ "^## \\[" { exit }
+              found { print }
+            ' CHANGELOG.md
+          } > "$notes"
+
+          gh release create "$GITHUB_REF_NAME" \
+            "$dmg" \
+            "$sha_file" \
+            --verify-tag \
+            --title "DSH Status v$version" \
+            --notes-file "$notes" \
+            --generate-notes \
+            --latest

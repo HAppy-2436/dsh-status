@@ -71,9 +71,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.1</string>
+  <string>0.2.0</string>
   <key>CFBundleVersion</key>
-  <string>3</string>
+  <string>4</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>CFBundleIconFile</key>
@@ -83,7 +83,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSHumanReadableCopyright</key>
-  <string>dsh-status</string>
+  <string>Copyright © 2026 HAppy-2436 · MIT License</string>
 </dict>
 </plist>
 PLIST

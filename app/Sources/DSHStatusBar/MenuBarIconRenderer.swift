@@ -463,37 +463,235 @@ enum MenuBarIconRenderer {
     }
 }
 
-// MARK: - App 图标 / 弹窗图标（菜单栏同款鲸鱼，无底色）
+// MARK: - App 图标（原创「状态环」，菜单栏空闲态鲸鱼保持不变）
 
+/// App / 通知 / 退出确认弹窗共用的应用图标：原创四色「状态环」。
+///
+/// 设计寓意（不含任何 DeepSeek / DSH 官方素材；菜单栏空闲态的鲸鱼 glyph 保持不变，见 WhaleLogo）：
+/// - **深色圆角方底**：按 macOS App 图标栅格绘制（1024 画布内 824 的 Squircle），带投影、
+///   顶部柔光、底部暗角与内描边高光；在浅色/深色背景和通知横幅里都是完整、独立的 App 图标，
+///   而不是一枚透明 glyph。
+/// - **四段状态环**：直接复用本产品自己的状态色——红 = 已停止、黄 = 待回答、绿 = 已完成、
+///   蓝 = 运行中；从顶部红色（菜单栏图标的最高优先级）起顺时针按优先级排列，与菜单栏
+///   v5 单色优先级环同一套视觉语言。四段用圆头端点 + 细缝分开，像一颗「状态指示环」。
+/// - **中心留白 + 白点**：环心不显示数字，留白代表「当前没有需要处理的待办」；白点是菜单栏
+///   中心数字的抽象化——安静，但「有状态」。
+///
+/// 缩放说明：几何全部按 1024 设计稿等比缩放；16pt 时细节自然简化为一圈四色环 + 中心亮点，
+/// 在 16/32/64/128/256/512/1024 均保持可辨（构建 .icns 时由 1024 源图下采样）。
 enum AppIconRenderer {
-    /// App 图标的鲸鱼主色（取参考图正中鲸鱼的实测色 #416EFB）。
-    static let brandColor = NSColor(hex: 0x416EFB)
+    // MARK: 调色板
+    // App 图标用比 22pt 菜单栏调色更亮的同源状态色（小尺寸菜单栏需要压暗，大图标需要更鲜艳）。
+    private static let baseTop = NSColor(hex: 0x2C3756)
+    private static let baseBottom = NSColor(hex: 0x0B0F18)
+    private static let baseGlow = NSColor(hex: 0x3D7BFF)
+    private static let stopRed = NSColor(hex: 0xFF453A)
+    private static let waitingYellow = NSColor(hex: 0xFFD60A)
+    private static let completedGreen = NSColor(hex: 0x34C759)
+    private static let runningBlue = NSColor(hex: 0x0A84FF)
+    private static let centerTint = NSColor(hex: 0xF2F6FF)
 
-    /// 透明底 + 品牌蓝鲸鱼（轻微投影，深浅背景都可见）。
-    /// 与菜单栏空闲态同一 glyph，不放圆角方块，避免和 DeepSeek Harness 官方图标混淆。
+    // MARK: 几何（1024 设计稿基准，按 size 等比缩放）
+    private static let design: CGFloat = 1024
+    /// macOS App 图标栅格：1024 画布内圆角方形边长 824（四周各留 100 给投影/呼吸空间）。
+    private static let baseRatio: CGFloat = 824 / design
+    /// 底板超椭圆指数（2 = 圆，越大越方；≈5 观感接近 macOS Squircle）。
+    private static let baseExponent: CGFloat = 5
+    private static let ringRadius: CGFloat = 294
+    private static let ringWidth: CGFloat = 84
+    /// 四段环之间的视觉缝隙（度）。圆头端点本身会吃掉 / 补上一部分，故用几何角度反推。
+    private static let ringGap: CGFloat = 2.5
+    private static let centerDotRadius: CGFloat = 56
+
+    /// 渲染 App 图标。`size` 为点数：1024 → 构建 .icns 的源图，72 → 退出确认弹窗。
+    /// 返回值按需重绘（不预先栅格化），在不同屏幕 scale 下都保持清晰。
     static func image(size: CGFloat) -> NSImage {
-        NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            let whaleWidth = size * 0.80
-            let whaleHeight = whaleWidth * WhaleLogo.viewBoxHeight / WhaleLogo.viewBoxWidth
-            let whaleRect = NSRect(
-                x: (size - whaleWidth) / 2,
-                y: (size - whaleHeight) / 2,
-                width: whaleWidth,
-                height: whaleHeight
-            )
-            let path = WhaleLogo.path(fitting: whaleRect)
-
-            // 轻微投影：浅色背景上也能看清轮廓；不添加任何底色/描边
-            let shadow = NSShadow()
-            shadow.shadowColor = NSColor.black.withAlphaComponent(0.26)
-            shadow.shadowBlurRadius = size * 0.030
-            shadow.shadowOffset = NSSize(width: 0, height: -size * 0.008)
-            shadow.set()
-
-            brandColor.setFill()
-            path.fill()
+        let side = max(1, size)
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            let scale = side / design
+            let baseSide = side * baseRatio
+            drawBase(in: NSRect(x: (side - baseSide) / 2, y: (side - baseSide) / 2,
+                                width: baseSide, height: baseSide),
+                     scale: scale)
+            let center = NSPoint(x: side / 2, y: side / 2)
+            drawStateRing(center: center, scale: scale)
+            drawCenterDot(center: center, scale: scale)
             return true
         }
+    }
+
+    // MARK: 底板
+
+    private static func drawBase(in rect: NSRect, scale: CGFloat) {
+        guard let cg = NSGraphicsContext.current?.cgContext else { return }
+        let path = squircleCGPath(in: rect)
+
+        // 投影：先画一层黑色 Squircle，随后被不透明渐变底完全盖住，只在边缘外留下阴影
+        NSGraphicsContext.saveGraphicsState()
+        cg.addPath(path)
+        cg.setShadow(offset: CGSize(width: 0, height: -14 * scale), blur: 32 * scale,
+                     color: NSColor.black.withAlphaComponent(0.45).cgColor)
+        cg.setFillColor(NSColor.black.cgColor)
+        cg.fillPath(using: .winding)
+        NSGraphicsContext.restoreGraphicsState()
+
+        // 底板：深色渐变 + 环心冷光 + 顶部柔光 + 底部暗角
+        NSGraphicsContext.saveGraphicsState()
+        cg.addPath(path)
+        cg.clip()
+        NSGradient(colors: [baseBottom, baseTop])?.draw(in: rect, angle: 90)
+        let glowSide = rect.width * 0.9
+        NSGradient(colors: [baseGlow.withAlphaComponent(0.10), baseGlow.withAlphaComponent(0)])?
+            .draw(in: NSRect(x: rect.midX - glowSide / 2, y: rect.midY - glowSide / 2,
+                             width: glowSide, height: glowSide),
+                  relativeCenterPosition: .zero)
+        NSGradient(colors: [NSColor.white.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0)])?
+            .draw(in: NSRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height * 0.5),
+                  angle: -90)
+        NSGradient(colors: [NSColor.black.withAlphaComponent(0.20), NSColor.black.withAlphaComponent(0)])?
+            .draw(in: NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height * 0.4),
+                  angle: 90)
+        NSGraphicsContext.restoreGraphicsState()
+
+        // 内描边高光：把底板「托」起来一层
+        fillStrokedPath(squircleCGPath(in: rect.insetBy(dx: 2 * scale, dy: 2 * scale)),
+                        lineWidth: 3.6 * scale, in: rect,
+                        colors: [NSColor.white.withAlphaComponent(0.03),
+                                 NSColor.white.withAlphaComponent(0.30)],
+                        angle: 90)
+    }
+
+    // MARK: 四色状态环
+
+    /// 环上四段：从顶部（红，最高优先级）起顺时针 黄 → 绿 → 蓝。
+    private struct RingSegment {
+        let startAngle: CGFloat
+        let endAngle: CGFloat
+        let color: NSColor
+    }
+
+    private static func ringSegments(scale: CGFloat) -> [RingSegment] {
+        let radius = ringRadius * scale
+        let width = ringWidth * scale
+        // 圆头端点沿切线方向约多占 width/2 的角度；把它算进去，保证缝隙 = ringGap
+        let capDegrees = (width / 2) / radius * 180 / .pi
+        let halfSpan = 45 - (ringGap / 2 + capDegrees)
+        let specs: [(center: CGFloat, color: NSColor)] = [
+            (90, stopRed), (0, waitingYellow), (270, completedGreen), (180, runningBlue),
+        ]
+        return specs.map {
+            RingSegment(startAngle: $0.center - halfSpan, endAngle: $0.center + halfSpan, color: $0.color)
+        }
+    }
+
+    private static func drawStateRing(center: NSPoint, scale: CGFloat) {
+        let radius = ringRadius * scale
+        let width = ringWidth * scale
+        let segments = ringSegments(scale: scale)
+        let ringPath = arcPath(segments: segments, center: center, radius: radius)
+
+        // 1) 环的投影：让彩色环从底板上浮起来
+        NSGraphicsContext.saveGraphicsState()
+        let cg = NSGraphicsContext.current?.cgContext
+        cg?.addPath(ringPath)
+        cg?.setLineWidth(width)
+        cg?.setLineCap(.round)
+        cg?.replacePathWithStrokedPath()
+        cg?.setShadow(offset: CGSize(width: 0, height: -6 * scale), blur: 20 * scale,
+                      color: NSColor.black.withAlphaComponent(0.30).cgColor)
+        cg?.fillPath(using: .winding)
+        NSGraphicsContext.restoreGraphicsState()
+
+        // 2) 逐段着色（每段上亮下暗，形成轻微立体感）
+        let ringBounds = NSRect(x: center.x - radius - width, y: center.y - radius - width,
+                                width: (radius + width) * 2, height: (radius + width) * 2)
+        for segment in segments {
+            let path = arcPath(segments: [segment], center: center, radius: radius)
+            let top = segment.color.blended(withFraction: 0.08, of: .white) ?? segment.color
+            let bottom = segment.color.blended(withFraction: 0.12, of: .black) ?? segment.color
+            fillStrokedPath(path, lineWidth: width, in: ringBounds, colors: [bottom, top], angle: 90)
+        }
+
+        // 3) 统一高光/暗部 + 内缘暗线、外缘高光（让环像嵌进底板）
+        fillStrokedPath(ringPath, lineWidth: width, in: ringBounds,
+                        colors: [NSColor.white.withAlphaComponent(0.11), NSColor.white.withAlphaComponent(0),
+                                 NSColor.black.withAlphaComponent(0.08)], angle: -90)
+        fillStrokedPath(arcPath(segments: segments, center: center,
+                                radius: radius - width / 2 + 2 * scale),
+                        lineWidth: 4 * scale, in: ringBounds,
+                        colors: [NSColor.black.withAlphaComponent(0.07),
+                                 NSColor.black.withAlphaComponent(0.18)],
+                        angle: 90)
+        fillStrokedPath(arcPath(segments: segments, center: center,
+                                radius: radius + width / 2 - 2 * scale),
+                        lineWidth: 4 * scale, in: ringBounds,
+                        colors: [NSColor.white.withAlphaComponent(0.06),
+                                 NSColor.white.withAlphaComponent(0.14)],
+                        angle: 90)
+    }
+
+    // MARK: 中心白点
+
+    private static func drawCenterDot(center: NSPoint, scale: CGFloat) {
+        let radius = centerDotRadius * scale
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = runningBlue.withAlphaComponent(0.35)
+        shadow.shadowBlurRadius = radius * 1.25
+        shadow.shadowOffset = .zero
+        shadow.set()
+        let path = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius,
+                                              width: radius * 2, height: radius * 2))
+        let bottom = centerTint.blended(withFraction: 0.07, of: .black) ?? centerTint
+        NSGradient(colors: [bottom, centerTint])?.draw(in: path, angle: 90)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    // MARK: 绘制工具
+
+    /// 超椭圆（Squircle）路径：|x/a|^5 + |y/b|^5 = 1 的参数化采样（≈ macOS 图标圆角）。
+    private static func squircleCGPath(in rect: NSRect) -> CGPath {
+        let a = rect.width / 2
+        let b = rect.height / 2
+        let path = CGMutablePath()
+        let steps = 720
+        for i in 0...steps {
+            let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
+            let ct = cos(t), st = sin(t)
+            let x = rect.midX + a * (ct < 0 ? -1 : 1) * pow(abs(ct), 2 / baseExponent)
+            let y = rect.midY + b * (st < 0 ? -1 : 1) * pow(abs(st), 2 / baseExponent)
+            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+            else { path.addLine(to: CGPoint(x: x, y: y)) }
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    /// 圆头端点绘制的圆弧集合（每段一个独立子路径，避免子路径之间产生连线）。
+    private static func arcPath(segments: [RingSegment], center: NSPoint, radius: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        for segment in segments {
+            let start = segment.startAngle * .pi / 180
+            let end = segment.endAngle * .pi / 180
+            path.move(to: CGPoint(x: center.x + cos(start) * radius, y: center.y + sin(start) * radius))
+            path.addArc(center: center, radius: radius,
+                        startAngle: start, endAngle: end, clockwise: false)
+        }
+        return path
+    }
+
+    /// 先用 `lineWidth` 描边 `path` 再裁切，然后在裁切区内画渐变——得到「带渐变的描边」。
+    private static func fillStrokedPath(_ path: CGPath, lineWidth: CGFloat, in bounds: NSRect,
+                                        colors: [NSColor], angle: CGFloat) {
+        guard let cg = NSGraphicsContext.current?.cgContext else { return }
+        NSGraphicsContext.saveGraphicsState()
+        cg.addPath(path)
+        cg.setLineWidth(lineWidth)
+        cg.setLineCap(.round)
+        cg.replacePathWithStrokedPath()
+        cg.clip()
+        NSGradient(colors: colors)?.draw(in: bounds, angle: angle)
+        NSGraphicsContext.restoreGraphicsState()
     }
 }
 

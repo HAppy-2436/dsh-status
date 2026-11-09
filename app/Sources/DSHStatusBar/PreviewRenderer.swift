@@ -47,13 +47,13 @@ enum PreviewRenderer {
             appearance: dark, colorScheme: .dark,
             title: "DSH Status 设置页 · 提示音（深色）",
             subtitle: "通知 → 提示音：App 内独立播放、独立音量，系统通知被关闭时仍会响",
-            scrollOffset: 822,
+            scrollOffset: 844,
             to: directory.appendingPathComponent("settings-sound-preview-dark.png"))
         try renderSettingsSheet(
             appearance: light, colorScheme: .light,
             title: "DSH Status 设置页 · 提示音（浅色）",
             subtitle: "通知 → 提示音：App 内独立播放、独立音量，系统通知被关闭时仍会响",
-            scrollOffset: 822,
+            scrollOffset: 844,
             to: directory.appendingPathComponent("settings-sound-preview-light.png"))
         // 后台分区单独出图：滚到「面板 → 后台」，展示「运行时阻止睡眠」开关（默认关）。
         // 校准入口：DSH_STATUS_SETTINGS_BACKGROUND_OFFSET=<pt> 覆盖滚动位置。

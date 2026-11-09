@@ -29,7 +29,7 @@ final class LaunchAtLoginController: ObservableObject {
 
     var detailText: String {
         switch state {
-        case .enabled: return "登录 macOS 后自动打开 DSH Status"
+        case .enabled: return "已随登录自动启动"
         case .disabled: return "登录 macOS 后自动打开 DSH Status"
         case .requiresApproval: return "已注册，需在「系统设置 → 通用 → 登录项」中允许"
         case .failed(let message): return message
@@ -37,11 +37,20 @@ final class LaunchAtLoginController: ObservableObject {
     }
 
     func refresh() {
+        // 离屏预览（`--render-previews`）不读取本机真实登录项，保证文档图可复现。
+        if CommandLine.arguments.contains("--render-previews") {
+            state = .disabled
+            return
+        }
         switch SMAppService.mainApp.status {
         case .enabled: state = .enabled
         case .requiresApproval: state = .requiresApproval
         case .notRegistered: state = .disabled
-        case .notFound: state = .failed("系统未找到 App 的登录项注册")
+        case .notFound:
+            // 首次注册前，部分环境（App 不在 /Applications、尚未经 LaunchServices 登记等）
+            // 会返回 notFound。语义上等同「尚未注册」：按关闭显示；register() 仍可成功，
+            // 若确实失败，切换开关时会进入 failed 并显示系统错误。
+            state = .disabled
         @unknown default: state = .disabled
         }
     }

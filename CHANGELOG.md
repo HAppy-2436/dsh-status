@@ -8,7 +8,28 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
-## [0.2.2] - 2026-11-09
+## [0.2.3] - 2026-11-09
+
+### 中文
+
+#### 修复
+- 「登录时自动启动」在首次注册前若系统返回 `SMAppService.Status.notFound`，不再显示错误文案，
+  而是按「未启用」正常显示（该状态在 App 不在 /Applications、或尚未经 LaunchServices 登记时可能出现；
+  此时 `register()` 仍可正常注册，真正失败会在切换开关时提示系统错误）。
+- 开关副标题区分「已随登录自动启动」与「登录 macOS 后自动打开 DSH Status」；离屏设置页预览不再读取
+  本机真实登录项状态（文档图可复现）。
+
+### English
+
+#### Fixed
+- The login-item toggle no longer shows an error when macOS reports `SMAppService.Status.notFound`
+  before the first registration (possible when the app is outside `/Applications` or not yet registered
+  with LaunchServices). It is treated as "not enabled"; a real failure is still reported when toggling.
+- The subtitle now distinguishes "Launch at login is on" from the disabled hint, and offscreen settings
+  previews no longer read the machine's real login-item state (reproducible docs).
+
+---
+
 
 ### 中文
 

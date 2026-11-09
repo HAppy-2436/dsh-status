@@ -1,31 +1,35 @@
-# AGENTS.md — 给 agent 的固定上下文
+# AGENTS.md — 仓库固定上下文
 
-## 工作前
+面向在本仓库工作的 coding agent。用户文档见 `README.md` / `README.zh.md`；
+`STATUS.md` 是维护者的内部工作日志（当前进度与下一步），不属于公开文档。
 
-1. 读 `STATUS.md` 的 `next` 字段
-2. 读 `README.md` 了解项目用途
-3. `git status` 确认工作区干净
+## 开始前
+
+1. 读 `README.md` 了解产品，读 `STATUS.md` 顶部的 `next` 了解当前工作
+2. `git status` 确认工作区状态
 
 ## 常用命令
 
 ```bash
-# 安装
-# 运行
-# 测试
+bash scripts/build-app.sh    # release 构建 dist/DSHStatusBar.app（ad-hoc 签名，含提示音自检）
+bash scripts/demo.sh         # mock 桥 + App，不依赖 DSH
+bash scripts/test-bridge.sh  # 桥协议合约测试
+bash scripts/release-dmg.sh  # 生成 DMG 发布产物
+(cd app && swift build -c release)
 ```
 
 ## 约定
 
-- 不要提交 `.env`、`node_modules/`、`.venv/`、构建产物
-- 修改行为/接口时同步更新 `README.md`
-- 每轮结束更新 `STATUS.md` 的 `updated` 与 `next`
+- App：Swift 5.9+ / macOS 13+，源码在 `app/Sources/DSHStatusBar`，无第三方依赖。
+- 桥插件在独立仓库 `dsh-status-bridge` 维护，不要在本仓库新增插件代码；
+  插件与 App 的通信协议见 `docs/protocol.md`。
+- 改动行为或界面时，同步更新 `README.md`、`README.zh.md` 和相关 `docs/`。
+- `docs/previews/*.png` 由 App 的 `--render-previews` 生成，优先重新生成而不是手改；
+  另有多张真机截图，重截时注意保持文件名与用途一致。
+- 不要提交构建产物（`dist/`、`.build/`）、凭据或本机绝对路径。
+- 许可证：改编自 Status Trio 的代码为 Apache-2.0，DeepSeek 鲸鱼矢量路径为 MIT；
+  涉及这些内容时同步维护 `THIRD_PARTY_NOTICES.md`、`NOTICE` 与 `LICENSES/`。
 
-## 完成标准（agent 收尾，不需要人参与）
+## 收尾
 
-1. 代码已提交并推送：`git status` 干净、分支有 upstream 且无未推送提交
-2. `README.md` 里有结论 / 用法
-3. `STATUS.md` 改为 `status: done`（`updated` 同步）
-4. 跑 `dev done <slug>`：校验提交/推送、标记 done、刷新索引；有问题会**非零退出**，修完重跑
-5. **不要自行 `dev archive`**：归档会移动目录、让 DSH 工作区绑定失效，留给人在终端做
-
-> 中途每轮结束：更新 `STATUS.md` 的 `updated` 与 `next`，顺手跑 `dev index` 刷新根索引；不用跑 `dev done`。
+更新 `STATUS.md` 的 `updated` 与 `next`。

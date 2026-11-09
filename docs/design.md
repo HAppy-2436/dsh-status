@@ -1,5 +1,9 @@
 # dsh-status 设计方案（v2 · 简化版）
 
+> **历史文档**：本文是 2026-11-03 的设计阶段记录。插件代码已于 2026-11-09 拆分为独立仓库
+> [dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge)；实现细节以仓库代码与
+> [docs/protocol.md](protocol.md) 为准。
+
 > 状态：**提案 v2，待确认**（2026-11-03）
 > 图标已在实现阶段按用户 v4 设计更新（空闲鲸鱼 / 外层介入环 + 内层运行弧），见 [docs/app-design.md](app-design.md)。
 >

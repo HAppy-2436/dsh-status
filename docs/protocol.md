@@ -3,6 +3,10 @@
 DSH 插件（Host 桥 + Client 状态）与原生菜单栏 App 之间唯一的通信约定。
 **实现方（Host / Client / App / mock）必须严格按本文档，任何字段变更先改本文档。**
 
+> **实现位置（2026-11-09 起）**：Host 桥与 Client 半的插件代码已迁至独立仓库
+> [dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge)（npm 包 `dsh-status-bridge`）；
+> 本文件是 App、插件与 mock 共用的通信契约，仍是唯一的协议来源。
+
 ## 1. 发现与鉴权
 
 Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入：先写 `.tmp` 再 rename）：

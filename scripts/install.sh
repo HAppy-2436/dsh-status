@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# dsh-status 安装脚本（本机）：
+# dsh-status 安装脚本（开发机用）：
 #   1) 构建并安装菜单栏 App 到 ~/Applications
 #   2) 打印 DSH 插件安装步骤
+#
+# 终端用户请从 GitHub Releases 下载 DMG 安装，无需运行本脚本。
 #
 # 用法：bash scripts/install.sh
 set -euo pipefail
@@ -29,16 +31,16 @@ cat <<EOF
 ✅ App 已安装：$APP_DST
 
 接下来安装 DSH 插件（Desktop profile 只能通过 GUI 安装）：
-  1. 打开 DeepSeek Harness → 左侧边栏「Plugins」（插件）
-  2. 点「Add plugin / 添加插件」→ 选「Install a third-party plugin」
-  3. 在包名输入框粘贴本地绝对路径：
-       $ROOT/plugin
-  4. Install → 安装完成后点「Enable now / 立即启用」
+  1. 打开 DeepSeek Harness → 左侧边栏「插件」（Plugins）
+  2. 点「添加插件」→「安装第三方插件」（Install a third-party plugin）
+  3. 输入 npm 包名：dsh-status-bridge
+     （npm 包发布前，可改为粘贴 Git 地址：github:HAppy-2436/dsh-status-bridge）
+  4. 安装 → 完成后点「立即启用」（Enable now）
   5. 若提示需要重启，重启 DeepSeek Harness
 
 插件激活后会：
   - 写 ~/.dsh-status/bridge.json
-  - 自动拉起 ~/Applications/DSH Status.app（若存在）
+  - 自动拉起 /Applications/DSH Status.app 或 ~/Applications/DSH Status.app（若存在）
   - 菜单栏出现 DSH 图标；首次待回答消息会请求通知权限
 
 只想先看界面效果（不装插件）：

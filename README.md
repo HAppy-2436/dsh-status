@@ -1,187 +1,276 @@
-# dsh-status
+# DSH Status
 
-> macOS 菜单栏常驻工具：图标旁数字 = DeepSeek Harness 中「待回答 + 已完成 + 已停止」的会话数；
-> 单击弹出面板，只列非空闲会话（运行中 / 已完成 / 已停止 / 待回答），点击某行跳到 DSH 主窗口并打开该会话。
-> 面板与设置窗口按 **macOS 26/27（Liquid Glass）原生规范**重做：无箭头自定义 NSPanel + 系统玻璃材质、
-> 系统语义色与字号；设置窗口为标准 NSWindow + 原生 grouped Form。
+[![Latest release](https://img.shields.io/github/v/release/HAppy-2436/dsh-status?label=release)](https://github.com/HAppy-2436/dsh-status/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?logo=apple&logoColor=white)
+![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-black?logo=apple&logoColor=white)
+![DeepSeek Harness 0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-4D6BFE)
 
-## 当前状态（2026-11-09）
+**A native macOS menu bar companion for DeepSeek Harness.** It keeps the state of
+your DSH sessions visible at all times — how many are running, waiting for you,
+finished, or stopped — and shows the details in a native panel with one click.
 
-- **安装位置 / Bundle ID**：`~/Applications/DSH Status.app`，`com.liyitong.dshstatus.menubar`
-  （更早版本的设置域会在首次启动时自动迁移）
-- **App 图标**：与菜单栏空闲态同款的鲸鱼 glyph，**透明底、无圆角方块、主色 `#416EFB`**
-  （构建时由 `WhaleLogo` 生成 `.icns`），避免和 DeepSeek Harness 官方图标混淆
-- **P0 已完成**：Swift 菜单栏 App 可用——**鲸鱼 + 单色优先级环图标（v5）**：
-  - 外环始终是一整圈单色，颜色 = 当前最高优先级待办：**红(已停止) > 黄(待回答) > 绿(已完成)**；
-  - 有任务运行时：彗星弧用 Core Animation（GPU）平滑旋转 + 弧长呼吸；
-    静态层只在状态变化时重绘，实测常驻 CPU ≈ 0%；
-  - 只有运行中：动态弧直接用外环大小 + 中心运行数；内外环同时存在时不显示数字；
-  - 中心数字可在设置里选：全部任务（默认）/ 需要介入 / 与环色一致 / 不显示；
-  - 完全空闲时显示 DeepSeek 鲸鱼 Logo。
-  - **全状态切换动效（2026-11-08）**：空闲 / 待办 / 运行中 / 双层 / 未连接之间的 18 类切换都有过渡——
-    外环 0.45s 自 12 点顺时针扫入 / 逆时针收回 / 新色覆盖旧环；内容 0.24s 交叉淡化；
-    数字 0.18s 里程表滚动（≤2.4pt、永不横移）；运行中 ↔ 双层时彗星弧半径连续变形；
-    断连 / 恢复为无方向同步淡化；同轨交接（外环与彗星同半径）让退场方先走；单次总时长 ≤0.60s。
-    全部尊重「减弱动态效果」/ 低电量 / 设置开关；实测稳态 CPU 0.0%。
-    **v3 验收修复**：不变原子改为公共静态层（不再被双图淡化压暗到 75%）；>99 同文本（100→101）不再播过渡；
-    `99+` 改 6.4pt + ink bbox 居中（不再压外环）；屏幕参数变化/菜单栏重建强制落静态帧。
-    规范与逐帧对照：[docs/icon-transitions.md](docs/icon-transitions.md) ·
-    [真机逐帧图](docs/previews/icon-transition-dark.png) · [验收检查报告](docs/icon-audit.md)；
-    复现：`--test-icon-transitions`（51 步）+ `scripts/capture-icon-transitions.sh`；
-    **人工验收回放**：`bash scripts/replay-icon-transitions.sh 2`（慢放 2× 依次回放 51 次切换，结束自动恢复已安装 App）。
-  - 面板：**自定义无箭头 NSPanel**（330pt 宽、16pt continuous 圆角、顶边贴住菜单栏下沿），
-    Liquid Glass（`NSGlassEffectView(.regular)`，不设 tint）/ 经典磨砂 / 实色可切；
-    **扁平会话列表**（不按状态分组，最近一次状态变化在上）+ 行首红/黄/蓝/绿状态圆点；
-    子智能体默认折叠（父行**行尾**显示「数量 + 下箭头」，点它展开/收起、展开时箭头转成上箭头；
-    该按钮有独立悬停胶囊、便于点击；无子会话的行行尾是右箭头 `chevron.right`，点卡片任意位置跳转会话）；
-    圆角阶梯（面板 16 continuous 超椭圆 / 行与整块高亮 12 / 子行 8 / 行尾按钮 5；12 是「更圆」的视觉偏好，
-    比严格同心值 8 再大 4），
-    动效对齐 macOS：hover 0.12s、箭头 0.22s 旋转、子行错班淡入、面板高度 0.22s 跟随，且全部尊重「减弱动态效果」；
-    展开/收起子智能体时**只有窗口底边在做高度动画**（内容固定顶部对齐、由窗口裁切逐步揭幕），
-    且动画是 **60fps 逐帧真实 resize**（不用 AppKit 的窗口动画快路径，避免动画期间内容/阴影被拉伸成重影）；
-    调试时可用 `DSH_STATUS_ANIM_SCALE=10` 放慢逐帧核对；
-    **空闲 / 未连接时面板缩成一块 330×68 的大按钮**（鲸鱼 + 「全部空闲」/「未连接」，居中），
-    点面板任意位置就打开 DSH —— 不显示副标题、说明文字或额外的「打开 DSH」按钮；
-    footer 一行 = 连接状态点 + 设置 / 勿扰 / 退出；面板打开时状态项系统原生高亮；
-    通知未授权时面板顶部可操作提示。
-  - 勿扰：面板底部月亮按钮（总开关，持久化）；开启时静音全部系统通知**与提示音**，设置页单项开关保留。
-  - **提示音（2026-11-08；2026-11-09 新增「系统通知音」送达方式）**：设置页「提示音」分区——
-    默认「DSH 提示音」（三音上行琶音，峰值约为系统 Glass 的 4.6 倍，见 `app/Resources/dsh-chime.wav`），
-    另可选 8 个 macOS 系统声音 / 系统默认通知音 / 自定义音频文件（WAV·AIFF·MP3·M4A·CAF）/ 静音，
-    右侧「试听」即时试听。**播放方式二选一**：
-    ① **App 直接播放（默认）**：App 内 `NSSound` 直接发声，**0–100% 独立音量**（默认 90%）、
-      不受系统「通知音量/提醒音量」限制；系统通知被关闭时仍会响；系统「专注模式」也不会静音它
-      （需要安静时用本 App 勿扰或关闭提示音）。注意 App 内音量是**相对系统输出音量的比例**：
-      最终响度 ≈ 系统输出音量 × App 音量——系统总音量调低会按比例变小、系统静音时同样不会响；
-    ② **系统通知音**：声音随系统通知播放，**跟随系统专注模式/勿扰与通知音量**（App 内音量滑杆禁用、
-      显示「系统」）；所选音色（含自定义文件）会复制到 `~/Library/Sounds` 供系统读取，
-      适合想统一交给系统勿扰管理的场景。系统方式下「试听」会发一条真实测试通知。
-    两种方式都与通知共用「待回答 / 已完成 / 已停止」三个状态开关，勿扰模式同时静音两者；
-    App 播放方式下同帧多个会话跃迁合并为一次提示音。默认：开启 / App 直接播放 / DSH 提示音 / 90%。
-    自检：`--self-test-sound`（构建时自动跑，48 项）；`--test-sound[=<选项>,<音量>[,<自定义路径>]]`
-    （配合 `DSH_STATUS_SOUND_DELIVERY=app|system` 验收两种通道）。
-  - **后台：运行时阻止睡眠（2026-11-09）**：设置页新增「后台」分区，**默认关闭**；开启后只要 DSH 还有
-    **运行中的顶层会话**，App 就申请 `PreventUserIdleSystemSleep` 电源断言（等价 `caffeinate -i`），
-    阻止 Mac 进入**闲置睡眠**——屏幕仍可关闭，合盖 / 手动睡眠不受影响；断线、会话全部结束、关闭开关
-    或退出 App 都会释放（进程退出时由系统兜底回收）。实现在 `SleepPrevention.swift`，
-    断言名 `DSH Status: sessions running, preventing idle sleep`（`pmset -g assertions` 可查）。
-  - 设置窗口：标准 NSWindow（540×640、可缩放、位置记忆、关闭不退出）+ 原生 `Form(.grouped)`；
-    分区「菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 后台 / 通用」，24pt 图标块 + 原生开关/弹出按钮；
-    恢复默认带二次确认，页脚显示版本与连接状态。
-    提示音分区预览：[深色](docs/previews/settings-sound-preview-dark.png) ·
-    [浅色](docs/previews/settings-sound-preview-light.png)；
-    后台分区预览：[深色](docs/previews/settings-background-preview-dark.png) ·
-    [浅色](docs/previews/settings-background-preview-light.png)。
-  - SSE 桥客户端、未连接态、通知；配套 mock 桥可脱离 DSH 演示；
-    设计预览图与真机截图在 [`docs/previews/`](docs/previews/README.md)。
-- **P1 已实现并真机接通（2026-11-05）**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令）已在 DSH 安装启用，
-  真实状态推送正常；待验证「点击会话行跳转」与「通知点击」。
-- 图标系统 v5（鲸鱼 + 单色优先级环 + 运行中彗星弧）；进一步图标改进建议见
-  [docs/icon-suggestions.md](docs/icon-suggestions.md)。
+English · [简体中文](README.zh.md)
 
-### 圆环同心性核查结论（2026-11-06）
+![The DSH Status panel with two running sessions](docs/previews/panel-real-dark.png)
 
-**结论：几何上全部同心（偏差 0.00px），但双层环在视觉上确实会「看起来外圈略偏右」。**
-逐项测量（2x 渲染 44×44px，复现方法见下「圆环同心性核查」一节）：
+*The panel on macOS 27.2 (dark mode). Each row is a non-idle session with its
+current state and running time.*
 
-| 元素 | 圆心（pt，画布中心 = 11,11） | 判定 |
-| --- | --- | --- |
-| 外环（红/黄/绿/蓝整环，静态图） | (11.000, 11.000) | 同心 |
-| 内层轨道（16% 中性细环） | (11.000, 11.000) | 同心 |
-| 外环扫入过渡层（CAShapeLayer，`button.bounds` 中心） | (11.000, 11.000) | 同心 |
-| 彗星弧（CA 层，`bounds.midX/midY`） | (11.000, 11.000) | 同心 |
-| 未连接虚线环 | (11.065, 10.955) | 虚线相位造成的分布偏移，非几何偏心 |
-| 中心数字 | 字形质心（面积质心 + 墨迹居中） | 有意为之的视觉居中 |
+## Why use it
 
-「偏右」的视觉成因（外圈被误看成偏心，实际是**内层视觉重心偏右**）：
-1. **中性影子的视觉不对称**：22pt 画布中央的黑色不是背景色，而是中性层内容阴影的扩散光晕，能量中心约在 (13.2, 12.9)。
-2. **内层亮弧的静止位置在右上**：只运行中 / 双层的内层彗星弧，静态帧固定起始于 90°（正上方）并顺时针铺开，
-   落点偏右上；动态旋转时也不是对称的整环，整圈的「视觉重量」在右上更重。
-3. **彗星弧旋转层的支点比静态层偏右 0.5pt**：静态图 22pt 画在 44px 位图上；
-   CA 层用 `button.bounds.midX` 作为支点，按钮宽度是奇数像素（如 31px → midX = 15.5），
-   与静态层的 22pt 中心（约 15.0）差 0.5px。肉眼通常看不出来，但与 2 同向叠加会放大「外圈偏右」。
+- **Status at a glance.** The menu bar tells you whether a session needs you
+  without switching back to DSH.
+- **Only what matters.** The panel lists the sessions that are running, waiting
+  for an answer, finished, or stopped — not every session you have ever opened.
+- **Native, not a web wrapper.** The app is written in Swift with AppKit and
+  SwiftUI, and follows the system's own materials, colors, and typography.
+- **Local by design.** The app talks only to a bridge plugin that runs on your
+  own machine. There is no account, no cloud sync, and no telemetry.
 
-可选修正（未实施，需用户确认）：把 CA 层支点取整到与静态图一致（`round(bounds.midX)`）；或把内层彗星的静态帧起点
-改为对称/上下镜像的落点，降低右上偏重。
+## Features
 
-**复现**：`swift build -c release` 后 `.build/release/DSHStatusBar --render-previews /tmp/prev`，
-`docs/previews/icon-preview-*.png` 里含全部双层/单层/运行中/未连接状态；几何参数集中在
-`MenuBarIconRenderer.center / outerRadius / innerRadius`（`center` 只有一处，全部圆环共用）。
+### Menu bar icon
 
+- Idle with nothing to report: the DeepSeek whale glyph.
+- Otherwise a monochrome ring whose color is the highest-priority item:
+  red (stopped) > yellow (waiting for you) > green (completed).
+- Running sessions animate an arc around the ring. The center number can show
+  all tasks (default), only tasks that need you, only the count matching the
+  ring color, or nothing.
+- Transitions between states are animated; Reduced Motion, Low Power Mode, and
+  the in-app animation switches are respected.
 
-### 动效与对齐验收检查结论（2026-11-08）
+![The menu-bar icon at 8×: one running session](docs/previews/menubar-real.png)
 
-用户要求逐项检查「每个动态切换的动画」与「各个数字和状态下的对齐实现」。三路独立检查
-（代码契约审计 / 真机逐帧 646 帧 / 离屏 2×·8× 亚像素测量）结论：
+*The menu-bar glyph at 8×: one session running, drawn as an animated arc with
+the running count in the center.*
 
-| 项 | 结论 |
+### Session panel
+
+- A flat list of non-idle sessions, most recently changed first.
+- A colored dot marks each state: blue running, yellow waiting for an answer,
+  green completed, red stopped.
+- Subagent sessions are folded under their parent row and expand in place.
+- Click a session to open it in DeepSeek Harness.
+- When everything is idle — or the bridge is disconnected — the panel shrinks
+  to a single compact button that opens DSH.
+- Right-click the menu-bar icon for: open DSH, Do Not Disturb, Settings, Quit.
+
+### Notifications and sounds
+
+- A system notification when a session needs an answer, finishes, or stops;
+  each state can be enabled separately. Clicking a notification opens the
+  session.
+- Do Not Disturb silences every notification and sound while keeping the
+  individual preferences.
+- The alert sound can be the built-in DSH chime, one of eight macOS system
+  sounds, a custom audio file (WAV, AIFF, MP3, M4A, CAF), or silent.
+- Two delivery modes: **play from the app** (independent volume; not muted by
+  Focus) or **attach the sound to the system notification** (follows Focus and
+  the system notification volume).
+
+### Background
+
+- **Prevent idle sleep while sessions are running** (off by default). While at
+  least one session is running and the bridge is connected, the app keeps the
+  Mac awake; the screen may still turn off, and closing the lid or sleeping
+  manually is not blocked.
+
+### Settings
+
+The standard grouped settings window covers the menu-bar icon, display,
+projects, notifications, sounds, panel material, background, and general
+options (including restore-to-defaults and quit confirmation).
+
+![DSH Status settings window](docs/previews/settings-real-dark.png)
+
+*The settings window on macOS 27.2 (dark mode).*
+
+## Requirements
+
+- **macOS 13 or later.** The 0.2.0 build is Apple Silicon (arm64) only.
+- **DeepSeek Harness Desktop 0.2.x** with third-party plugin support. Tested
+  with 0.2.1-rc.5 and 0.2.2-rc.1.
+- **Liquid Glass panel material** requires macOS 26 or later; on older systems
+  the panel uses the classic frosted material or a solid fill instead.
+
+## Install
+
+DSH Status has two parts: the menu bar app and a bridge plugin that runs inside
+DeepSeek Harness. Install the app first, then the plugin.
+
+### 1. Install the app
+
+1. Download **`DSH-Status-0.2.0.dmg`** from the
+   [latest release](https://github.com/HAppy-2436/dsh-status/releases/latest).
+2. Open the DMG and drag **DSH Status** into `/Applications`.
+3. Open the app from `/Applications`.
+
+The 0.2.0 build is ad-hoc signed and not notarized, so macOS blocks the first
+launch. To allow it:
+
+- **Right-click (Control-click) the app → Open**, then confirm **Open**; or
+- open **System Settings → Privacy & Security**, scroll down, and click
+  **Open Anyway** next to the DSH Status entry.
+
+If macOS instead says that the app **is damaged**, remove the quarantine flag
+and open it again:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
+```
+
+### 2. Install the bridge plugin
+
+1. Open DeepSeek Harness.
+2. In the sidebar, go to **Plugins → Add plugin → Install a third-party plugin**.
+3. Enter the package name **`dsh-status-bridge`** and click **Install**.
+   If the package is not available from your registry yet, enter the Git URL
+   `github:HAppy-2436/dsh-status-bridge` in the same field instead.
+4. Click **Enable now** when the installation finishes. If DSH prompts for a
+   restart, restart it so the plugin can load.
+
+The plugin lives in its own repository:
+[HAppy-2436/dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge).
+It writes `~/.dsh-status/bridge.json`, launches the menu bar app automatically,
+and keeps it connected while DSH is running.
+
+### 3. Confirm it works
+
+The DSH Status icon appears in the menu bar. If the app did not start
+automatically, open **/Applications/DSH Status.app** manually.
+
+Notifications are off until macOS grants permission. Enable them from the
+notification row in **Settings**, from the notification entry in the right-click
+menu, or later under **System Settings → Notifications → DSH Status**.
+
+## Compatibility and known limitations
+
+| Item | Notes |
 | --- | --- |
-| 18 类迁移（M1–M18） | **全部实现**；基线真机 31 次回放 **30 PASS / 1 FAIL**（FAIL = 100→101 同一「99+」双影，已修） |
-| 时长与通道编排 | **31/31 与计划一致**（0.12–0.60s；M8 0.43–0.46s、M9 0.60s、彗星半径迁移 0.44s） |
-| 外环 / 彗星 / 数字逐帧 | 覆盖角单调、换色无闪空、彗星半径单调不重启、数字水平漂移 ≤0.11pt、M8/M9 同轨双亮 0 帧、尾帧差 0.000 |
-| 渲染质量 | **2 类实质缺陷已修**：不变原子被双图交叉淡化压暗（实测 0.77–0.81 亮度）；`99+` 压外环内缘 1.885pt |
-| 各状态几何对齐 | **全部精确同心**：环/轨/彗星/虚线环/短横/鲸鱼圆心 = (11.000, 11.000)，偏差 ≤0.0005pt，深浅一致 |
-| 各数字对齐 | 实现与文档一致（水平面积质心、垂直 ink bbox 中心均 = 11.000）；跨数字 bbox 跳动 ≤0.633pt 属面积质心方案取舍（P0-2 建议未实施） |
-| `99+` 对齐 | 旧：右缘超环内缘 1.885pt → 新：6.4pt + bbox 居中，左右余量各 0.41pt |
-| 待补 | 修复后真机逐帧复测 + 降级路径 smoke（屏幕锁定，解锁后补跑） |
+| Tested macOS | macOS 27.2 (minimum supported: macOS 13) |
+| Architecture | Apple Silicon arm64 |
+| Tested DeepSeek Harness | 0.2.1-rc.5 and 0.2.2-rc.1 |
+| Panel material | Liquid Glass on macOS 26+; frosted / solid fallback below that |
 
-完整报告：[docs/icon-audit.md](docs/icon-audit.md)（含逐迁移判定、逐数字对齐表、未修复取舍、复现命令）；
-验证记录：[docs/icon-transition-verification.md](docs/icon-transition-verification.md)。
+Known limitations:
 
-## 快速开始（P0 演示，假数据）
+- **One snapshot for all DSH windows.** When several DSH windows are open, the
+  app shows a single merged view based on the most recent state pushed by the
+  bridge; per-window breakdowns are not available.
+- **Unread counts reset when DSH restarts.** The “needs answer” bookkeeping
+  lives in the DSH renderer, so a DSH restart starts the counts from zero.
+- **No automatic updates.** New versions are published on the Releases page and
+  must be downloaded and installed manually.
+- **Not notarized.** The app is ad-hoc signed; the first launch after
+  installation needs the Gatekeeper steps above.
+- **Sessions that ended before the bridge started** are shown as completed.
+- **The app interface is currently in Simplified Chinese.** The documentation
+  is bilingual; UI localization has not shipped yet.
+
+## FAQ and troubleshooting
+
+**The icon never connects / the panel says “not connected”.**
+Make sure DeepSeek Harness is running and the `dsh-status-bridge` plugin is
+enabled. Check that DSH created `~/.dsh-status/bridge.json`. If the file is
+missing, disable and re-enable the plugin; if it exists but the app still does
+not connect, restart DSH, then open the app again.
+
+**I don't get notifications.**
+Open Settings → Notifications and check the permission row, or allow DSH Status
+under System Settings → Notifications. Also make sure the three state toggles
+are on and that Do Not Disturb is off. With the “system notification sound”
+delivery mode, macOS Focus can mute the sound.
+
+**macOS won't open the app.**
+Use the Gatekeeper steps in [Install](#install): right-click → Open, or allow it
+in System Settings → Privacy & Security. If macOS reports the app is damaged,
+run the `xattr` command above and open it again.
+
+**Does the app start when I log in?**
+Not by itself. Add it under System Settings → General → Login Items if you want
+it to start automatically.
+
+**How do I uninstall it?**
+Right-click the menu-bar icon → **Quit**, then drag `/Applications/DSH Status.app`
+to the Trash. In DSH, open Plugins and disable or remove `dsh-status-bridge`.
+Optionally delete `~/.dsh-status` to remove the bridge token and leftover
+settings.
+
+## Development
+
+Requirements: macOS with Xcode Command Line Tools (Swift 5.9 or later), and
+Node.js 20+ (or the Node runtime bundled with DeepSeek Harness) for the mock
+bridge and the demo script.
 
 ```bash
-bash scripts/demo.sh          # 起 mock 桥 + 菜单栏 App；Ctrl-C 退出
+git clone https://github.com/HAppy-2436/dsh-status.git
+cd dsh-status
+
+bash scripts/build-app.sh   # build dist/DSHStatusBar.app (release, ad-hoc signed, runs self-tests)
+bash scripts/demo.sh        # launch a mock bridge + the app (no DSH needed)
+bash scripts/test-bridge.sh # check the bridge protocol against the mock
+
+cd app && swift build -c release   # native SwiftPM build
 ```
 
-菜单栏会出现图标：mock 数据 = 1 待回答 + 2 运行中 + 1 已完成 + 1 已停止（角标 3）。
-点图标看面板，点会话行会打印一条 openSession 命令（mock 不真跳转）。
+Release packaging is done with `bash scripts/release-dmg.sh`, which produces
+`dist/release/DSH-Status-<version>.dmg` and its `.sha256` file.
 
-打开设置：点面板底部齿轮，或右键菜单栏图标 →「设置…」；修改即时生效。
+Repository layout:
 
-真实接入（一次性安装）：
+- `app/` — the Swift menu bar app (SwiftPM, no third-party dependencies)
+- `mock/` — mock bridge used by the demo and protocol tests
+- `scripts/` — build, install, demo, test, and DMG packaging scripts
+- `docs/` — design documents, previews, and screenshots
 
-```bash
-bash scripts/install.sh       # 构建 App 到 ~/Applications，并打印插件安装步骤
-```
+The bridge plugin now lives in
+[dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge); the wire
+protocol between the plugin and the app is documented in
+[docs/protocol.md](docs/protocol.md).
 
-然后在 DeepSeek Harness 左侧边栏 **Plugins → Add plugin → Install a third-party plugin**，
-粘贴本仓库 `plugin/` 的绝对路径安装并启用。插件会写 `~/.dsh-status/bridge.json` 并自动拉起 App。
+## Documentation
 
-## 开源致谢
+| Document | Contents |
+| --- | --- |
+| [docs/app-design.md](docs/app-design.md) | App design system: menu-bar icon states, panel structure, settings |
+| [docs/icon-transitions.md](docs/icon-transitions.md) | Menu-bar icon state transitions and timing |
+| [docs/icon-audit.md](docs/icon-audit.md) | Animation and alignment acceptance report |
+| [docs/previews/README.md](docs/previews/README.md) | Index of screenshots and design previews |
+| [docs/RELEASE.md](docs/RELEASE.md) | Release and DMG packaging process |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
-- 面板窗口/材质实现参考 [Status Trio](https://github.com/lingyired/status-trio)（Apache-2.0，
-  Copyright 2026 lingyired）：无边框 `NSPanel` + `NSGlassEffectView(.regular)`（不设 tint）+ 系统窗口阴影 + 16pt 圆角，
-  内容宿主放在 `glass.contentView` 内；本仓库按 Apache-2.0 条款保留出处与许可说明。
+`STATUS.md` is the maintainer's internal work log and is not part of the user
+documentation.
 
-## 架构
+## License
 
-```
-DSH renderer ── 插件 Client 半（读 uiSession 状态）──┐
-                                                    ├─ 本机 HTTP/SSE ── 原生菜单栏 App
-DSH Host ── 插件 Host 薄桥（bridge.json + 路由）────┘
-```
+DSH Status is released under the [MIT License](LICENSE).
+Copyright (c) 2026 HAppy-2436.
 
-- 协议：[docs/protocol.md](docs/protocol.md)
-- 产品设计：[docs/design.md](docs/design.md)
-- App / 图标设计规范：[docs/app-design.md](docs/app-design.md)
-- 原生 UI 实测与 HIG 依据：[docs/research/macos-ui-conventions.md](docs/research/macos-ui-conventions.md)
-- 本次面板/设置重设计契约：[docs/ui-redesign-spec.md](docs/ui-redesign-spec.md)
-- 图标设计建议：[docs/icon-suggestions.md](docs/icon-suggestions.md)
-- 动效与对齐验收检查报告：[docs/icon-audit.md](docs/icon-audit.md)
-- P0 演示与协议自检：`scripts/demo.sh`、`scripts/test-bridge.sh`
+Portions of the project are derived from other open-source work:
 
-## 目录结构
+- The panel window and material implementation is adapted from
+  [Status Trio](https://github.com/lingyired/status-trio)
+  (Apache License 2.0, Copyright 2026 lingyired).
+- The whale logo vector path comes from
+  [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+  (MIT, Copyright (c) 2026 DeepSeek).
 
-- `app/` — Swift 菜单栏 App（SwiftPM，无第三方依赖）
-- `plugin/` — DSH 插件 bundle：Host 薄桥 + Client 状态聚合（含 `node --test` 测试与开发用 dev-host）
-- `mock/` — mock 桥（P0 演示 / App 联调）
-- `scripts/dev-*` — 开发辅助（见各脚本头部说明）
-- `scripts/` — 构建、安装、演示、协议测试
-- `docs/` — 设计文档与预览图
+The full license texts are in [`LICENSES/`](LICENSES/). Attribution and the list
+of modifications are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[`NOTICE`](NOTICE).
 
-## 文档
+## Disclaimer
 
-- [docs/previews/README.md](docs/previews/README.md) — 图标/面板预览图说明
-- `STATUS.md` — 当前状态与下一步（**每轮工作后更新**）
-- `AGENTS.md` — 给 agent 的固定上下文
+DSH Status is an unofficial, independent project. It is not affiliated with,
+endorsed by, or sponsored by DeepSeek. “DeepSeek” and “DeepSeek Harness” are
+trademarks of their respective owners. The “DSH” abbreviation in the project
+name refers to DeepSeek Harness and is used in line with DeepSeek's brand
+guidance.
+
+The application icon is an original design. The whale glyph shown in the
+menu-bar idle state is derived from DeepSeek Harness under the MIT License.
+Status Trio–derived code is used under the Apache License 2.0. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.

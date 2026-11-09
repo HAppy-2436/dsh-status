@@ -55,6 +55,23 @@ enum PreviewRenderer {
             subtitle: "通知 → 提示音：App 内独立播放、独立音量，系统通知被关闭时仍会响",
             scrollOffset: 822,
             to: directory.appendingPathComponent("settings-sound-preview-light.png"))
+        // 后台分区单独出图：滚到「面板 → 后台」，展示「运行时阻止睡眠」开关（默认关）。
+        // 校准入口：DSH_STATUS_SETTINGS_BACKGROUND_OFFSET=<pt> 覆盖滚动位置。
+        let backgroundOffset: CGFloat = ProcessInfo.processInfo.environment["DSH_STATUS_SETTINGS_BACKGROUND_OFFSET"]
+            .flatMap { Double($0) }
+            .map { CGFloat($0) } ?? 1245
+        try renderSettingsSheet(
+            appearance: dark, colorScheme: .dark,
+            title: "DSH Status 设置页 · 后台（深色）",
+            subtitle: "有会话运行中时阻止 Mac 闲置睡眠（等价 caffeinate -i，默认关闭）",
+            scrollOffset: backgroundOffset,
+            to: directory.appendingPathComponent("settings-background-preview-dark.png"))
+        try renderSettingsSheet(
+            appearance: light, colorScheme: .light,
+            title: "DSH Status 设置页 · 后台（浅色）",
+            subtitle: "有会话运行中时阻止 Mac 闲置睡眠（等价 caffeinate -i，默认关闭）",
+            scrollOffset: backgroundOffset,
+            to: directory.appendingPathComponent("settings-background-preview-light.png"))
     }
 
     // MARK: - 图标矩阵
@@ -325,7 +342,7 @@ enum PreviewRenderer {
             (colorScheme == .dark ? NSColor(hex: 0x0E0E10) : NSColor(hex: 0xF0F0F3)).setFill()
             rect.fill()
             let sheetTitle = title ?? ("DSH Status 设置页 · " + (colorScheme == .dark ? "深色" : "浅色"))
-            let sheetSubtitle = subtitle ?? "原生 grouped Form：菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 通用；修改即时生效"
+            let sheetSubtitle = subtitle ?? "原生 grouped Form：菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 后台 / 通用；修改即时生效"
             drawText(sheetTitle,
                      font: .systemFont(ofSize: 15, weight: .semibold),
                      color: .labelColor, at: NSPoint(x: margin, y: sheetHeight - margin - 18))

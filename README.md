@@ -5,7 +5,7 @@
 > 面板与设置窗口按 **macOS 26/27（Liquid Glass）原生规范**重做：无箭头自定义 NSPanel + 系统玻璃材质、
 > 系统语义色与字号；设置窗口为标准 NSWindow + 原生 grouped Form。
 
-## 当前状态（2026-11-08）
+## 当前状态（2026-11-09）
 
 - **安装位置 / Bundle ID**：`~/Applications/DSH Status.app`，`com.liyitong.dshstatus.menubar`
   （更早版本的设置域会在首次启动时自动迁移）
@@ -55,11 +55,18 @@
     与通知共用「待回答 / 已完成 / 已停止」三个状态开关，勿扰模式同时静音两者；同帧多个会话跃迁合并为一次提示音。
     默认：开启、DSH 提示音、音量 90%。自检：`--self-test-sound`（构建时自动跑）、
     `--test-sound[=<选项>,<音量>]`（单独试听并退出）。
+  - **后台：运行时阻止睡眠（2026-11-09）**：设置页新增「后台」分区，**默认关闭**；开启后只要 DSH 还有
+    **运行中的顶层会话**，App 就申请 `PreventUserIdleSystemSleep` 电源断言（等价 `caffeinate -i`），
+    阻止 Mac 进入**闲置睡眠**——屏幕仍可关闭，合盖 / 手动睡眠不受影响；断线、会话全部结束、关闭开关
+    或退出 App 都会释放（进程退出时由系统兜底回收）。实现在 `SleepPrevention.swift`，
+    断言名 `DSH Status: sessions running, preventing idle sleep`（`pmset -g assertions` 可查）。
   - 设置窗口：标准 NSWindow（540×640、可缩放、位置记忆、关闭不退出）+ 原生 `Form(.grouped)`；
-    分区「菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 通用」，24pt 图标块 + 原生开关/弹出按钮；
+    分区「菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 后台 / 通用」，24pt 图标块 + 原生开关/弹出按钮；
     恢复默认带二次确认，页脚显示版本与连接状态。
     提示音分区预览：[深色](docs/previews/settings-sound-preview-dark.png) ·
-    [浅色](docs/previews/settings-sound-preview-light.png)。
+    [浅色](docs/previews/settings-sound-preview-light.png)；
+    后台分区预览：[深色](docs/previews/settings-background-preview-dark.png) ·
+    [浅色](docs/previews/settings-background-preview-light.png)。
   - SSE 桥客户端、未连接态、通知；配套 mock 桥可脱离 DSH 演示；
     设计预览图与真机截图在 [`docs/previews/`](docs/previews/README.md)。
 - **P1 已实现并真机接通（2026-11-05）**：DSH 插件（Host 薄桥 + Client 状态聚合 + 跳转命令）已在 DSH 安装启用，

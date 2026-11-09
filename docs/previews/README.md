@@ -2,8 +2,9 @@
 
 - 离屏图：由 `dist/DSHStatusBar.app/Contents/MacOS/DSHStatusBar --render-previews docs/previews` 生成
   （`*-preview-*.png`、`scene-preview-dark.png`、`scene-preview-light.png`）；
-  `settings-sound-preview-*.png` 是在 640pt 窗口内真实滚动到「通知 → 提示音」分区后截出的离屏图
-  （调试入口 `DSH_STATUS_SETTINGS_PREVIEW_HEIGHT=<pt>` 可出完整长页）；
+  `settings-sound-preview-*.png` / `settings-background-preview-*.png` 是在 640pt 窗口内真实滚动到
+  对应分区后截出的离屏图（调试入口 `DSH_STATUS_SETTINGS_PREVIEW_HEIGHT=<pt>` 可出完整长页、
+  `DSH_STATUS_SETTINGS_BACKGROUND_OFFSET=<pt>` 可校准后台分区滚动位置）；
 - 真机截图：`menubar-real.png` / `icon-real-zoom.png` / `panel-real-dark.png` /
   `panel-real-expanded-dark.png` / `panel-real-idle-dark.png` / `panel-real-idle-hover-dark.png` / `settings-real-dark.png`
   （macOS 27.2 深色模式，2x；空闲态那张用空闲 mock 桥出图）；
@@ -25,8 +26,9 @@
 | `panel-real-idle-dark.png` | 真机空闲态（Liquid Glass，330×68）：鲸鱼 +「全部空闲」，整块面板可点打开 DSH |
 | `panel-real-idle-hover-dark.png` | 同上，鼠标悬停态：高亮底色铺满整块内容区（圆角 12），说明点哪里都有效 |
 | `scene-preview-dark.png` / `scene-preview-light.png` | 场景示意（离屏渲染，菜单栏 + 打开的面板；外壳圆角与真机同为 16pt continuous） |
-| `settings-preview-dark.png` / `settings-preview-light.png` | 设置页（离屏渲染，深/浅）：原生 grouped Form 的七个分区（窗口默认高度下可见前三个） |
+| `settings-preview-dark.png` / `settings-preview-light.png` | 设置页（离屏渲染，深/浅）：原生 grouped Form 的八个分区（窗口默认高度下可见前三个） |
 | `settings-sound-preview-dark.png` / `settings-sound-preview-light.png` | **提示音分区（2026-11-08 新增，离屏渲染）**：通知 → 提示音；App 内独立播放 + 独立音量、可选音色/自定义文件、勿扰同时静音 |
+| `settings-background-preview-dark.png` / `settings-background-preview-light.png` | **后台分区（2026-11-09 新增，离屏渲染）**：面板 → 后台 → 通用；「运行时阻止睡眠」默认关，开启后有会话运行中时阻止 Mac 闲置睡眠 |
 | `settings-real-dark.png` | 设置窗口真机截图（深色，540×640 标准 NSWindow） |
 | `ui-before-after-dark.png` | 改版前后对照（面板 + 设置窗口，深色） |
 | `quit-confirm-dark.png` | 退出二次确认弹窗（深色，默认焦点在「取消」） |

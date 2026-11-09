@@ -106,6 +106,10 @@ final class AppSettings: ObservableObject {
     @Published var panelBackgroundStyle: PanelBackgroundStyle {
         didSet { save("panelBackgroundStyle", panelBackgroundStyle.rawValue) }
     }
+    /// 有会话运行中时阻止 Mac 进入闲置睡眠（默认关；等价 `caffeinate -i`）。
+    @Published var preventSleepWhileRunning: Bool {
+        didSet { save("preventSleepWhileRunning", preventSleepWhileRunning) }
+    }
 
     // MARK: 提示音（App 内独立播放，音量与系统通知音量无关）
 
@@ -138,7 +142,8 @@ final class AppSettings: ObservableObject {
                   legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
             for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "doNotDisturb", "confirmBeforeQuit",
-                        "panelBackgroundStyle", "soundEnabled", "soundOption", "soundVolume", "soundCustomPath"] {
+                        "panelBackgroundStyle", "soundEnabled", "soundOption", "soundVolume", "soundCustomPath",
+                        "preventSleepWhileRunning"] {
                 if let value = legacy.object(forKey: "dshStatus.\(key)") {
                     defaults.set(value, forKey: "dshStatus.\(key)")
                 }
@@ -179,6 +184,7 @@ final class AppSettings: ObservableObject {
         let storedVolume = store?.object(forKey: "dshStatus.soundVolume") as? Double
         soundVolume = min(max(storedVolume ?? 0.9, 0), 1)
         soundCustomPath = store?.string(forKey: "dshStatus.soundCustomPath") ?? ""
+        preventSleepWhileRunning = store?.object(forKey: "dshStatus.preventSleepWhileRunning") as? Bool ?? false
     }
 
     /// 预览/演示用：不落盘，也不读取本机真实设置（离屏出图可复现）。
@@ -202,6 +208,7 @@ final class AppSettings: ObservableObject {
         soundOption = .dshChime
         soundVolume = 0.9
         soundCustomPath = ""
+        preventSleepWhileRunning = false
     }
 
     /// 当前自定义音频文件 URL（未选择 / 路径为空时为 nil）。
@@ -257,6 +264,7 @@ struct SettingsView: View {
             notificationSection
             soundSection
             panelSection
+            backgroundSection
             generalSection
             aboutSection
         }
@@ -550,6 +558,27 @@ struct SettingsView: View {
             Text("面板")
         } footer: {
             SettingsFootnote("「液态玻璃」需要 macOS 26 或更高版本；开启系统「降低透明度」时自动使用实色。")
+        }
+    }
+
+    // MARK: 后台
+
+    private var backgroundSection: some View {
+        Section {
+            SettingsRow(symbol: "moon.zzz.fill",
+                        color: .systemIndigo,
+                        title: "运行时阻止睡眠",
+                        subtitle: model.sleepPrevented
+                            ? "当前已阻止闲置睡眠（屏幕仍可关闭）"
+                            : "有会话运行中时，阻止 Mac 进入闲置睡眠") {
+                Toggle("运行时阻止睡眠", isOn: $settings.preventSleepWhileRunning)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+        } header: {
+            Text("后台")
+        } footer: {
+            SettingsFootnote("仅阻止「闲置系统睡眠」（等价 caffeinate -i）：屏幕仍可关闭，合盖与手动睡眠不受影响。需要 DSH Status App 保持运行；断线或会话全部结束后自动释放。")
         }
     }
 

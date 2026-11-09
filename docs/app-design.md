@@ -155,7 +155,7 @@
   不自绘卡片/描边/底栏。
 - 行：左侧 **24×24** continuous 圆角色块（系统状态色 + 轻微渐变，白色 SF Symbol 12pt semibold）
   + 标题 13pt + 可选副标题 11pt secondary + Spacer + 原生控件（`Toggle .switch` / `Picker .menu` / bordered 小按钮）。
-- 分区顺序：**菜单栏图标 → 显示 → 项目显示 → 通知 → 提示音 → 面板 → 通用**；页脚为 11pt tertiary 版本/连接脚注。
+- 分区顺序：**菜单栏图标 → 显示 → 项目显示 → 通知 → 提示音 → 面板 → 后台 → 通用**；页脚为 11pt tertiary 版本/连接脚注。
 - 分区说明文字为 11pt secondary、左对齐，位于卡片下方。
 
 | 分区 | 设置 | 说明 |
@@ -173,10 +173,17 @@
 | | 音量 | 0–100% **独立音量**（默认 90%），与系统通知/提醒音量无关 |
 | | 自定义音频 | 仅在选择「自定义音频文件…」时出现；选择后立即试听，路径持久化 |
 | 面板 | 材质 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 |
+| 后台 | 运行时阻止睡眠 | 默认关；有会话运行中时阻止 Mac 闲置睡眠（等价 `caffeinate -i`） |
 | 通用 | 退出前确认 | 点面板电源键或右键「退出」时先弹确认框 |
 | | 恢复所有设置… | NSAlert 二次确认后恢复推荐默认值 |
 
 - 所有设置项即时生效并持久化到 UserDefaults（键前缀 `dshStatus.`，含旧域迁移）。
+- **「运行时阻止睡眠」的实现与边界**：用 `ProcessInfo.beginActivity(.idleSystemSleepDisabled)` 申请
+  `PreventUserIdleSystemSleep` 断言（`SleepPrevention.swift`）。条件 = 设置开关 && 已连接 && 顶层运行中会话数 > 0；
+  断线、会话全部结束、关闭开关或 App 退出时释放（断言随进程销毁由系统兜底回收）。只阻止**闲置系统睡眠**：
+  屏幕仍可关闭，合盖 / 手动睡眠 / 低电量强制睡眠不受影响；App 未运行时没有保护。
+  断言名在 `pmset -g assertions` 中显示为 `DSH Status: sessions running, preventing idle sleep`
+  （用 ASCII——中文会被系统过滤成空串，影响排查）。
 - HIG 说明：HIG 建议设置窗口采用「工具栏 + 多 pane」结构、不提供 app 专属外观设置；
   本 App 为单页设置（内容量不足以拆分 pane），保持标准 titlebar + grouped Form；
   「面板材质」保留为兼容/可读性选项（系统「降低透明度」优先），在文档中标注该取舍。

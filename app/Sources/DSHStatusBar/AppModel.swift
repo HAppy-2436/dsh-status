@@ -8,6 +8,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var connected: Bool = false
     @Published private(set) var lastUpdate: Date?
     @Published private(set) var notificationPermission: NotificationPermission = .unknown
+    /// 当前是否正在阻止 Mac 闲置睡眠（设置页副标题用）。
+    @Published private(set) var sleepPrevented: Bool = false
 
     /// 状态跃迁：某会话进入新状态（用于通知；首帧基线不触发）。
     var onStatusTransition: ((SessionRow, SessionStatus) -> Void)?
@@ -27,6 +29,8 @@ final class AppModel: ObservableObject {
     private var previousStatus: [String: String] = [:]
     private var hasBaseline = false
     private var settingsCancellable: AnyCancellable?
+    private var sleepSettingCancellable: AnyCancellable?
+    private let sleepPreventer = SleepPreventer()
 
     init(settings: AppSettings = .shared) {
         self.settings = settings
@@ -34,6 +38,11 @@ final class AppModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.objectWillChange.send() }
+            }
+        sleepSettingCancellable = settings.$preventSleepWhileRunning
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { self?.refreshSleepPrevention() }
             }
     }
 
@@ -125,7 +134,20 @@ final class AppModel: ObservableObject {
         hasBaseline = true
         self.state = state
         self.lastUpdate = Date()
+        refreshSleepPrevention()
         for (row, status) in transitions { onStatusTransition?(row, status) }
+    }
+
+    /// 维护「有会话运行中时阻止闲置睡眠」的电源断言。
+    ///
+    /// 条件 = 设置开关 && 已连接 DSH && 有运行中的顶层会话。
+    /// 断线、全部跑完、关闭开关或 App 退出时都会释放；断言是幂等的，重复调用不会叠加。
+    private func refreshSleepPrevention() {
+        let shouldPrevent = settings.preventSleepWhileRunning
+            && connected
+            && state.counts.running > 0
+        let active = sleepPreventer.update(shouldPrevent: shouldPrevent)
+        if sleepPrevented != active { sleepPrevented = active }
     }
 
     // MARK: - 过滤
@@ -151,6 +173,7 @@ final class AppModel: ObservableObject {
             // 断线时保留最后一帧数据用于「打开 DSH」，但图标显示未连接
             lastUpdate = Date()
         }
+        refreshSleepPrevention()
     }
 
     // MARK: - 预览用

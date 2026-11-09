@@ -187,7 +187,7 @@ enum MenuBarIconRenderer {
             if includeContent {
                 switch model.idleStyle {
                 case .whale: drawWhale(dark: dark)
-                case .dashedDoubleRing: drawDashedDoubleRing(dark: dark)
+                case .dashedRing: drawDashedRing(dark: dark)
                 }
             }
             return
@@ -262,33 +262,10 @@ enum MenuBarIconRenderer {
         path.fill()
     }
 
-    /// 空闲可选的品牌「双层环」线稿：外环虚线 + 内环细实线，单色、中性。
-    ///
-    /// 与「未连接」的单环 + 短横区分：这里是**两层同心环**，且不使用状态色；
-    /// 深浅色仍由菜单栏实际外观决定（`isDark`）。
-    private static func drawDashedDoubleRing(dark: Bool) {
-        let ink = dark ? NSColor.white : NSColor(hex: 0x1F1F23)
-
-        // 外环：粗一点的圆头虚线，22pt 下保持 2–3 段 dash 可辨。
-        ink.withAlphaComponent(dark ? 0.94 : 0.88).setStroke()
-        let outer = NSBezierPath(ovalIn: NSRect(
-            x: center.x - outerRadius, y: center.y - outerRadius,
-            width: outerRadius * 2, height: outerRadius * 2
-        ))
-        outer.lineWidth = 1.9
-        outer.lineCapStyle = .round
-        outer.setLineDash([2.8, 2.4], count: 2, phase: 0)
-        outer.stroke()
-
-        // 内环：细实线，形成「双层」结构（品牌双环）。
-        ink.withAlphaComponent(dark ? 0.62 : 0.55).setStroke()
-        let inner = NSBezierPath(ovalIn: NSRect(
-            x: center.x - innerRadius, y: center.y - innerRadius,
-            width: innerRadius * 2, height: innerRadius * 2
-        ))
-        inner.lineWidth = 1.15
-        inner.lineCapStyle = .round
-        inner.stroke()
+    /// 空闲可选的「虚线圆环」：直接复用「未连接」状态的单虚线环素材（无短横），
+    /// 中性、不与状态色环混淆；深浅色仍由菜单栏实际外观决定（`isDark`）。
+    private static func drawDashedRing(dark: Bool) {
+        strokeDisconnectedRing(dark: dark)
     }
 
     // MARK: 运行中动态弧
@@ -305,7 +282,8 @@ enum MenuBarIconRenderer {
 
     // MARK: 未连接
 
-    private static func drawDisconnected(dark: Bool) {
+    /// 「未连接」/「空闲可选」共用的单虚线圆环描边。
+    private static func strokeDisconnectedRing(dark: Bool) {
         let color = NSColor.labelColor.withAlphaComponent(dark ? 0.42 : 0.36)
         color.setStroke()
         let ring = NSBezierPath(ovalIn: NSRect(
@@ -318,7 +296,11 @@ enum MenuBarIconRenderer {
         ring.lineCapStyle = .round
         ring.setLineDash([2.2, 3.2], count: 2, phase: 0)
         ring.stroke()
+    }
 
+    private static func drawDisconnected(dark: Bool) {
+        let color = NSColor.labelColor.withAlphaComponent(dark ? 0.42 : 0.36)
+        strokeDisconnectedRing(dark: dark)
         color.setFill()
         let minus = NSRect(x: center.x - 3.0, y: center.y - 0.7, width: 6.0, height: 1.4)
         NSBezierPath(roundedRect: minus, xRadius: 0.7, yRadius: 0.7).fill()

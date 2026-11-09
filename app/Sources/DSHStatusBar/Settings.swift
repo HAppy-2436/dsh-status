@@ -69,15 +69,24 @@ enum AppIconStyle: String, CaseIterable, Identifiable {
 enum MenuBarIdleStyle: String, CaseIterable, Identifiable {
     /// DeepSeek 鲸鱼（默认；借助其 MIT 许可与出处声明）。
     case whale
-    /// 品牌「双层环」的虚线版（单色线稿，中性、不与状态色环混淆）。
-    case dashedDoubleRing
+    /// 「未连接」状态的单虚线圆环样式（复用同一绘制素材；中性、不与状态色环混淆）。
+    case dashedRing
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .whale: return "鲸鱼 Logo（默认）"
-        case .dashedDoubleRing: return "虚线双环"
+        case .dashedRing: return "虚线圆环（未连接样式）"
+        }
+    }
+
+    /// 兼容 0.4.0 曾使用过的 `dashedDoubleRing` 存档值。
+    init(storedValue: String?) {
+        switch storedValue {
+        case MenuBarIdleStyle.dashedRing.rawValue, "dashedDoubleRing": self = .dashedRing
+        case MenuBarIdleStyle.whale.rawValue: self = .whale
+        default: self = .whale
         }
     }
 }
@@ -216,7 +225,7 @@ final class AppSettings: ObservableObject {
             defaults.set(2, forKey: "dshStatus.centerNumberModeVersion")
         }
         centerNumberMode = storedCenterMode
-        menuBarIdleStyle = MenuBarIdleStyle(rawValue: store?.string(forKey: "dshStatus.menuBarIdleStyle") ?? "") ?? .whale
+        menuBarIdleStyle = MenuBarIdleStyle(storedValue: store?.string(forKey: "dshStatus.menuBarIdleStyle"))
         appIconStyle = AppIconStyle(rawValue: store?.string(forKey: "dshStatus.appIconStyle") ?? "") ?? .brand
         runAnimation = store?.object(forKey: "dshStatus.runAnimation") as? Bool ?? true
         transitionAnimation = store?.object(forKey: "dshStatus.transitionAnimation") as? Bool ?? true
@@ -362,7 +371,7 @@ struct SettingsView: View {
             SettingsRow(symbol: "circle.circle",
                         color: Theme.uiNSColor(.completed),
                         title: "空闲时图标",
-                        subtitle: "没有任务时菜单栏显示鲸鱼，或品牌「双层环」的虚线版") {
+                        subtitle: "没有任务时菜单栏显示鲸鱼，或「未连接」样式的虚线圆环") {
                 Picker("空闲时图标", selection: $settings.menuBarIdleStyle) {
                     ForEach(MenuBarIdleStyle.allCases) { style in
                         Text(style.label).tag(style)

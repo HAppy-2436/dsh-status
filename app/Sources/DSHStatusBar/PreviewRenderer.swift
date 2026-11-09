@@ -78,8 +78,8 @@ enum PreviewRenderer {
 
     private static let states: [(String, String, IconModel)] = [
         ("空闲", "没有任何非空闲任务 · 鲸鱼 Logo（默认）", IconModel(statuses: [])),
-        ("空闲（可选）", "设置：空闲时图标 = 品牌「虚线双环」",
-         IconModel(statuses: [], idleStyle: .dashedDoubleRing)),
+        ("空闲（可选）", "设置：空闲时图标 = 虚线圆环（复用未连接样式）",
+         IconModel(statuses: [], idleStyle: .dashedRing)),
         ("1 个运行中", "静态：轨道 + 固定活动弧 · 中心 1",
          IconModel(statuses: [.running])),
         ("3 个运行中", "静态：轨道 + 固定活动弧 · 中心 3",

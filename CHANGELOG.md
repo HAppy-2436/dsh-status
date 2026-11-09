@@ -8,6 +8,23 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-11-10
+
+### 中文
+
+#### 修正
+- 「菜单栏 → 空闲时图标 → 虚线圆环」改为**直接复用「未连接」状态的单虚线环素材**（不带短横），
+  不再是 0.4.0 的双层虚线环。默认仍为鲸鱼 Logo，不预选该选项。
+
+### English
+
+#### Fixed
+- The idle-icon option "dashed ring" now reuses the **single dashed ring of the "not connected"
+  state** (no minus sign) instead of the 0.4.0 double-dashed ring. The default stays the whale
+  logo; the option is not preselected.
+
+---
+
 ## [0.4.0] - 2026-11-09
 
 ### 中文

@@ -198,7 +198,11 @@ cd ~/Developer/projects/dsh-status
 bash scripts/build-app.sh
 app/.build/release/DSHStatusBar --render-previews /tmp/prev
 
-# 51 步回放（真机；需解锁屏幕）
+# 人工验收（推荐）：慢放 2× 依次回放 51 次切换，结束自动恢复已安装 App
+bash scripts/replay-icon-transitions.sh 2
+bash scripts/replay-icon-transitions.sh 4 3,2     # 只慢放看 M8+M9（运行中→已完成）
+
+# 51 步回放（真机；需解锁屏幕、会与已安装 App 出现两个图标）
 DSH_STATUS_ANIM_SCALE=3 app/.build/release/DSHStatusBar --test-icon-transitions
 bash scripts/capture-icon-transitions.sh /tmp/iconcap 3        # 逐帧捕获（约 3 分钟）
 

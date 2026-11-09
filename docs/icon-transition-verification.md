@@ -55,6 +55,9 @@ M17→attention/running、M16 from both）。
 
 ```bash
 cd ~/Developer/projects/dsh-status
+# 0) 人工验收回放（慢放 2× 依次看全部 51 次切换；结束自动恢复已安装 App）
+bash scripts/replay-icon-transitions.sh 2
+
 # 1) 修复后全量逐帧复测（同参数，51 步）
 bash scripts/capture-icon-transitions.sh /tmp/icon-check/frames-after 3
 #    重点：T30（100→101）应无任何中间帧；T14/T25/T26/T27/T30 的环/数字亮度不再凹陷；尾帧干净

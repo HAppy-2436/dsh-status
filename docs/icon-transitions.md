@@ -341,7 +341,12 @@
 # 1) 构建（release）
 bash scripts/build-app.sh
 
-# 2) 脚本化回放全部状态迁移（真机）：自动退出，打印时间线
+# 2) 人工验收回放（推荐）：慢放回放 51 次切换，结束自动恢复已安装 App
+#    用法：scripts/replay-icon-transitions.sh [倍速=2] [起始步,步数]
+bash scripts/replay-icon-transitions.sh 2
+bash scripts/replay-icon-transitions.sh 4 13,2      # 只慢放看 M1 3 个 + M14 3→2（环不应闪）
+
+# 2b) 脚本化回放全部状态迁移（真机）：自动退出，打印时间线
 #    51 步 = 32 步基础迁移（M1–M17 + 99+ 边界）+ 19 步子变体（M18 独立 / M10·M11 变色 / M14 增减 /
 #    M15 1→99·99→100 / M8 数字不变 / M17→attention·running / M16 from both）
 app/.build/release/DSHStatusBar --test-icon-transitions

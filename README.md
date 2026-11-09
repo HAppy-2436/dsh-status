@@ -27,7 +27,8 @@
     `99+` 改 6.4pt + ink bbox 居中（不再压外环）；屏幕参数变化/菜单栏重建强制落静态帧。
     规范与逐帧对照：[docs/icon-transitions.md](docs/icon-transitions.md) ·
     [真机逐帧图](docs/previews/icon-transition-dark.png) · [验收检查报告](docs/icon-audit.md)；
-    复现：`--test-icon-transitions`（51 步）+ `scripts/capture-icon-transitions.sh`。
+    复现：`--test-icon-transitions`（51 步）+ `scripts/capture-icon-transitions.sh`；
+    **人工验收回放**：`bash scripts/replay-icon-transitions.sh 2`（慢放 2× 依次回放 51 次切换，结束自动恢复已安装 App）。
   - 面板：**自定义无箭头 NSPanel**（330pt 宽、16pt continuous 圆角、顶边贴住菜单栏下沿），
     Liquid Glass（`NSGlassEffectView(.regular)`，不设 tint）/ 经典磨砂 / 实色可切；
     **扁平会话列表**（不按状态分组，最近一次状态变化在上）+ 行首红/黄/蓝/绿状态圆点；

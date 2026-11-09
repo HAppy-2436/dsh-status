@@ -49,4 +49,5 @@ See the root [README](../README.md) for the product overview and
 - `NotificationManager.swift`, `NotificationSound.swift` — system notifications and alert sounds
 - `SleepPrevention.swift` — optional idle-sleep prevention while sessions are running
 - `AppModel.swift`, `AppDelegate.swift`, `Models.swift`, `Theme.swift` — state model, app lifecycle, data types, design tokens
+- `LaunchAtLogin.swift`, `SleepPrevention.swift` — launch-at-login (`SMAppService`) and idle-sleep prevention
 - `PreviewRenderer.swift` — off-screen preview rendering

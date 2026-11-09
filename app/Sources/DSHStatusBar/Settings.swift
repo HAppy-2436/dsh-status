@@ -272,6 +272,8 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     /// 「试听」回调（由设置窗口注入；nil 时退化为 App 内播放）。
     var onPreviewSound: (() -> Void)? = nil
+    /// 登录项状态以系统 `SMAppService` 为准（见 LaunchAtLogin.swift）。
+    @StateObject private var launchAtLogin = LaunchAtLoginController()
 
     private let statuses: [SessionStatus] = [.waiting, .running, .completed, .stopped]
 
@@ -291,6 +293,7 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.settingsContentBackground)
+        .onAppear { launchAtLogin.refresh() }
     }
 
     // MARK: 菜单栏图标
@@ -632,6 +635,27 @@ struct SettingsView: View {
 
     private var backgroundSection: some View {
         Section {
+            SettingsRow(symbol: "arrow.up.forward.app.fill",
+                        color: .systemBlue,
+                        title: "登录时自动启动",
+                        subtitle: launchAtLogin.detailText) {
+                Toggle("登录时自动启动", isOn: Binding(
+                    get: { launchAtLogin.isOn },
+                    set: { launchAtLogin.setEnabled($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+            }
+            if case .requiresApproval = launchAtLogin.state {
+                SettingsRow(symbol: "checkmark.shield.fill",
+                            color: .systemOrange,
+                            title: "允许登录项",
+                            subtitle: "系统需要你在登录项列表中确认一次") {
+                    Button("打开系统设置") { launchAtLogin.openLoginItemsSettings() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+            }
             SettingsRow(symbol: "moon.zzz.fill",
                         color: .systemIndigo,
                         title: "运行时阻止睡眠",
@@ -645,7 +669,7 @@ struct SettingsView: View {
         } header: {
             Text("后台")
         } footer: {
-            SettingsFootnote("仅阻止「闲置系统睡眠」（等价 caffeinate -i）：屏幕仍可关闭，合盖与手动睡眠不受影响。需要 DSH Status App 保持运行；断线或会话全部结束后自动释放。")
+            SettingsFootnote("「登录时自动启动」由 macOS 登录项管理（可在「系统设置 → 通用 → 登录项」查看）。\n「运行时阻止睡眠」仅阻止「闲置系统睡眠」（等价 caffeinate -i）：屏幕仍可关闭，合盖与手动睡眠不受影响。需要 DSH Status App 保持运行；断线或会话全部结束后自动释放。")
         }
     }
 

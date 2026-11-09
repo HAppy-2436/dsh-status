@@ -146,6 +146,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                                         count: count)
             }
         }
+        if let raw = CommandLine.arguments.first(where: { $0.hasPrefix("--test-launch-at-login") }) {
+            let controller = LaunchAtLoginController()
+            var action = "status"
+            if raw.hasSuffix("=on") {
+                action = controller.setEnabled(true) ? "on-ok" : "on-failed"
+            } else if raw.hasSuffix("=off") {
+                action = controller.setEnabled(false) ? "off-ok" : "off-failed"
+            }
+            print("[dsh-status] launch-at-login action=\(action) state=\(controller.state) "
+                  + "detail=\(controller.detailText)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSApp.terminate(nil) }
+        }
         if CommandLine.arguments.contains("--dump-appearance") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
                 self?.statusItemController.dumpAppearanceDebug()

@@ -8,6 +8,28 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-11-09
+
+### 中文
+
+#### 新增
+- **登录时自动启动**：设置页「后台」分区新增开关（默认关，macOS 13+），通过
+  `SMAppService.mainApp` 注册/注销系统登录项；需要系统确认时在设置页提示并可直接打开
+  「系统设置 → 通用 → 登录项」。状态每次从系统读取，不写入 UserDefaults。
+- 调试入口 `--test-launch-at-login[=on|off]`：查询/注册/注销登录项并打印状态。
+
+### English
+
+#### Added
+- **Launch at login**: new switch in **Settings → Background** (off by default, macOS 13+),
+  backed by `SMAppService.mainApp`. When macOS requires approval, the settings page says so and
+  offers a button to open **System Settings → General → Login Items**. The state is always read
+  from the system, never persisted separately.
+- Debug entry `--test-launch-at-login[=on|off]` prints the login-item state after an optional
+  register/unregister.
+
+---
+
 ## [0.2.1] - 2026-11-09
 
 ### 中文

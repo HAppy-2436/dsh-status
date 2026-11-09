@@ -72,6 +72,9 @@ the running count in the center.*
 
 ### Background
 
+- **Launch at login** (off by default, macOS 13+). Registers through the system
+  login items (`SMAppService`); toggle it in **Settings → Background**. If macOS
+  asks for approval, allow DSH Status under **System Settings → General → Login Items**.
 - **Prevent idle sleep while sessions are running** (off by default). While at
   least one session is running and the bridge is connected, the app keeps the
   Mac awake; the screen may still turn off, and closing the lid or sleeping

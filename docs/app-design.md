@@ -174,6 +174,7 @@
 | | 音量 | App 方式：0–100% **独立音量**（默认 90%）；系统方式：禁用并显示「系统」（由系统通知音量控制） |
 | | 自定义音频 | 仅在选择「自定义音频文件…」时出现；选择后立即试听，路径持久化；系统方式下会复制到 `~/Library/Sounds` |
 | 面板 | 材质 | 液态玻璃（macOS 26+ 默认）/ 经典磨砂 / 实色 |
+| 后台 | 登录时自动启动 | 默认关；用 `SMAppService.mainApp` 注册为系统登录项（macOS 13+）；需要系统确认时引导到「系统设置 → 通用 → 登录项」 |
 | 后台 | 运行时阻止睡眠 | 默认关；有会话运行中时阻止 Mac 闲置睡眠（等价 `caffeinate -i`） |
 | 通用 | 退出前确认 | 点面板电源键或右键「退出」时先弹确认框 |
 | | 恢复所有设置… | NSAlert 二次确认后恢复推荐默认值 |
@@ -284,6 +285,8 @@ app/
     SettingsWindow.swift        // 设置窗口 chrome（标准 NSWindow / frame autosave）
     NotificationManager.swift   // 通知权限与横幅发送（通知音交给 NotificationSound）
     NotificationSound.swift     // 提示音：送达方式 / 音色选项 / NSSound 播放器 / 系统通知音落地 / 自检
+    SleepPrevention.swift       // 运行时阻止睡眠（PreventUserIdleSystemSleep 断言）
+    LaunchAtLogin.swift         // 登录时自动启动（SMAppService.mainApp 注册/注销 + 系统登录项状态）
     Theme.swift                 // 设计 token（系统语义色 / 尺寸 / hover）
     PreviewRenderer.swift       // 离屏预览图（图标矩阵 / 面板 / 场景 / 设置页）
 ```
@@ -295,6 +298,8 @@ app/
   - `--animate-subagents`：打开面板 → 展开 → 收起第一个有子智能体的会话，用于逐帧核对高度动画。
   - `--test-icon-transitions[=<起始步>,<步数>]`：脚本化回放全部图标状态迁移（每步打印时间线并自动退出）。
   - `--test-sound[=<option>,<volume>[,<customPath>]]`：按指定选项/音量试听提示音后退出（默认用当前设置）。
+  - `--test-launch-at-login[=on|off]`：查询/注册/注销登录项并打印 `SMAppService` 状态，便于核对自启动。
+  - `--dump-appearance`：打印 `NSApp.effectiveAppearance` 与菜单栏实际外观（`NSStatusBarButton.effectiveAppearance`），核对深浅色识别。
   - `DSH_STATUS_SOUND_DELIVERY=app|system`：`--test-sound` 时强制送达方式（验收两种通道用）。
   - `DSH_STATUS_SETTINGS_SOUND_DELIVERY=app|system` / `_SOUND_OPTION=<option>`：离屏设置页预览时覆盖提示音状态。
   - `--self-test-sound`：提示音自检（资源打包 / 选项解析 / 音量映射 / 设置持久化），无音频硬件依赖。

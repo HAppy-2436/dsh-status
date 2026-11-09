@@ -1,0 +1,81 @@
+import Foundation
+import ServiceManagement
+
+/// 「登录时自动启动」的系统状态（macOS 13+ 的 `SMAppService.mainApp`）。
+///
+/// 不把开关存进 `UserDefaults`：登录项的真实状态由系统维护，App 只读取
+/// `SMAppService.mainApp.status` 并据此渲染开关。这样用户在「系统设置 → 通用 → 登录项」
+/// 里手动关掉、或系统要求确认时，设置页仍显示真实状态，不会出现「开关记住了、系统没生效」。
+final class LaunchAtLoginController: ObservableObject {
+    enum State: Equatable {
+        case enabled
+        case disabled
+        /// 已注册但需要用户在「系统设置 → 通用 → 登录项」里放行。
+        case requiresApproval
+        case failed(String)
+    }
+
+    @Published private(set) var state: State = .disabled
+
+    init() { refresh() }
+
+    /// 开关显示值：`requiresApproval` 视为「已开启、等待系统确认」。
+    var isOn: Bool {
+        switch state {
+        case .enabled, .requiresApproval: return true
+        case .disabled, .failed: return false
+        }
+    }
+
+    var detailText: String {
+        switch state {
+        case .enabled: return "登录 macOS 后自动打开 DSH Status"
+        case .disabled: return "登录 macOS 后自动打开 DSH Status"
+        case .requiresApproval: return "已注册，需在「系统设置 → 通用 → 登录项」中允许"
+        case .failed(let message): return message
+        }
+    }
+
+    func refresh() {
+        switch SMAppService.mainApp.status {
+        case .enabled: state = .enabled
+        case .requiresApproval: state = .requiresApproval
+        case .notRegistered: state = .disabled
+        case .notFound: state = .failed("系统未找到 App 的登录项注册")
+        @unknown default: state = .disabled
+        }
+    }
+
+    /// 返回是否成功；失败时 `state == .failed(message)`。
+    @discardableResult
+    func setEnabled(_ enabled: Bool) -> Bool {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            state = .failed(error.localizedDescription)
+            return false
+        }
+        refresh()
+        return true
+    }
+
+    /// 打开「系统设置 → 通用 → 登录项」。
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
+}
+
+extension LaunchAtLoginController.State: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .enabled: return "enabled"
+        case .disabled: return "disabled"
+        case .requiresApproval: return "requiresApproval"
+        case .failed(let message): return "failed(\(message))"
+        }
+    }
+}

@@ -39,21 +39,21 @@ const log = (...args) => {
 const F = (min) => Date.now() - min * 60_000
 const baseSessions = () => [
   {
-    id: 'session-erhu-0001',
-    title: '选哪种调音方案？',
-    workspaceId: 'w-erhu',
-    workspaceTitle: 'erhu',
+    id: 'session-example-a-0001',
+    title: '选择实现方案',
+    workspaceId: 'w-example-app',
+    workspaceTitle: 'example-app',
     status: 'waiting',
-    pending: { kind: 'question', summary: '选哪种调音方案？' },
+    pending: { kind: 'question', summary: '选择实现方案' },
     lastTurn: { kind: 'completed', at: F(3) },
     since: F(1),
     updatedAt: F(1),
   },
   {
-    id: 'session-dsh-status-0002',
-    title: '实现菜单栏图标',
-    workspaceId: 'w-dsh-status',
-    workspaceTitle: 'dsh-status',
+    id: 'session-example-b-0002',
+    title: '实现设置页',
+    workspaceId: 'w-example-app',
+    workspaceTitle: 'example-app',
     status: 'running',
     pending: null,
     lastTurn: null,
@@ -61,10 +61,10 @@ const baseSessions = () => [
     updatedAt: F(0.2),
   },
   {
-    id: 'session-stability-0003',
-    title: '测试出口节点',
-    workspaceId: 'w-stability',
-    workspaceTitle: 'stability',
+    id: 'session-example-c-0003',
+    title: '运行回归测试',
+    workspaceId: 'example-lab',
+    workspaceTitle: 'example-lab',
     status: 'running',
     pending: null,
     lastTurn: null,
@@ -72,10 +72,10 @@ const baseSessions = () => [
     updatedAt: F(0.3),
   },
   {
-    id: 'session-dsh-status-0004',
-    title: '写桥接协议',
-    workspaceId: 'w-dsh-status',
-    workspaceTitle: 'dsh-status',
+    id: 'session-example-d-0004',
+    title: '编写接入文档',
+    workspaceId: 'w-example-app',
+    workspaceTitle: 'example-app',
     status: 'completed',
     pending: null,
     lastTurn: { kind: 'completed', at: F(9) },
@@ -83,10 +83,10 @@ const baseSessions = () => [
     updatedAt: F(9),
   },
   {
-    id: 'session-homebrew-0005',
-    title: '梳理 homebrew 配置',
-    workspaceId: 'w-homebrew',
-    workspaceTitle: 'homebrew',
+    id: 'session-example-e-0005',
+    title: '整理配置清单',
+    workspaceId: 'example-tools',
+    workspaceTitle: 'example-tools',
     status: 'stopped',
     pending: null,
     lastTurn: { kind: 'aborted', at: F(42) },
@@ -137,8 +137,8 @@ setInterval(() => {
 let phase = 0
 const phases = [
   () => log('阶段：等待回答'),
-  () => mut((s) => s.id === 'session-erhu-0001' && ((s.status = 'running'), (s.pending = null), (s.since = Date.now()), (s.updatedAt = Date.now()))),
-  () => mut((s) => s.id === 'session-dsh-status-0002' && ((s.status = 'completed'), (s.lastTurn = { kind: 'completed', at: Date.now() }), (s.since = Date.now()), (s.updatedAt = Date.now()))),
+  () => mut((s) => s.id === 'session-example-a-0001' && ((s.status = 'running'), (s.pending = null), (s.since = Date.now()), (s.updatedAt = Date.now()))),
+  () => mut((s) => s.id === 'session-example-b-0002' && ((s.status = 'completed'), (s.lastTurn = { kind: 'completed', at: Date.now() }), (s.since = Date.now()), (s.updatedAt = Date.now()))),
   () => {
     // 回到初始形态，循环演示
     sessions.splice(0, sessions.length, ...baseSessions())

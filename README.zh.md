@@ -11,9 +11,9 @@
 
 [English](README.md) · 简体中文
 
-![DSH Status 面板，显示两个运行中的会话](docs/previews/panel-real-dark.png)
+![DSH Status 场景示意 — 离屏渲染（示例数据）](docs/previews/scene-preview-dark.png)
 
-*macOS 27.2 深色模式下的面板。每一行是一个非空闲会话，显示当前状态与已运行时长。*
+*离屏渲染 + 示例数据：不包含任何真实会话、标题或项目名。*
 
 ## 为什么用它
 
@@ -33,9 +33,9 @@
   仅需要介入、与环色一致的数量、不显示。
 - 状态切换带过渡动画，并遵循「减弱动态效果」、低电量模式与 App 内的动画开关。
 
-![菜单栏图标 8 倍放大：一个运行中的会话](docs/previews/menubar-real.png)
+![会话面板 — 离屏渲染（示例数据）](docs/previews/panel-preview-dark.png)
 
-*8 倍放大的菜单栏图标：一个运行中的会话，以动画圆弧表示，中心是运行中数量。*
+*会话面板离屏渲染（运行中 / 待回答 / 已完成 / 已停止，示例数据）。*
 
 ### 会话面板
 
@@ -67,9 +67,9 @@
 标准分组设置窗口涵盖菜单栏图标、显示、项目、通知、提示音、面板材质、后台与通用选项
 （含**应用图标**：品牌双层环 / DeepSeek 蓝色鲸鱼；恢复默认设置、退出前确认）。
 
-![DSH Status 设置窗口](docs/previews/settings-real-dark.png)
+![DSH Status 设置窗口 — 离屏渲染](docs/previews/settings-preview-dark.png)
 
-*macOS 27.2 深色模式下的设置窗口。*
+*设置窗口离屏渲染（菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 后台 / 通用）。*
 
 ## 环境要求
 
@@ -204,7 +204,7 @@ cd app && swift build -c release   # 原生 SwiftPM 构建
 | [docs/RELEASE.md](docs/RELEASE.md) | 发布与 DMG 打包流程 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本更新日志 |
 
-`STATUS.md` 是维护者的内部工作日志，不属于用户文档。
+（本地维护日志不纳入仓库。）
 
 ## 许可证
 

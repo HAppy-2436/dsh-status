@@ -11,3 +11,6 @@ build/
 .env
 .env.local
 .ipynb_checkpoints/
+
+# 维护者本地日志（含内部/隐私信息，不纳入公开仓库）
+STATUS.md

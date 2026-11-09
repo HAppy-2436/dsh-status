@@ -8,7 +8,7 @@
 > 前置：[app-design.md §2](app-design.md)（图标 v5 语义与几何）、[icon-suggestions.md](icon-suggestions.md)（P1-6/P1-7）、
 > [research/macos-ui-conventions.md](research/macos-ui-conventions.md)（HIG 动效原则）。
 > **本文不改图标几何、配色语义与信息结构，只定义过渡。**
-> 实拍逐帧对照：[`docs/previews/icon-transition-dark.png`](previews/icon-transition-dark.png)（真机，动画放慢 3×）。
+> 真机逐帧核对已完成；出于隐私，真机截图证据不随仓库发布（仅本地保留）。
 > 独立验证报告：[`docs/icon-transition-verification.md`](icon-transition-verification.md)。
 
 ## 0. 结论先行

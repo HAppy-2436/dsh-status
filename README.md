@@ -12,10 +12,9 @@ finished, or stopped — and shows the details in a native panel with one click.
 
 English · [简体中文](README.zh.md)
 
-![The DSH Status panel with two running sessions](docs/previews/panel-real-dark.png)
+![DSH Status scene — offscreen render with demo data](docs/previews/scene-preview-dark.png)
 
-*The panel on macOS 27.2 (dark mode). Each row is a non-idle session with its
-current state and running time.*
+*Offscreen render with demo data (no real sessions, titles or project names).*
 
 ## Why use it
 
@@ -43,10 +42,9 @@ current state and running time.*
 - Transitions between states are animated; Reduced Motion, Low Power Mode, and
   the in-app animation switches are respected.
 
-![The menu-bar icon at 8×: one running session](docs/previews/menubar-real.png)
+![The session panel — offscreen render with demo data](docs/previews/panel-preview-dark.png)
 
-*The menu-bar glyph at 8×: one session running, drawn as an animated arc with
-the running count in the center.*
+*The session panel, offscreen render with demo data (running / waiting / completed / stopped).*
 
 ### Session panel
 
@@ -89,9 +87,9 @@ projects, notifications, sounds, panel material, background, and general
 options (including the app icon — brand double ring or the DeepSeek blue whale —
 restore-to-defaults, and quit confirmation).
 
-![DSH Status settings window](docs/previews/settings-real-dark.png)
+![DSH Status settings window — offscreen render](docs/previews/settings-preview-dark.png)
 
-*The settings window on macOS 27.2 (dark mode).*
+*The settings window, offscreen render (menu bar icon / display / projects / notifications / sounds / panel / background / general).*
 
 ## Requirements
 
@@ -247,8 +245,7 @@ protocol between the plugin and the app is documented in
 | [docs/RELEASE.md](docs/RELEASE.md) | Release and DMG packaging process |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
-`STATUS.md` is the maintainer's internal work log and is not part of the user
-documentation.
+(The maintainer's local work log is not tracked in this repository.)
 
 ## License
 

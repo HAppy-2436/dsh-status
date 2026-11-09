@@ -215,12 +215,12 @@ enum DemoState {
 
     static let state: BridgeState = {
         let rows = [
-            row("session-erhu", "选哪种调音方案？", "erhu", "waiting",
-                pending: PendingInfo(kind: "question", summary: "选哪种调音方案？"), updatedMinutesAgo: 1),
-            row("session-dsh", "实现菜单栏图标", "dsh-status", "running", updatedMinutesAgo: 0.2, since: Date().timeIntervalSince1970 * 1000 - 134_000),
-            row("session-stability", "测试出口节点", "stability", "running", updatedMinutesAgo: 0.3, since: Date().timeIntervalSince1970 * 1000 - 300_000),
-            row("session-protocol", "写桥接协议", "dsh-status", "completed", updatedMinutesAgo: 9),
-            row("session-homebrew", "梳理 homebrew 配置", "homebrew", "stopped", updatedMinutesAgo: 42),
+            row("session-example-a", "选择实现方案", "example-app", "waiting",
+                pending: PendingInfo(kind: "question", summary: "选择实现方案"), updatedMinutesAgo: 1),
+            row("session-example-b", "实现设置页", "example-app", "running", updatedMinutesAgo: 0.2, since: Date().timeIntervalSince1970 * 1000 - 134_000),
+            row("session-example-c", "运行回归测试", "example-lab", "running", updatedMinutesAgo: 0.3, since: Date().timeIntervalSince1970 * 1000 - 300_000),
+            row("session-example-d", "编写接入文档", "example-app", "completed", updatedMinutesAgo: 9),
+            row("session-example-e", "整理配置清单", "example-tools", "stopped", updatedMinutesAgo: 42),
         ]
         return BridgeState(
             version: 1,
@@ -230,11 +230,11 @@ enum DemoState {
             counts: Counts(waiting: 1, running: 2, completed: 1, stopped: 1, attention: 3),
             sessions: rows,
             subagents: [
-                SubagentRow(id: "sub-1", parentId: "session-dsh", title: "你是 A（设计系统与一级页面）",
+                SubagentRow(id: "sub-1", parentId: "session-example-b", title: "拆分设计任务",
                             status: "running", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 20_000),
-                SubagentRow(id: "sub-2", parentId: "session-dsh", title: "谱面导入与叠印实现",
+                SubagentRow(id: "sub-2", parentId: "session-example-b", title: "实现数据导入",
                             status: "completed", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 120_000),
-                SubagentRow(id: "sub-3", parentId: "session-stability", title: "你是 B（录音/分析中/结果页）",
+                SubagentRow(id: "sub-3", parentId: "session-example-c", title: "核对分析结果",
                             status: "running", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 40_000),
             ]
         )

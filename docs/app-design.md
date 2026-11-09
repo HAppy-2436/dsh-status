@@ -56,7 +56,7 @@
   + 数字里程表滚动（0.18s、≤2.4pt、不横移）+ 彗星淡入淡出/半径变形（0.18 / 0.45s）；同轨交接（外环 ↔ 彗星同半径）
   让退场方先走 0.18–0.30s；单次总时长 ≤0.60s，结束立刻落回完整静态帧。
   完整参数与 18 类迁移矩阵见 [icon-transitions.md](icon-transitions.md)，真机逐帧对照见
-  [previews/icon-transition-dark.png](previews/icon-transition-dark.png)。
+  （真机截图因隐私不随仓库发布。）
   调试：`--test-icon-transitions[=<起始步>,<步数>]` 脚本化回放全部迁移，`DSH_STATUS_ANIM_SCALE` 放慢倍数，
   `scripts/capture-icon-transitions.sh` 逐帧捕获。
 - **v3 验收修复（2026-11-08）**：内容通道改为「不变原子公共静态层 + 变化原子交叉淡化」（相同像素不再被双图淡化压暗）；

@@ -402,11 +402,11 @@ enum PreviewRenderer {
                                          to url: URL) throws {
         let demo = AppModel.demo()
         let demoExpanded = AppModel.demo()
-        demoExpanded.toggleSubagents(for: "session-dsh")
+        demoExpanded.toggleSubagents(for: "session-example-b")
         let demoHoverRow = AppModel.demo()
-        demoHoverRow.setPreviewHover(rowId: "session-erhu", trailing: .row)
+        demoHoverRow.setPreviewHover(rowId: "session-example-a", trailing: .row)
         let demoHoverControl = AppModel.demo()
-        demoHoverControl.setPreviewHover(rowId: "session-dsh", trailing: .control)
+        demoHoverControl.setPreviewHover(rowId: "session-example-b", trailing: .control)
         let models: [(String, AppModel)] = [
             ("默认（行尾数量 + 下箭头）", demo),
             ("行悬停 / 展开按钮悬停", demoHoverRow),

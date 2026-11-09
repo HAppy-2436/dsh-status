@@ -214,4 +214,4 @@ DSH_STATUS_DISABLE_RUN_ANIMATION=1  DSH_STATUS_ANIM_SCALE=0.3 app/.build/release
 数据索引（临时目录）：代码审计 `/tmp/icon-check/motion/report.md`；真机逐帧 `/tmp/icon-check/frames/report.md`
 （+`data/per_transition.json`、`summary.csv`、`contact_sheet_1/2.png`）；对齐 `/tmp/icon-check/align/report.md`
 （+`measure.json`、`annotated/`）；Lead 复核 `/tmp/icon-check/lead/`（计划级测试、图层拆分核验、8× 复测）。
-修复前后 `99+` 对照与 T30 双影真机证据：`docs/previews/icon-audit-99plus-and-fix.png`。
+修复前后的 `99+` 对照与 T30 双影真机证据已完成核对；出于隐私，真机截图不随仓库发布（仅本地保留）。

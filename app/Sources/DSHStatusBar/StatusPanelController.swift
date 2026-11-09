@@ -6,6 +6,9 @@ import SwiftUI
 ///
 /// 结构与 macOS 26/27 原生菜单栏模块一致，参考 Apache-2.0 开源的 **Status Trio**
 /// （`AnchoredStatusPanel` / `StatusPanelContentViewController`，Copyright 2026 lingyired）：
+///
+/// **本文件是改编版本（Modified from lingyired/status-trio，Apache-2.0）**；
+/// 具体修改点见仓库根 `THIRD_PARTY_NOTICES.md`。
 /// - 无边框 `NSPanel`，`hasShadow = true`，圆角 16，`level = .statusBar`；
 /// - macOS 26+ 用 `NSGlassEffectView(style: .regular)` 做背景，**不设 tint**（保留原生折射/高光），
 ///   SwiftUI 内容放在 `glass.contentView` 内的一层普通容器里；

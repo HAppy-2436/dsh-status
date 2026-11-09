@@ -1,0 +1,17 @@
+dsh-status
+Copyright 2026 HAppy-2436
+
+This product includes software developed by lingyired.
+
+Status Trio
+Copyright 2026 lingyired
+
+Status Trio is licensed under the Apache License, Version 2.0.
+A copy of the license is provided in LICENSES/Apache-2.0.txt.
+
+This product also includes a vector path derived from DeepSeek Harness
+(https://github.com/deepseek-ai/deepseek-harness), Copyright (c) 2026 DeepSeek,
+licensed under the MIT License.
+A copy of the license is provided in LICENSES/MIT-deepseek-harness.txt.
+
+See THIRD_PARTY_NOTICES.md for attribution and modification details.

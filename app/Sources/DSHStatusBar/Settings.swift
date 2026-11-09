@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 import UniformTypeIdentifiers
+import UserNotifications
 
 // MARK: - 设置模型
 
@@ -115,6 +116,10 @@ final class AppSettings: ObservableObject {
 
     /// 提示音总开关：关闭后状态变化只发系统通知横幅、不发声。
     @Published var soundEnabled: Bool { didSet { save("soundEnabled", soundEnabled) } }
+    /// 提示音送达方式：App 直接播放（独立音量，不受专注模式限制）或系统通知音（跟随系统专注模式/通知音量）。
+    @Published var soundDelivery: SoundDeliveryMode {
+        didSet { save("soundDelivery", soundDelivery.rawValue) }
+    }
     /// 提示音音色（内置 DSH 提示音 / macOS 系统声音 / 自定义文件 / 静音）。
     @Published var soundOption: NotificationSoundOption {
         didSet { save("soundOption", soundOption.rawValue) }
@@ -140,7 +145,7 @@ final class AppSettings: ObservableObject {
         for domain in legacyDefaultsDomains {
             guard let legacy = UserDefaults(suiteName: domain),
                   legacy.object(forKey: "dshStatus.centerNumberMode") != nil else { continue }
-            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation",
+            for key in ["visibleStatuses", "hiddenWorkspaces", "centerNumberMode", "runAnimation", "transitionAnimation", "soundDelivery",
                         "notifyWaiting", "notifyCompleted", "notifyStopped", "doNotDisturb", "confirmBeforeQuit",
                         "panelBackgroundStyle", "soundEnabled", "soundOption", "soundVolume", "soundCustomPath",
                         "preventSleepWhileRunning"] {
@@ -181,6 +186,7 @@ final class AppSettings: ObservableObject {
 
         soundEnabled = store?.object(forKey: "dshStatus.soundEnabled") as? Bool ?? true
         soundOption = NotificationSoundOption(rawValue: store?.string(forKey: "dshStatus.soundOption") ?? "") ?? .dshChime
+        soundDelivery = SoundDeliveryMode(rawValue: store?.string(forKey: "dshStatus.soundDelivery") ?? "") ?? .app
         let storedVolume = store?.object(forKey: "dshStatus.soundVolume") as? Double
         soundVolume = min(max(storedVolume ?? 0.9, 0), 1)
         soundCustomPath = store?.string(forKey: "dshStatus.soundCustomPath") ?? ""
@@ -205,6 +211,7 @@ final class AppSettings: ObservableObject {
         confirmBeforeQuit = true
         panelBackgroundStyle = PanelBackgroundStyle.systemDefault
         soundEnabled = true
+        soundDelivery = .app
         soundOption = .dshChime
         soundVolume = 0.9
         soundCustomPath = ""
@@ -218,12 +225,22 @@ final class AppSettings: ObservableObject {
     }
 
     /// 用当前设置播放一次提示音（设置页「试听」与状态跃迁共用）。
+    /// 仅「App 直接播放」送达方式生效；「系统通知音」由通知本身携带声音（见 `systemNotificationSound`）。
     @discardableResult
     func playSound() -> Bool {
-        guard soundEnabled else { return false }
+        guard soundEnabled, soundDelivery == .app else { return false }
         return NotificationSoundPlayer.shared.play(option: soundOption,
                                                    volume: soundVolume,
                                                    customPath: soundCustomPath)
+    }
+
+    /// 系统通知音送达方式下交给 `UNNotificationSound` 的声音；App 直接播放模式返回 nil。
+    /// - Parameter stagingDirectory: 落地目录（默认 `~/Library/Sounds`；自检传临时目录用）。
+    func systemNotificationSound(stagingDirectory: URL? = nil) -> UNNotificationSound? {
+        guard soundEnabled, soundDelivery == .system else { return nil }
+        return SystemNotificationSound.sound(option: soundOption,
+                                             customPath: soundCustomPath,
+                                             stagingDirectory: stagingDirectory)
     }
 
     /// 某状态是否在面板/图标中显示。
@@ -253,6 +270,8 @@ final class AppSettings: ObservableObject {
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var model: AppModel
+    /// 「试听」回调（由设置窗口注入；nil 时退化为 App 内播放）。
+    var onPreviewSound: (() -> Void)? = nil
 
     private let statuses: [SessionStatus] = [.waiting, .running, .completed, .stopped]
 
@@ -418,17 +437,30 @@ struct SettingsView: View {
             SettingsRow(symbol: settings.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
                         color: .systemOrange,
                         title: "播放提示音",
-                        subtitle: "状态变化时由 App 直接播放；音量独立，不受系统通知音量影响") {
+                        subtitle: "状态变化时提醒；可选择 App 直接播放或走系统通知音") {
                 Toggle("播放提示音", isOn: $settings.soundEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
+            }
+            SettingsRow(symbol: "arrow.triangle.swap",
+                        color: .systemBlue,
+                        title: "播放方式",
+                        subtitle: deliverySubtitle) {
+                Picker("播放方式", selection: soundDeliveryBinding) {
+                    ForEach(SoundDeliveryMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .disabled(!settings.soundEnabled)
             }
             SettingsRow(symbol: "music.note",
                         color: .systemPink,
                         title: "声音") {
                 HStack(spacing: 8) {
                     Picker("声音", selection: soundOptionBinding) {
-                        ForEach(NotificationSoundOption.allCases) { option in
+                        ForEach(availableSoundOptions) { option in
                             Text(option.label).tag(option)
                         }
                     }
@@ -445,17 +477,17 @@ struct SettingsView: View {
             SettingsRow(symbol: "speaker.wave.1.fill",
                         color: .systemTeal,
                         title: "音量",
-                        subtitle: "独立于系统通知音量") {
+                        subtitle: volumeSubtitle) {
                 HStack(spacing: 8) {
                     Slider(value: $settings.soundVolume, in: 0...1)
                         .frame(width: 150)
                         .accessibilityLabel("提示音音量")
-                    Text("\(volumePercent)%")
+                    Text(settings.soundDelivery == .app ? "\(volumePercent)%" : "系统")
                         .font(.system(size: 11).monospacedDigit())
                         .foregroundStyle(.secondary)
                         .frame(width: 36, alignment: .trailing)
                 }
-                .disabled(!settings.soundEnabled || settings.soundOption == .none)
+                .disabled(!settings.soundEnabled || settings.soundOption == .none || settings.soundDelivery == .system)
             }
             if settings.soundOption == .custom {
                 SettingsRow(symbol: "waveform",
@@ -473,7 +505,7 @@ struct SettingsView: View {
         } header: {
             Text("提示音")
         } footer: {
-            SettingsFootnote("提示音由 App 直接播放，不经过系统通知：系统通知被关闭时仍会响；音量也与系统通知/提醒音量无关（仍受系统总输出音量限制）。系统「专注模式」不会静音本提示音——需要安静时请用勿扰模式或关闭提示音。")
+            SettingsFootnote("「App 直接播放」由 App 直接发声：独立音量，不受系统「专注模式/勿扰」限制；「系统通知音」随系统通知播放：专注模式/勿扰会静音，音量由系统通知音量控制（所选音色会复制到 ~/Library/Sounds 供系统读取）。两种方式都受本页总开关与「勿扰模式」控制。")
         }
     }
 
@@ -500,6 +532,37 @@ struct SettingsView: View {
         return url.lastPathComponent
     }
 
+    /// 当前送达方式下可选的声音（「系统默认通知音」只有系统通知音通道能播放）。
+    private var availableSoundOptions: [NotificationSoundOption] {
+        NotificationSoundOption.allCases.filter { option in
+            option != .systemDefault || settings.soundDelivery == .system
+        }
+    }
+
+    private var deliverySubtitle: String {
+        switch settings.soundDelivery {
+        case .app: return "独立音量；不受系统「专注模式/勿扰」限制"
+        case .system: return "专注模式/勿扰会静音，音量由系统控制"
+        }
+    }
+
+    private var volumeSubtitle: String {
+        settings.soundDelivery == .app ? "独立于系统通知音量" : "系统模式下由系统通知音量控制"
+    }
+
+    /// 播放方式 Picker 的绑定：切回 App 播放时，把只属于系统通道的「系统默认通知音」换掉。
+    private var soundDeliveryBinding: Binding<SoundDeliveryMode> {
+        Binding(
+            get: { settings.soundDelivery },
+            set: { newValue in
+                settings.soundDelivery = newValue
+                if newValue == .app, settings.soundOption == .systemDefault {
+                    settings.soundOption = .dshChime
+                }
+            }
+        )
+    }
+
     /// 声音 Picker 的绑定：选到「自定义音频文件…」且还没有文件时直接弹选择框，
     /// 取消则退回上一个选项（避免停在「自定义但没选文件」的半残状态）。
     private var soundOptionBinding: Binding<NotificationSoundOption> {
@@ -517,7 +580,11 @@ struct SettingsView: View {
     }
 
     private func previewSound() {
-        settings.playSound()
+        if let onPreviewSound {
+            onPreviewSound()
+        } else {
+            settings.playSound()
+        }
     }
 
     /// 选择自定义提示音：写入路径后立即试听，方便判断音量/音色是否合适。

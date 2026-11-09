@@ -11,13 +11,16 @@ import SwiftUI
 final class SettingsWindowController {
     private let settings: AppSettings
     private let model: AppModel
+    /// 设置页「试听」回调（由 AppDelegate 注入，负责区分 App 内播放 / 系统通知音）。
+    private let onPreviewSound: (() -> Void)?
     private var window: NSWindow?
 
     private static let autosaveName = "DSHStatusSettings"
 
-    init(settings: AppSettings, model: AppModel) {
+    init(settings: AppSettings, model: AppModel, onPreviewSound: (() -> Void)? = nil) {
         self.settings = settings
         self.model = model
+        self.onPreviewSound = onPreviewSound
     }
 
     func show() {
@@ -35,7 +38,7 @@ final class SettingsWindowController {
     // MARK: - 窗口构建
 
     private func makeWindow() -> NSWindow {
-        let root = SettingsView(settings: settings, model: model)
+        let root = SettingsView(settings: settings, model: model, onPreviewSound: onPreviewSound)
         let hosting = NSHostingController(rootView: root)
 
         let window = NSWindow(contentViewController: hosting)

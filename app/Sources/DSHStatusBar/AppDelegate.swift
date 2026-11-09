@@ -44,14 +44,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             guard enabled else { return }
-            // 提示音是独立通道：由 App 直接播放，不依赖系统通知权限/系统通知音音量。
-            // 0.4s 内的多次跃迁合并为一次提示音（否则同帧多个会话会叠成一片噪音）。
-            let now = Date()
-            if now.timeIntervalSince(self.lastSoundAt) >= 0.4 {
-                self.lastSoundAt = now
-                self.settings.playSound()
+            // 送达方式二选一：
+            // - App 直接播放：独立音量、不受系统专注模式限制；0.4s 内的多次跃迁合并为一次提示音。
+            // - 系统通知音：声音随通知一起发，受系统专注模式/勿扰与通知音量控制。
+            if self.settings.soundDelivery == .app {
+                let now = Date()
+                if now.timeIntervalSince(self.lastSoundAt) >= 0.4 {
+                    self.lastSoundAt = now
+                    self.settings.playSound()
+                }
             }
-            self.notifications.notify(row, status: status)
+            self.notifications.notify(row, status: status,
+                                      sound: self.settings.systemNotificationSound())
         }
         model.onOpenSettings = { [weak self] in
             self?.panelController.close()
@@ -71,7 +75,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController.onOpenNotificationSettings = { [weak self] in self?.notifications.openSystemSettings() }
 
         panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem, settings: settings)
-        settingsWindow = SettingsWindowController(settings: settings, model: model)
+        settingsWindow = SettingsWindowController(settings: settings, model: model,
+                                                    onPreviewSound: { [weak self] in
+                                                        self?.previewNotificationSound()
+                                                    })
 
         // 展开/收起子智能体后内容高度变化：等 SwiftUI 完成一轮布局再重新适配面板。
         model.onPanelLayoutChange = { [weak self] in
@@ -162,26 +169,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { NSApp.terminate(nil) }
         }
-        // 调试：单独试听提示音（不影响通知）。`--test-sound[=<option>,<volume>]`，播完自动退出。
+        // 调试：单独试听提示音（不影响正式通知）。
+        // `--test-sound[=<option>,<volume>[,<customPath>]]`；送达方式默认跟随设置，
+        // 可用 `DSH_STATUS_SOUND_DELIVERY=app|system` 覆盖（验收两种通道用），播完自动退出。
         if let raw = CommandLine.arguments.first(where: { $0 == "--test-sound" || $0.hasPrefix("--test-sound=") }) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
                 guard let self else { return }
                 var option = self.settings.soundOption
                 var volume = self.settings.soundVolume
+                var customPath = self.settings.soundCustomPath
                 if let equals = raw.firstIndex(of: "=") {
-                    let parts = raw[raw.index(after: equals)...].split(separator: ",")
+                    let parts = raw[raw.index(after: equals)...]
+                        .split(separator: ",", omittingEmptySubsequences: false)
                     if let first = parts.first,
                        let parsed = NotificationSoundOption(rawValue: String(first)) { option = parsed }
                     if parts.count > 1, let parsed = Double(parts[1]) { volume = parsed }
+                    if parts.count > 2 { customPath = String(parts[2]) }
                 }
-                let player = NotificationSoundPlayer.shared
-                let ok = player.play(option: option,
-                                     volume: volume,
-                                     customPath: self.settings.soundCustomPath)
-                let url = player.lastResolvedURL?.path ?? "nil"
-                let error = player.lastError.map { " error=\($0)" } ?? ""
-                print("[dsh-status] --test-sound option=\(option.rawValue) volume=\(volume) ok=\(ok) file=\(url)\(error)")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { NSApp.terminate(nil) }
+                let delivery = ProcessInfo.processInfo.environment["DSH_STATUS_SOUND_DELIVERY"]
+                    .flatMap { SoundDeliveryMode(rawValue: $0) } ?? self.settings.soundDelivery
+                if delivery == .system {
+                    let sound = SystemNotificationSound.sound(option: option, customPath: customPath)
+                    let staged = SystemNotificationSound.stage(
+                        option: option, customPath: customPath,
+                        directory: SystemNotificationSound.defaultStagingDirectory)
+                    self.notifications.previewSound(sound)
+                    print("[dsh-status] --test-sound delivery=system option=\(option.rawValue) "
+                          + "ok=\(sound != nil) staged=\(staged?.path ?? "nil")")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { NSApp.terminate(nil) }
+                } else {
+                    let player = NotificationSoundPlayer.shared
+                    let ok = player.play(option: option, volume: volume, customPath: customPath)
+                    let url = player.lastResolvedURL?.path ?? "nil"
+                    let error = player.lastError.map { " error=\($0)" } ?? ""
+                    print("[dsh-status] --test-sound delivery=app option=\(option.rawValue) "
+                          + "volume=\(volume) ok=\(ok) file=\(url)\(error)")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { NSApp.terminate(nil) }
+                }
             }
         }
         if CommandLine.arguments.contains("--preview-quit-confirm") {
@@ -256,6 +280,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertSecondButtonReturn {
             NSApp.terminate(nil)
+        }
+    }
+
+    /// 设置页「试听」：App 播放模式直接播；系统通知音模式发一条真实测试通知。
+    private func previewNotificationSound() {
+        if settings.soundDelivery == .app {
+            _ = settings.playSound()
+        } else {
+            notifications.previewSound(settings.systemNotificationSound())
         }
     }
 

@@ -314,6 +314,15 @@ enum PreviewRenderer {
             .flatMap(Double.init)
             .map { CGFloat($0) } ?? Theme.Metrics.settingsHeight
         let settings = AppSettings.preview()
+        // 调试出图用：可把设置页预览强制成「系统通知音」送达方式 / 指定音色，便于核对两种模式的 UI。
+        if let raw = ProcessInfo.processInfo.environment["DSH_STATUS_SETTINGS_SOUND_DELIVERY"],
+           let delivery = SoundDeliveryMode(rawValue: raw) {
+            settings.soundDelivery = delivery
+        }
+        if let raw = ProcessInfo.processInfo.environment["DSH_STATUS_SETTINGS_SOUND_OPTION"],
+           let option = NotificationSoundOption(rawValue: raw) {
+            settings.soundOption = option
+        }
         let model = AppModel.demo(settings: settings)
         let root = SettingsView(settings: settings, model: model)
             .environment(\.colorScheme, colorScheme)

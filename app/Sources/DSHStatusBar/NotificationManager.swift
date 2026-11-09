@@ -61,7 +61,8 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         NSWorkspace.shared.open(url)
     }
 
-    func notify(_ row: SessionRow, status: SessionStatus) {
+    /// - Parameter sound: 系统通知音通道的声音；App 直接播放模式传 nil（避免双响）。
+    func notify(_ row: SessionRow, status: SessionStatus, sound: UNNotificationSound? = nil) {
         guard isBundled else { return }
         // 不因缓存状态守卫：权限可能在运行中被用户打开，交给系统过滤即可。
         let key = "\(row.id)-\(status.rawValue)"
@@ -83,8 +84,9 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         default:
             return
         }
-        // 声音由 App 自己播放（独立音量、可换音色）；这里显式不给系统声音，避免「双响」。
-        content.sound = nil
+        // 声音：App 直接播放模式为 nil（由 NSSound 播，避免双响）；
+        // 系统通知音模式由通知携带（跟随系统专注模式/通知音量）。
+        content.sound = sound
         content.userInfo = ["sessionId": row.id]
         let identifier = "\(status.rawValue)-\(row.id)-\(Int(now.timeIntervalSince1970))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
@@ -93,6 +95,21 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 FileHandle.standardError.write(Data("[dsh-status] 通知发送失败：\(error)\n".utf8))
             }
         }
+    }
+
+    /// 设置页「试听」（系统通知音通道）：发一条真实测试通知，声音与正式提醒一致。
+    /// 系统通知权限未开启时不会出现（设置页「系统通知」行会显示授权状态）。
+    func previewSound(_ sound: UNNotificationSound?) {
+        guard isBundled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "DSH Status 提示音试听"
+        content.body = sound == nil
+            ? "当前声音为静音：实际提醒时只弹横幅、不发声。"
+            : "系统通知音模式：声音由 macOS 通知系统播放，受专注模式与通知音量控制。"
+        content.sound = sound
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "sound-preview-\(UUID().uuidString)",
+                                  content: content, trigger: nil))
     }
 
     // MARK: - UNUserNotificationCenterDelegate

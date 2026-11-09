@@ -8,6 +8,32 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-11-09
+
+### 中文
+
+#### 修复
+- **菜单栏图标深浅色识别错误**：图标改为跟随**菜单栏自身的实际外观**
+  （`NSStatusBarButton.effectiveAppearance`）绘制，而不是 App 的 `NSApp.effectiveAppearance`。
+  修复「系统浅色模式 + 深色壁纸 / 菜单栏实际为深色」时，系统图标显示为浅色而本 App 图标变深色的问题；
+  与开源项目 Status Trio 的菜单栏外观识别方式一致（观察 status-item button 的 effective appearance）。
+  新增调试入口 `--dump-appearance`，打印 App 外观与菜单栏实际外观，便于核对。
+
+#### 新增
+- 无。
+
+### English
+
+#### Fixed
+- **Menu bar icon light/dark detection**: the icon now follows the **menu bar's actual appearance**
+  (`NSStatusBarButton.effectiveAppearance`) instead of `NSApp.effectiveAppearance`. This fixes the icon
+  turning dark while system/template icons stayed light when the menu bar itself is dark (for example a
+  light system appearance with a dark wallpaper). Matches how Status Trio resolves menu bar appearance
+  (observing the status-item button's effective appearance). New debug entry `--dump-appearance` prints
+  both appearances for verification.
+
+---
+
 ## [0.2.0] - 2026-11-09
 
 ### 中文

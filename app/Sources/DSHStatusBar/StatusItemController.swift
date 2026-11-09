@@ -19,7 +19,8 @@ final class StatusItemController: NSObject {
     var onOpenNotificationSettings: (() -> Void)?
 
     private var appearanceObserver: NSObjectProtocol?
-    private var themeObserver: NSObjectProtocol?
+    /// 菜单栏实际外观（`NSStatusBarButton.effectiveAppearance`）的 KVO 观察。
+    private var buttonAppearanceObservation: NSKeyValueObservation?
     private var reduceMotionObserver: NSObjectProtocol?
     private var powerObserver: NSObjectProtocol?
     private let animator = IconAnimator()
@@ -46,6 +47,7 @@ final class StatusItemController: NSObject {
             button.imagePosition = .imageOnly
             button.toolTip = "DSH 状态"
             animator.attach(to: button)
+            observeMenuBarAppearance(button)
         }
         refresh()
 
@@ -57,10 +59,6 @@ final class StatusItemController: NSObject {
             self?.forceSnapNext = true
             self?.refresh()
         }
-        themeObserver = DistributedNotificationCenter.default().addObserver(
-            forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil, queue: .main
-        ) { [weak self] _ in self?.refresh() }
         // 「减弱动态效果」/「低电量」开关变化时立即降级（不必等下一次状态推送）。
         reduceMotionObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
@@ -73,11 +71,46 @@ final class StatusItemController: NSObject {
 
     deinit {
         if let appearanceObserver { NotificationCenter.default.removeObserver(appearanceObserver) }
-        if let themeObserver { DistributedNotificationCenter.default().removeObserver(themeObserver) }
+        buttonAppearanceObservation?.invalidate()
         if let reduceMotionObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(reduceMotionObserver)
         }
         if let powerObserver { NotificationCenter.default.removeObserver(powerObserver) }
+    }
+
+    // MARK: 菜单栏外观
+
+    /// 图标应按**菜单栏自身的实际外观**绘制，而不是 App 的 `NSApp.effectiveAppearance`。
+    ///
+    /// `NSStatusBarButton.effectiveAppearance` 由菜单栏解析（vibrant 外观名，例如
+    /// `vibrantDark` / `vibrantLight`），在「系统浅色 + 深色壁纸」等情况下，菜单栏实际是深色的、
+    /// 系统/模板图标按深色菜单栏显示为浅色，而 `NSApp.effectiveAppearance` 仍是浅色 —— 两者会不一致。
+    /// Status Trio 对菜单栏图标同样读取 status-item button 的 effective appearance
+    /// （其 `StatusBarController.observeAppearanceChanges()` / `appearanceProvider`），这里采用同一信号。
+    private var menuBarAppearance: NSAppearance {
+        statusItem.button?.effectiveAppearance ?? NSApp.effectiveAppearance
+    }
+
+    /// 观察菜单栏外观变化并重绘；状态项被系统重建后需要重新挂到新的 button 上。
+    private func observeMenuBarAppearance(_ button: NSStatusBarButton) {
+        buttonAppearanceObservation?.invalidate()
+        buttonAppearanceObservation = button.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.forceSnapNext = true
+                self.refresh()
+            }
+        }
+    }
+
+    /// 调试：`--dump-appearance` 打印 App 外观与菜单栏实际外观，供深浅色识别核对。
+    func dumpAppearanceDebug() {
+        func describe(_ appearance: NSAppearance) -> String {
+            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return "\(appearance.name.rawValue) (\(dark ? "dark" : "light"))"
+        }
+        print("[dsh-status] appearance app=\(describe(NSApp.effectiveAppearance)) "
+              + "menubar=\(describe(menuBarAppearance)) used=\(describe(menuBarAppearance))")
     }
 
     // MARK: 图标刷新
@@ -85,9 +118,10 @@ final class StatusItemController: NSObject {
     func refresh() {
         guard let button = statusItem.button else { return }
         let buttonReplaced = animator.attach(to: button)
+        if buttonReplaced { observeMenuBarAppearance(button) }
 
         let iconModel = debugIconOverride ?? model.iconModel
-        let appearance = NSApp.effectiveAppearance
+        let appearance = menuBarAppearance
         let appearanceKey = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
         let cometAnimated = shouldAnimate(iconModel)
 
@@ -169,7 +203,7 @@ final class StatusItemController: NSObject {
             return
         }
         guard let displayedModel else { return }
-        animator.updateComet(model: displayedModel, appearance: NSApp.effectiveAppearance,
+        animator.updateComet(model: displayedModel, appearance: menuBarAppearance,
                              animate: displayedCometAnimated, force: true)
     }
 
@@ -288,7 +322,7 @@ final class StatusItemController: NSObject {
     /// 调试：直接把图标落到目标模型（不播过渡），并作为后续过渡的起点。
     private func debugSnap(to iconModel: IconModel) {
         debugIconOverride = iconModel
-        let appearance = NSApp.effectiveAppearance
+        let appearance = menuBarAppearance
         let key = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
         hasRenderedOnce = true
         lastAppearanceKey = key

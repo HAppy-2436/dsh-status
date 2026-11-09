@@ -146,6 +146,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                                         count: count)
             }
         }
+        if CommandLine.arguments.contains("--dump-appearance") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+                self?.statusItemController.dumpAppearanceDebug()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { NSApp.terminate(nil) }
+            }
+        }
         if CommandLine.arguments.contains("--open-panel") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
                 self?.panelController.show()

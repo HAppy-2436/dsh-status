@@ -24,6 +24,10 @@ final class StatusItemController: NSObject {
     private var reduceMotionObserver: NSObjectProtocol?
     private var powerObserver: NSObjectProtocol?
     private let animator = IconAnimator()
+    /// 外观通知合并标记：同一轮 runloop 内多次 `effectiveAppearance` 变化只处理一次。
+    private var appearanceRefreshScheduled = false
+    /// 上一次写入的提示文本：未变化时不重复写 `toolTip` / accessibilityLabel。
+    private var lastTooltip: String?
 
     /// 当前画面上（或正在过渡到的）图标模型：过渡起点由它决定。
     private var displayedModel: IconModel?
@@ -92,15 +96,36 @@ final class StatusItemController: NSObject {
     }
 
     /// 观察菜单栏外观变化并重绘；状态项被系统重建后需要重新挂到新的 button 上。
+    ///
+    /// 重要（macOS 27 实测）：`NSStatusItem` 重绘 / 快照按钮时会让 `effectiveAppearance` 变化并发出
+    /// KVO。如果回调里无条件 `refresh()`（`forceSnapNext = true` + 重设 `button.image`），就会形成
+    /// 「重画 → 状态项快照 → 外观通知 → 重画」的自激循环：实测常驻 85% CPU、整机功耗 4W→12W。
+    /// 因此这里两道闸：
+    ///   ① 通知合并到主线程下一轮，同一轮多次通知最多刷新一次；
+    ///   ② 解析出的深/浅色没变就直接忽略（图标渲染只区分深/浅色，同色系外观变化不需要重画）。
     private func observeMenuBarAppearance(_ button: NSStatusBarButton) {
         buttonAppearanceObservation?.invalidate()
         buttonAppearanceObservation = button.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.forceSnapNext = true
-                self.refresh()
-            }
+            self?.scheduleAppearanceRefresh()
         }
+    }
+
+    private func scheduleAppearanceRefresh() {
+        guard !appearanceRefreshScheduled else { return }
+        appearanceRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.appearanceRefreshScheduled = false
+            guard self.hasRenderedOnce else { return }
+            guard Self.appearanceKey(self.menuBarAppearance) != self.lastAppearanceKey else { return }
+            self.forceSnapNext = true
+            self.refresh()
+        }
+    }
+
+    /// 图标渲染只需要区分菜单栏深浅色（`MenuBarIconRenderer.isDark` 同口径）。
+    private static func appearanceKey(_ appearance: NSAppearance) -> String {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
     }
 
     /// 调试：`--dump-appearance` 打印 App 外观与菜单栏实际外观，供深浅色识别核对。
@@ -118,15 +143,24 @@ final class StatusItemController: NSObject {
     func refresh() {
         guard let button = statusItem.button else { return }
         let buttonReplaced = animator.attach(to: button)
-        if buttonReplaced { observeMenuBarAppearance(button) }
+        if buttonReplaced {
+            observeMenuBarAppearance(button)
+            // 新按钮没有旧按钮的 toolTip / accessibilityLabel：强制下面重写一次。
+            lastTooltip = nil
+        }
 
         let iconModel = debugIconOverride ?? model.iconModel
         let appearance = menuBarAppearance
-        let appearanceKey = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
+        let appearanceKey = Self.appearanceKey(appearance)
         let cometAnimated = shouldAnimate(iconModel)
 
-        button.toolTip = MenuBarIconRenderer.tooltip(for: iconModel)
-        button.setAccessibilityLabel(MenuBarIconRenderer.tooltip(for: iconModel))
+        // 提示文本只在变化时写：重复赋值同样会触发状态项快照重绘。
+        let tooltip = MenuBarIconRenderer.tooltip(for: iconModel)
+        if tooltip != lastTooltip {
+            lastTooltip = tooltip
+            button.toolTip = tooltip
+            button.setAccessibilityLabel(tooltip)
+        }
 
         // 强制落静态帧的场景：首帧 / 外观切换 / 屏幕参数变化 / 状态项按钮被系统重建。
         let mustSnap = !hasRenderedOnce || appearanceKey != lastAppearanceKey
@@ -323,7 +357,7 @@ final class StatusItemController: NSObject {
     private func debugSnap(to iconModel: IconModel) {
         debugIconOverride = iconModel
         let appearance = menuBarAppearance
-        let key = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
+        let key = Self.appearanceKey(appearance)
         hasRenderedOnce = true
         lastAppearanceKey = key
         displayedModel = iconModel

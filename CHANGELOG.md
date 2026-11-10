@@ -8,6 +8,44 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-11-10
+
+### 中文
+
+#### 修复
+- **异常耗电 / 常驻 CPU 85%**：菜单栏外观 KVO 与状态项快照重绘形成自激循环 —— App 只要在运行
+  就常驻约 85% 单核（整机功耗 4W → 12W、活动监视器能耗影响数千），与「播放运行动画 / 状态切换动效」
+  等设置无关。修复：
+  - **外观通知去重**：解析出的菜单栏深/浅色没有变化时不再重画（此前每次通知都 `forceSnapNext` +
+    `refresh`），通知合并到主线程下一轮、同一轮最多刷新一次；
+  - **静态图缓存**：状态 / 深浅色 / 动效开关都没变时复用同一张 `NSImage`，不重复渲染、不重复给
+    `button.image` 赋值（macOS 27 上重复设图会触发状态项快照重绘）；
+  - 提示文本（toolTip / accessibilityLabel）只在变化时写入；状态项尺寸未变时跳过图层布局；
+    过渡用透明占位图改为复用缓存。
+  - 实测：常驻 CPU **85.4% → 0.0%**（`top` 多轮采样均 0.0%，`sample` 无 `_updateReplicants` /
+    `refresh` 热点）；深浅色切换、mock 每 8s 状态切换、51 步图标过渡回放、面板打开均正常。
+
+### English
+
+#### Fixed
+- **Excessive power drain / constant 85% CPU**: a self-sustaining loop between the menu bar appearance
+  KVO and status-item snapshot redraws — the app burned ~85% of one core whenever it was running
+  (system power 4W → 12W, Activity Monitor energy impact in the thousands), independent of the
+  "run animation" / "transition animation" settings. Fixed by:
+  - **de-duplicating appearance notifications**: no redraw unless the resolved dark/light menu bar style
+    actually changed (previously every notification forced `snapTo` + `refresh`), with notifications
+    coalesced to at most one refresh per run loop turn;
+  - **caching the static image**: same state / appearance / animation flag reuses the same `NSImage` —
+    no re-render and no repeated `button.image` assignment (repeated assignments trigger status-item
+    snapshot redraws on macOS 27);
+  - writing toolTip / accessibilityLabel only when changed, skipping layer layout when the item size is
+    unchanged, and reusing a cached transparent placeholder during transitions.
+  - Measured: steady-state CPU **85.4% → 0.0%** (0.0% across repeated `top` samples; no
+    `_updateReplicants` / `refresh` hotspots in `sample`); dark/light switching, the mock bridge's 8s
+    state cycling, the 51-step icon transition replay and panel opening all still work.
+
+---
+
 ## [0.4.1] - 2026-11-10
 
 ### 中文

@@ -60,6 +60,8 @@ final class IconAnimator {
         guard let button else { return }
         let bounds = button.bounds
         guard bounds.width > 0, bounds.height > 0 else { return }
+        // 尺寸没变时不做任何事：这个方法每次 refresh 都会调用，重复写 frame 会打扰渲染服务器。
+        if cometLayer.superlayer != nil, cometBounds == bounds { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         cometLayer.frame = bounds
@@ -187,14 +189,49 @@ final class IconAnimator {
         updateComet(model: model, appearance: appearance, animate: cometAnimated, force: true)
     }
 
+    // MARK: 静态图缓存
+
+    /// 决定 `button.image` 内容的全部输入。状态/外观没变时直接复用同一张 NSImage：
+    ///   · 不必重复跑位图渲染（数字阴影走高斯模糊，单次约 0.5–1ms）；
+    ///   · 不重复给 `button.image` 赋新对象 —— macOS 27 上重复设图会触发 `NSStatusItem`
+    ///     快照重绘，是「外观 KVO 自激循环」的另一半放大点。
+    private struct StaticImageKey: Equatable {
+        let statuses: [SessionStatus]
+        let connected: Bool
+        let numberMode: CenterNumberMode
+        let idleStyle: MenuBarIdleStyle
+        let dark: Bool
+        let cometAnimated: Bool
+    }
+    private var lastStaticKey: StaticImageKey?
+    private var lastStaticImage: NSImage?
+
     private func applyStaticImage(model: IconModel, appearance: NSAppearance, cometAnimated: Bool) {
         guard let button else { return }
+        let key = StaticImageKey(
+            statuses: model.statuses,
+            connected: model.connected,
+            numberMode: model.numberMode,
+            idleStyle: model.idleStyle,
+            dark: appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua,
+            cometAnimated: cometAnimated
+        )
+        if key == lastStaticKey, let image = lastStaticImage {
+            // 画面内容没变：复用缓存图；只有按钮当前不是这张图时才补设（例如刚取消过渡、按钮仍是占位图）。
+            if button.image !== image {
+                button.image = image
+                button.imageScaling = .scaleNone
+            }
+            return
+        }
         let image: NSImage
         if cometAnimated {
             image = MenuBarIconRenderer.staticImage(for: model, appearance: appearance)
         } else {
             image = MenuBarIconRenderer.image(for: model, appearance: appearance)
         }
+        lastStaticKey = key
+        lastStaticImage = image
         button.image = image
         button.imageScaling = .scaleNone
     }

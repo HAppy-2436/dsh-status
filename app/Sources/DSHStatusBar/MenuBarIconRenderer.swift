@@ -119,12 +119,14 @@ enum MenuBarIconRenderer {
         }
     }
 
+    private static let cachedBlankImage: NSImage = render(
+        width: canvas, height: canvas,
+        appearance: NSAppearance(named: .darkAqua)!) { _ in }
+
     /// 完全透明的占位图：过渡期间临时替换 `button.image`，保持状态项宽度不变
     /// （真正的画面由 Core Animation 图层合成；结束后换回完整静态图）。
-    static func blankImage() -> NSImage {
-        render(width: canvas, height: canvas,
-               appearance: NSAppearance(named: .darkAqua)!) { _ in }
-    }
+    /// 图是常量，缓存复用（不再每次过渡都渲染一张 44×44 的透明位图）。
+    static func blankImage() -> NSImage { cachedBlankImage }
 
     /// 彗星弧的几何参数（半径/线宽）与颜色。返回 nil 表示当前状态没有运行中动画。
     struct CometSpec {

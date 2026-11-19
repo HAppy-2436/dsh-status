@@ -162,6 +162,25 @@ final class BridgeClient: NSObject {
 
     // MARK: - 命令
 
+    /// 让 Host 删掉焦点会话的临时「已完成」行（面板行尾 × 触发）；不经过队列，失败只记日志。
+    func dismissSession(_ sessionId: String) {
+        guard let info = bridgeInfo,
+              let url = URL(string: "\(info.origin)/dsh-status/command") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(info.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONEncoder().encode(CommandRequest(type: "dismiss", sessionId: sessionId))
+        request.timeoutInterval = 5
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if error == nil, (200..<300).contains(status) { return }
+            DispatchQueue.main.async {
+                self?.log("忽略失败（\(status)），可再点一次")
+            }
+        }.resume()
+    }
+
     func sendOpenSession(_ sessionId: String) {
         let command = CommandRequest(type: "openSession", sessionId: sessionId)
         pendingCommands.append(command)

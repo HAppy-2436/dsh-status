@@ -64,9 +64,12 @@ English · [简体中文](README.zh.md)
   session.
 - **The session you are viewing also notifies when it finishes.** DSH marks a
   session unread only when it ends while you are away, so a session that ends
-  in the main view would never notify. The bridge reports that turn end
-  separately and DSH Status still shows the banner and plays the sound — no
-  "completed" row, no badge count, clicking still jumps to the session.
+  in the main view would otherwise neither notify nor appear as completed. The
+  bridge reports that turn end separately: the banner and sound fire as usual,
+  and a **transient "completed" row** appears so the menu-bar icon goes
+  running → completed with the badge +1. Click the **×** at the end of the row
+  to dismiss it (badge −1); sending another message in that session clears it
+  automatically too.
 - Do Not Disturb silences every notification and sound while keeping the
   individual preferences.
 - The alert sound can be the built-in DSH chime, one of eight macOS system

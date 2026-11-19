@@ -8,6 +8,45 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.4.4] - 2026-11-19
+
+### 中文
+
+#### 改进
+- **焦点会话跑完，菜单栏图标不再直接跳空闲**：0.4.3 只补了通知，但图标/面板只认状态行，
+  所以看起来是「运行中 → 空闲」。现在桥会为焦点会话补一条 **transient「已完成」行**
+  （`SessionRow.transient = true`）：
+  - 图标走「运行中 → 已完成」，角标 +1，面板里出现这一行（点它照样打开会话）；
+  - 行尾有 **×**：点一下即忽略（桥删掉该行，角标 -1，不影响会话）；
+  - 在该会话里继续发消息（重新运行 / 待回答）或 DSH 自己报了未读时，临时行自动消失；
+  - 临时行由 Host 维护：DSH 重启或桥重载后不再存在。
+- 通知仍由 `notices` 提供，与行通知共用 30s 去重，不会响两次。
+
+#### 兼容
+- 协议 v1 纯增量：`SessionRow.transient`（可选）与 `POST /command {type:"dismiss"}`。
+  旧 App 忽略 `transient`，行照常显示、只是没有 ×；旧桥不下发时 App 行为不变（0.4.3 的纯通知）。
+
+### English
+
+#### Changed
+- **A focused session no longer makes the menu-bar icon jump straight to idle.** 0.4.3 only added
+  the notification, but the icon and panel are driven by status rows, so it looked like
+  running → idle. The bridge now adds a **transient "completed" row** (`SessionRow.transient = true`):
+  - the icon goes running → completed, the badge goes +1, and the row shows in the panel (clicking
+    it still opens the session);
+  - the row has an **×**: clicking it dismisses the row (the host drops it, badge −1, session
+    untouched);
+  - starting another turn in that session (running / waiting) or DSH reporting the session unread
+    clears the transient row automatically;
+  - transient rows live in the host only: a DSH restart or bridge reload drops them.
+- Notifications still come from `notices` and share the 30 s de-duplication with row notifications,
+  so there is no double alert.
+
+#### Compatibility
+- Protocol v1, additive: `SessionRow.transient` (optional) and `POST /command {type:"dismiss"}`.
+  Old apps ignore `transient` and simply show the row without the ×; old bridges leave the app on the
+  notification-only behavior of 0.4.3.
+
 ## [0.4.3] - 2026-11-19
 
 ### 中文
@@ -27,6 +66,7 @@ and [Semantic Versioning](https://semver.org/).
 #### 兼容
 - 协议 v1 纯增量：`BridgeState.notices`、`ClientSnapshot.focused`。旧 App 忽略新字段，旧桥不下发时
   App 按空列表处理，不需要同时升级；但要真正收到焦点提醒，桥插件需 **≥ 0.1.1** 并重启 DSH。
+- **0.4.4 调整**：焦点会话完成时额外补一条临时「已完成」行（图标不再跳空闲），见下一节。
 
 ### English
 

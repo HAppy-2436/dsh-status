@@ -20,6 +20,8 @@ final class AppModel: ObservableObject {
     var onOpenSettings: (() -> Void)?
 
     var onOpenSession: ((String) -> Void)?
+    /// 面板行尾「忽略」：删掉桥补的临时「已完成」行（sessionId）。
+    var onDismissSession: ((String) -> Void)?
     var onOpenDSH: (() -> Void)?
     var onQuit: (() -> Void)?
     /// 面板内容高度变化（如展开/收起子智能体）时请求重新适配窗口。
@@ -223,7 +225,8 @@ enum DemoState {
             pending: pending,
             lastTurn: status == "stopped" ? LastTurn(kind: "aborted", at: now - 42 * 60_000) : nil,
             since: since ?? now - updatedMinutesAgo * 60_000,
-            updatedAt: now - updatedMinutesAgo * 60_000
+            updatedAt: now - updatedMinutesAgo * 60_000,
+            transient: nil
         )
     }
 

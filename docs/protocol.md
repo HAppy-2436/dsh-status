@@ -102,9 +102,15 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
   "pending": null,                         // waiting 时非空
   "lastTurn": { "kind": "aborted", "at": 1762324799000 },
   "since": 1762324799000,                  // 进入当前状态的时刻
-  "updatedAt": 1762324800000
+  "updatedAt": 1762324800000,
+  "transient": true                        // 可选：焦点会话跑完的临时「已完成」行（见下）
 }
 ```
+
+`transient`：焦点会话跑完时 DSH 认为已读、不会产生 completed 行，Host 补一条临时行让
+图标/面板走「运行中 → 已完成」而不是直接跳空闲。App 可以点行尾 × 让 Host 删除它
+（`POST /command {type:"dismiss"}`）；该会话重新开始运行、进入待回答，或客户端自己报了
+未读时，Host 也会自动删除。旧版 App 忽略该字段，行照常显示（只是没有 ×）。
 
 `pending`：
 
@@ -172,7 +178,7 @@ Client 快照的 `focused` 里时，生成一条 `SessionNotice`。
 | --- | --- | --- |
 | `GET` | `/dsh-status/state` | 返回当前 `BridgeState`（无状态时也返回结构，sessions 为空、client.connected=false） |
 | `GET` | `/dsh-status/stream` | SSE 推送：连接后立即发一条 `event: state`，之后每次状态变化发一条；每 5s 发 `: ping` 注释保活 |
-| `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400 |
+| `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400。`{ "type": "dismiss", "sessionId": "..." }` 删除该会话的临时「已完成」行，返回 `{ "ok": true }` |
 | `GET` | `/dsh-status/health` | 无需鉴权，返回 `{ "ok": true, "version": 1 }`，供 App 判断端口存活 |
 
 SSE 示例：

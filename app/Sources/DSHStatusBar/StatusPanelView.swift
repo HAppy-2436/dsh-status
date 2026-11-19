@@ -86,7 +86,8 @@ struct StatusPanelView: View {
                        expanded: expanded,
                        previewHover: model.previewHover.flatMap { $0.rowId == row.id ? $0.trailing : nil },
                        onToggleSubagents: { model.toggleSubagents(for: row.id) },
-                       onOpen: { model.onOpenSession?(row.id) })
+                       onOpen: { model.onOpenSession?(row.id) },
+                       onDismiss: { model.onDismissSession?(row.id) })
         if expanded {
             // 逐条错开淡入 + 轻微下移（系统「列表展开」的节奏）；减弱动态效果时瞬时出现。
             VStack(alignment: .leading, spacing: 0) {
@@ -160,8 +161,10 @@ private struct SessionRowView: View {
     let previewHover: AppModel.PreviewHoverTrailing?
     let onToggleSubagents: () -> Void
     let onOpen: () -> Void
+    let onDismiss: () -> Void
     @State private var hoverRow = false
     @State private var hoverToggle = false
+    @State private var hoverDismiss = false
     @Environment(\.colorScheme) private var colorScheme
 
     private var hasSubagents: Bool { subagentCount > 0 }
@@ -201,14 +204,18 @@ private struct SessionRowView: View {
             }
             .buttonStyle(PanelRowButtonStyle(cornerRadius: Theme.Metrics.rowHighlightCornerRadius))
 
-            if hasSubagents {
-                subagentToggle
-                    .padding(.trailing, 8)
+            // 行尾控件：焦点会话跑完的临时行带一个「忽略」×，有子会话时再跟披露按钮
+            if hasSubagents || row.isTransient {
+                HStack(spacing: 2) {
+                    if row.isTransient { dismissButton }
+                    if hasSubagents { subagentToggle }
+                }
+                .padding(.trailing, 8)
             }
         }
         // 没有子会话：行尾只放一个右箭头作导航提示（不可单独点，点卡片任意位置都能进会话）。
         .overlay(alignment: .trailing) {
-            if !hasSubagents {
+            if !hasSubagents && !row.isTransient {
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
@@ -227,10 +234,37 @@ private struct SessionRowView: View {
         )
         .onHover { hoverRow = $0 }
         .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: hovering)
-        .help(hasSubagents
-              ? (expanded ? "点右侧箭头收起 \(subagentCount) 个子智能体 · 点其它区域打开会话"
-                          : "点右侧箭头展开 \(subagentCount) 个子智能体 · 点其它区域打开会话")
-              : (row.pendingSummary ?? row.displayTitle))
+        .help(helpText)
+    }
+
+    /// 行尾「忽略」：只出现在桥补的临时「已完成」行上（点它删掉该行、角标减一，不跳转会话）。
+    private var dismissButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(hoverDismiss ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(width: 24, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.Metrics.inlineControlCornerRadius, style: .continuous)
+                        .fill(hoverDismiss ? Theme.controlHoverFill(colorScheme) : Color.clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(InlineControlButtonStyle(cornerRadius: Theme.Metrics.inlineControlCornerRadius))
+        .onHover { hoverDismiss = $0 }
+        .animation(Theme.respectingReduceMotion(Theme.Motion.hover), value: hoverDismiss)
+        .help("忽略这条已完成（角标减一，不影响会话）")
+    }
+
+    private var helpText: String {
+        var parts: [String] = []
+        if row.isTransient { parts.append("点右侧 × 忽略这条已完成") }
+        if hasSubagents {
+            parts.append(expanded ? "点箭头收起 \(subagentCount) 个子智能体"
+                                  : "点箭头展开 \(subagentCount) 个子智能体")
+        }
+        parts.append("点其它区域打开会话")
+        return parts.joined(separator: " · ")
     }
 
     /// 行尾「子智能体数量 + 披露箭头」：独立命中区 + 独立悬停胶囊（点它展开/收起，不跳转会话）。
@@ -264,11 +298,13 @@ private struct SessionRowView: View {
     /// 行尾为箭头 / 「数量 + 箭头」预留的宽度。
     /// 预留 = 控件实际宽度 + 间隙：标题截断不会压到控件，行尾也不会留出大片空白。
     private var trailingReserve: CGFloat {
-        guard hasSubagents else { return 12 }
+        var width: CGFloat = 12
+        if row.isTransient { width += 24 + 2 }   // × 按钮 + HStack 间隙
+        guard hasSubagents else { return width }
         // 数字（11pt 等宽 ≈ 7pt/位）+ 3 间隙 + 9 箭头 + 6×2 胶囊内距 + 额外余量
         // （SwiftUI 内建布局先于 overlay 排版，留一点余量保证标题截断后不会压到胶囊）
         let numberWidth = CGFloat(String(subagentCount).count) * 7
-        return ceil(numberWidth + 3 + 9 + 12 + 14)
+        return width + ceil(numberWidth + 3 + 9 + 12 + 14)
     }
 
     private var subtitle: String {

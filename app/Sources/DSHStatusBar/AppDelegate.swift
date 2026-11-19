@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.panelController.close()
             self?.openSession(sessionId)
         }
+        // 面板行尾「忽略」：让桥删掉焦点会话的临时「已完成」行（角标随之减一）
+        model.onDismissSession = { [weak self] sessionId in
+            self?.bridge.dismissSession(sessionId)
+        }
         model.onOpenDSH = { [weak self] in
             self?.panelController.close()
             self?.openDSH()

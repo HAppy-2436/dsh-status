@@ -50,6 +50,14 @@ enum NoticeSelfTest {
             with: "\"sessions\":[],\"futureField\":{\"x\":1}")
         check("未知字段被忽略", decodeState(unknown) != nil)
 
+        print("\n== SessionRow.transient（临时「已完成」行） ==")
+        check("transient:true 可解码",
+              decodeRow(#"{"id":"s1","title":"跑测试","status":"completed","transient":true}"#)?.isTransient == true)
+        check("缺 transient → 普通行",
+              decodeRow(#"{"id":"s2","title":"普通","status":"completed"}"#)?.isTransient == false)
+        check("transient 行状态标签",
+              decodeRow(#"{"id":"s3","status":"stopped","transient":true}"#)?.statusKind == .stopped)
+
         print("\n== SessionNotice 文案兜底 ==")
         let bare = SessionNotice(id: "n1", sessionId: "s1", kind: nil, title: nil,
                                  workspaceId: nil, workspaceTitle: nil, at: nil)
@@ -108,7 +116,7 @@ enum NoticeSelfTest {
 
         let running = SessionRow(id: "s1", title: "跑测试", workspaceId: "w1",
                                  workspaceTitle: "example-app", status: "running",
-                                 pending: nil, lastTurn: nil, since: 1, updatedAt: 1)
+                                 pending: nil, lastTurn: nil, since: 1, updatedAt: 1, transient: nil)
         func frame(_ notices: [SessionNotice]) -> BridgeState {
             BridgeState(version: 1, generatedAt: 2, dsh: nil,
                         client: ClientInfo(connected: true, lastPushAt: 2),
@@ -137,6 +145,11 @@ enum NoticeSelfTest {
 
         print(failures == 0 ? "\n全部通过" : "\n失败 \(failures) 项")
         return failures == 0 ? 0 : 1
+    }
+
+    private static func decodeRow(_ json: String) -> SessionRow? {
+        guard let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(SessionRow.self, from: data)
     }
 
     private static func decodeState(_ json: String) -> BridgeState? {

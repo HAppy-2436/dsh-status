@@ -106,8 +106,12 @@ struct SessionRow: Codable, Equatable, Identifiable {
     let lastTurn: LastTurn?
     let since: Double?
     let updatedAt: Double?
+    /// 焦点会话刚跑完时桥补的临时行（DSH 认为已读、本来不会出现）：图标/面板照常显示「已完成」，
+    /// 用户可以点行尾 × 忽略；旧版桥不发送该字段。
+    let transient: Bool?
 
     var statusKind: SessionStatus { SessionStatus(rawValue: status) ?? .idle }
+    var isTransient: Bool { transient == true }
     var displayTitle: String {
         if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
         return "未命名会话"

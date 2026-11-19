@@ -63,9 +63,34 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     /// - Parameter sound: 系统通知音通道的声音；App 直接播放模式传 nil（避免双响）。
     func notify(_ row: SessionRow, status: SessionStatus, sound: UNNotificationSound? = nil) {
+        deliver(sessionId: row.id,
+                title: row.displayTitle,
+                project: row.projectName,
+                pendingSummary: row.pendingSummary,
+                status: status,
+                sound: sound)
+    }
+
+    /// 焦点会话跑完的通知：没有状态行，文案与「已完成 / 已停止」行通知保持一致，
+    /// 点横幅同样跳转到对应会话（与行通知共用 30s 去重键，极端竞态下不会弹两条）。
+    func notify(_ notice: SessionNotice, sound: UNNotificationSound? = nil) {
+        deliver(sessionId: notice.sessionId,
+                title: notice.displayTitle,
+                project: notice.projectName,
+                pendingSummary: nil,
+                status: notice.statusKind,
+                sound: sound)
+    }
+
+    private func deliver(sessionId: String,
+                         title: String,
+                         project: String,
+                         pendingSummary: String?,
+                         status: SessionStatus,
+                         sound: UNNotificationSound?) {
         guard isBundled else { return }
         // 不因缓存状态守卫：权限可能在运行中被用户打开，交给系统过滤即可。
-        let key = "\(row.id)-\(status.rawValue)"
+        let key = "\(sessionId)-\(status.rawValue)"
         let now = Date()
         if let last = lastNotified[key], now.timeIntervalSince(last) < 30 { return }
         lastNotified[key] = now
@@ -73,22 +98,22 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         switch status {
         case .waiting:
-            content.title = "需要回答：\(row.displayTitle)"
-            content.body = "\(row.projectName) · \(row.pendingSummary ?? "等待你的回复")"
+            content.title = "需要回答：\(title)"
+            content.body = "\(project) · \(pendingSummary ?? "等待你的回复")"
         case .completed:
-            content.title = "已完成：\(row.displayTitle)"
-            content.body = "\(row.projectName) · 本轮已结束"
+            content.title = "已完成：\(title)"
+            content.body = "\(project) · 本轮已结束"
         case .stopped:
-            content.title = "已停止：\(row.displayTitle)"
-            content.body = "\(row.projectName) · 任务已停止"
+            content.title = "已停止：\(title)"
+            content.body = "\(project) · 任务已停止"
         default:
             return
         }
         // 声音：App 直接播放模式为 nil（由 NSSound 播，避免双响）；
         // 系统通知音模式由通知携带（跟随系统专注模式/通知音量）。
         content.sound = sound
-        content.userInfo = ["sessionId": row.id]
-        let identifier = "\(status.rawValue)-\(row.id)-\(Int(now.timeIntervalSince1970))"
+        content.userInfo = ["sessionId": sessionId]
+        let identifier = "\(status.rawValue)-\(sessionId)-\(Int(now.timeIntervalSince1970))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error {

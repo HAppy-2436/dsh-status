@@ -8,6 +8,49 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [0.4.3] - 2026-11-19
+
+### 中文
+
+#### 新增
+- **焦点会话跑完也会提醒**：DSH 的 `completionUnread` 只在「跑完时不在主视图」才置位，所以在看的
+  那个会话跑完既没有「已完成」行、也不会触发状态跃迁通知。现在桥插件随快照上报焦点会话
+  （`ClientSnapshot.focused`），Host 收到该会话 `turn/end` 时补一条 `BridgeState.notices`，
+  App 照常弹横幅、响提示音：
+  - 不产生面板行、不计入 counts / 角标（不会凭空出现一个「已完成」）；
+  - 通知文案、点击跳转、勿扰模式、「已完成 / 已停止」开关与状态跃迁完全一致；
+  - App 首帧只登记不通知（基线），之后按 notice `id` 去重，SSE 重连或重复推送不会重复提醒。
+- 调试入口 `--test-notice`（走正式 notice 通知链路，发一条后自动退出）；
+  `scripts/build-app.sh` 新增 `--self-test-notice` 自检：协议解码（含缺字段的旧桥）、
+  文案兜底、`NoticeInbox` 基线/去重/上限、隐藏项目与状态显示过滤、AppModel 接线。
+
+#### 兼容
+- 协议 v1 纯增量：`BridgeState.notices`、`ClientSnapshot.focused`。旧 App 忽略新字段，旧桥不下发时
+  App 按空列表处理，不需要同时升级；但要真正收到焦点提醒，桥插件需 **≥ 0.1.1** 并重启 DSH。
+
+### English
+
+#### Added
+- **The session you are viewing now notifies when it finishes.** DSH sets
+  `completionUnread` only when a turn ends outside the main view, so a session finishing while you
+  watch it produced neither a "completed" row nor a status-transition notification. The bridge now
+  reports focused sessions (`ClientSnapshot.focused`) and the host emits a `BridgeState.notices`
+  entry on that session's `turn/end`; the app shows the usual banner and plays the sound:
+  - no panel row, no counts / badge change (no phantom "completed");
+  - identical wording, click-to-open, Do Not Disturb and completed/stopped switches as row
+    notifications;
+  - the first frame only registers (baseline); afterwards notices are de-duplicated by `id`, so SSE
+    reconnects or repeated pushes never re-alert.
+- Debug entry `--test-notice` (drives the real notice path, posts one and quits);
+  `scripts/build-app.sh` gains a `--self-test-notice` check covering protocol decoding (including a
+  bridge without the new fields), wording fallbacks, `NoticeInbox` baseline/de-duplication/capacity,
+  hidden-project and status-visibility filters, and the AppModel wiring.
+
+#### Compatibility
+- Protocol v1, additive only: `BridgeState.notices` and `ClientSnapshot.focused`. Old apps ignore the
+  new fields and old bridges omitting them decode as an empty list, so no lockstep upgrade is
+  needed; the focus alert itself requires bridge **>= 0.1.1** and a DSH restart.
+
 ## [0.4.2] - 2026-11-10
 
 ### 中文

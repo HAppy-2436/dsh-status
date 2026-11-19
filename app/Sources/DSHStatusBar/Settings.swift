@@ -310,6 +310,13 @@ final class AppSettings: ObservableObject {
         return true
     }
 
+    /// 完成通知是否该提醒：与状态行同一套过滤（状态显示开关 + 隐藏项目）。
+    func isVisible(_ notice: SessionNotice) -> Bool {
+        guard shows(notice.statusKind) else { return false }
+        if let workspaceId = notice.workspaceId, hiddenWorkspaces.contains(workspaceId) { return false }
+        return true
+    }
+
     private func save(_ key: String, _ value: Any) {
         guard persist else { return }
         defaults?.set(value, forKey: "dshStatus.\(key)")

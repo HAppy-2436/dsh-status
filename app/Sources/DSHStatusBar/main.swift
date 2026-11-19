@@ -62,6 +62,13 @@ if arguments.contains("--self-test-sound") {
     exit(NotificationSoundSelfTest.run())
 }
 
+// --self-test-notice：焦点会话完成通知自检（notices 协议解码 / 文案兜底 / 去重基线 / 通知过滤）。
+// 纯逻辑，不依赖系统通知权限；由 scripts/build-app.sh 在组装 .app 后自动执行。
+if arguments.contains("--self-test-notice") {
+    _ = NSApplication.shared
+    exit(NoticeSelfTest.run())
+}
+
 let app = NSApplication.shared
 // 调试/截图：DSH_STATUS_APPEARANCE=light|dark 强制界面外观（不影响系统设置）。
 if let appearance = ProcessInfo.processInfo.environment["DSH_STATUS_APPEARANCE"] {

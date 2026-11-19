@@ -14,6 +14,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 提示音合并窗口：多个会话可能在同一帧里一起跃迁，只响一次避免叠音。
     private var lastSoundAt = Date.distantPast
 
+    /// 送达方式二选一：
+    /// - App 直接播放：独立音量、不受系统专注模式限制；0.4s 内的多次跃迁合并为一次提示音。
+    /// - 系统通知音：声音随通知一起发，受系统专注模式/勿扰与通知音量控制。
+    private func playAlertSound() {
+        guard settings.soundDelivery == .app else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastSoundAt) >= 0.4 else { return }
+        lastSoundAt = now
+        settings.playSound()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
@@ -44,18 +55,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             guard enabled else { return }
-            // 送达方式二选一：
-            // - App 直接播放：独立音量、不受系统专注模式限制；0.4s 内的多次跃迁合并为一次提示音。
-            // - 系统通知音：声音随通知一起发，受系统专注模式/勿扰与通知音量控制。
-            if self.settings.soundDelivery == .app {
-                let now = Date()
-                if now.timeIntervalSince(self.lastSoundAt) >= 0.4 {
-                    self.lastSoundAt = now
-                    self.settings.playSound()
-                }
-            }
+            self.playAlertSound()
             self.notifications.notify(row, status: status,
                                       sound: self.settings.systemNotificationSound())
+        }
+        // 焦点会话（DSH 主视图）跑完：DSH 不置 completionUnread，桥补一条 notice，这里照常提醒。
+        // 开关 / 勿扰 / 项目过滤与状态跃迁完全一致（项目过滤在 AppModel 里做）。
+        model.onCompletionNotice = { [weak self] notice in
+            guard let self, !self.settings.doNotDisturb else { return }
+            let enabled = notice.statusKind == .stopped
+                ? self.settings.notifyStopped
+                : self.settings.notifyCompleted
+            guard enabled else { return }
+            self.playAlertSound()
+            self.notifications.notify(notice, sound: self.settings.systemNotificationSound())
         }
         model.onOpenSettings = { [weak self] in
             self?.panelController.close()
@@ -203,6 +216,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     UNNotificationRequest(identifier: "test-\(UUID().uuidString)",
                                          content: content, trigger: nil)
                 )
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { NSApp.terminate(nil) }
+        }
+        // 调试：走「焦点会话跑完」的正式通知链路（横幅文案 / 提示音 / 点击跳转），1 条后自动退出。
+        // 与 `--test-notify` 的区别：这里用的是补发的 notice（没有状态行），验收焦点会话提醒用。
+        if CommandLine.arguments.contains("--test-notice") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self else { return }
+                let notice = SessionNotice(id: "test-\(UUID().uuidString)",
+                                           sessionId: "test-session",
+                                           kind: "completed",
+                                           title: "测试会话",
+                                           workspaceId: nil,
+                                           workspaceTitle: "示例项目",
+                                           at: Date().timeIntervalSince1970 * 1000)
+                self.playAlertSound()
+                self.notifications.notify(notice, sound: self.settings.systemNotificationSound())
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { NSApp.terminate(nil) }
         }

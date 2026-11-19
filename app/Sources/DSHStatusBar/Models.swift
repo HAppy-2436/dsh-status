@@ -22,8 +22,11 @@ struct BridgeState: Codable, Equatable {
     let sessions: [SessionRow]
     /// 子智能体会话：只用于面板展示，不计入 counts / 图标 / 通知。
     let subagents: [SubagentRow]?
+    /// 焦点会话跑完的一次性通知（见 `SessionNotice`）；旧版桥不发送该字段。
+    let notices: [SessionNotice]?
 
     var subagentRows: [SubagentRow] { subagents ?? [] }
+    var noticeRows: [SessionNotice] { notices ?? [] }
 
     static let empty = BridgeState(
         version: 1,
@@ -32,7 +35,8 @@ struct BridgeState: Codable, Equatable {
         client: nil,
         counts: Counts(waiting: 0, running: 0, completed: 0, stopped: 0, attention: 0),
         sessions: [],
-        subagents: []
+        subagents: [],
+        notices: []
     )
 }
 
@@ -137,6 +141,33 @@ struct SubagentRow: Codable, Equatable, Identifiable {
     var displayTitle: String {
         if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
         return "子智能体"
+    }
+}
+
+/// 焦点会话（DSH 主视图）跑完时桥补发的一次性通知。
+///
+/// DSH 只在「跑完时不在主视图」才置 `completionUnread`，所以在看的那个会话跑完既没有
+/// completed 行、也不会触发状态跃迁通知；桥按 `turn/end` 原因补一条 notice，App 据此照常提醒。
+/// notice 不产生面板行、不计入 counts / 角标。协议见 docs/protocol.md §2。
+struct SessionNotice: Codable, Equatable, Identifiable {
+    let id: String
+    let sessionId: String
+    let kind: String?
+    let title: String?
+    let workspaceId: String?
+    let workspaceTitle: String?
+    let at: Double?
+
+    var statusKind: SessionStatus { kind == "stopped" ? .stopped : .completed }
+
+    var displayTitle: String {
+        if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
+        return "未命名会话"
+    }
+
+    var projectName: String {
+        if let w = workspaceTitle, !w.isEmpty { return w }
+        return "未分组"
     }
 }
 

@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
 
     /// 状态跃迁：某会话进入新状态（用于通知；首帧基线不触发）。
     var onStatusTransition: ((SessionRow, SessionStatus) -> Void)?
+    /// 桥补发的「焦点会话跑完」通知（没有状态行；首帧基线不触发，按 id 去重）。
+    var onCompletionNotice: ((SessionNotice) -> Void)?
     var onRequestNotificationPermission: (() -> Void)?
     var onOpenNotificationSettings: (() -> Void)?
     var onOpenSettings: (() -> Void)?
@@ -28,6 +30,7 @@ final class AppModel: ObservableObject {
 
     private var previousStatus: [String: String] = [:]
     private var hasBaseline = false
+    private var noticeInbox = NoticeInbox()
     private var settingsCancellable: AnyCancellable?
     private var sleepSettingCancellable: AnyCancellable?
     private let sleepPreventer = SleepPreventer()
@@ -137,6 +140,17 @@ final class AppModel: ObservableObject {
         self.lastUpdate = Date()
         refreshSleepPrevention()
         for (row, status) in transitions { onStatusTransition?(row, status) }
+
+        // 焦点会话跑完：桥用 notice 代替 completed 行，这里做同样的开关/过滤后交给通知。
+        let notices = state.noticeRows
+        let freshNoticeIds = noticeInbox.fresh(notices.map(\.id))
+        guard !freshNoticeIds.isEmpty else { return }
+        var noticesById: [String: SessionNotice] = [:]
+        for notice in notices { noticesById[notice.id] = notice }
+        for id in freshNoticeIds {
+            guard let notice = noticesById[id], settings.isVisible(notice) else { continue }
+            onCompletionNotice?(notice)
+        }
     }
 
     /// 维护「有会话运行中时阻止闲置睡眠」的电源断言。
@@ -236,7 +250,8 @@ enum DemoState {
                             status: "completed", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 120_000),
                 SubagentRow(id: "sub-3", parentId: "session-example-c", title: "核对分析结果",
                             status: "running", pending: nil, updatedAt: Date().timeIntervalSince1970 * 1000 - 40_000),
-            ]
+            ],
+            notices: []
         )
     }()
 
@@ -247,6 +262,7 @@ enum DemoState {
         client: ClientInfo(connected: true, lastPushAt: Date().timeIntervalSince1970 * 1000),
         counts: Counts(waiting: 0, running: 0, completed: 0, stopped: 0, attention: 0),
         sessions: [],
-        subagents: []
+        subagents: [],
+        notices: []
     )
 }

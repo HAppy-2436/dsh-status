@@ -48,9 +48,32 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
     "attention": 2     // waiting + completed + stopped（菜单栏角标数字）
   },
   "sessions": [ SessionRow, ... ],         // 只含非空闲的**顶层**会话
-  "subagents": [ SubagentRow, ... ]        // 子智能体会话：仅用于面板展示，不计入 counts
+  "subagents": [ SubagentRow, ... ],       // 子智能体会话：仅用于面板展示，不计入 counts
+  "notices": [ SessionNotice, ... ]        // 焦点会话跑完的一次性通知（见下）
 }
 ```
+
+### SessionNotice
+
+焦点会话（DSH 主视图里正在看的那个）跑完时，DSH 不置 `completionUnread`，所以没有
+`completed` / `stopped` 行可通知。Host 在收到该会话的 `turn/end` 时补一条 notice，
+App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角标**。
+
+```jsonc
+{
+  "id": "session-7ca13994-...:1762324800123",  // 稳定唯一，App 按它去重
+  "sessionId": "session-7ca13994-...",
+  "kind": "completed",                     // completed | stopped（由 turn/end.reason.kind 映射）
+  "title": "示例会话标题",
+  "workspaceId": "35084b06-...",
+  "workspaceTitle": "example-app",
+  "at": 1762324800123                      // ms
+}
+```
+
+- Host 保留最近 120s、最多 20 条（`NOTICE_TTL_MS` / `NOTICE_LIMIT`），足够 SSE 重连；
+- App 首帧只登记不通知（与状态跃迁的「首帧基线不触发」一致），之后按 `id` 去重；
+- 旧版 App 忽略 `notices` 字段；旧版 Host 不下发该字段时 App 按空列表处理（向后兼容）。
 
 ### SubagentRow
 
@@ -109,11 +132,20 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
       "pending": { "kind": "question", "summary": "示例问题" },  // 或 null
       "updatedAt": 1762324800000
     }
+  ],
+  "focused": [                             // DSH 主视图里正在看的会话（通常 0～1 条）
+    {
+      "id": "session-...",
+      "title": "示例会话标题",
+      "workspaceId": "35084b06-...",
+      "workspaceTitle": "example-app"
+    }
   ]
 }
 ```
 
 - Client 只上报 `running || unread || pending` 的会话（非空闲）。
+- `focused` 是**全量**的焦点会话（不受上面的过滤影响），Host 用它决定要不要补 notice。
 - Host 负责补 `lastTurn`、计算 `status` / `since` / `counts`。
 
 ### 状态推导规则（Host 执行，优先级从上到下）
@@ -125,6 +157,10 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
 5. 其他 → 丢弃（空闲，不进 BridgeState）
 
 `since`：Host 缓存每个 session 上一次的 status，变化时记为当前时间（Host 重启后以首次收到的时间为准）。
+
+**焦点会话例外**：`completionUnread` 只在「跑完时不在主视图」才置位，所以正在看的会话跑完
+推导结果为 5（丢弃）。这条路径由 `notices` 补上通知——Host 收到该会话的 `turn/end` 且它出现在
+Client 快照的 `focused` 里时，生成一条 `SessionNotice`。
 
 ## 3. HTTP 接口
 

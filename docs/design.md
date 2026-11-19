@@ -50,6 +50,11 @@ v2 的实现量大幅下降，原因见 §3：**状态模型 DSH 客户端已经
 `completionUnread` 的清除规则正好符合直觉：用户打开该会话（成为主视图）就清；
 `pendingInteraction` 则要回答/批准后才清。
 
+代价是：**正在看的会话跑完时不会置 `completionUnread`**（`observeRunning` 里
+`!isMain(sessionId)` 才 add），于是既没有 completed 行、也没有状态跃迁通知。0.4.3 起由桥补一条
+`SessionNotice`（Client 上报 `focused` 列表，Host 在收到该会话 `turn/end` 时生成）：
+照常弹横幅 / 提示音，但不产生面板行、不计入 counts / 角标（协议见 `protocol.md` §2）。
+
 ## 4. 状态判定与计数
 
 ```
@@ -57,6 +62,7 @@ v2 的实现量大幅下降，原因见 §3：**状态模型 DSH 客户端已经
 运行中   = running == true（且不参与计数）
 已完成   = completionUnread && lastTurnOutcome == completed
 已停止   = completionUnread && lastTurnOutcome == aborted / blocked
+（焦点会话：不进 counts，靠 notices 发通知，见 §3 末）
 异常     = completionUnread && lastTurnOutcome == error（v2 先并入「已停止」或单独标红，待定）
 空闲     = 其余（面板不显示）
 ```

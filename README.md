@@ -62,6 +62,11 @@ English · [简体中文](README.zh.md)
 - A system notification when a session needs an answer, finishes, or stops;
   each state can be enabled separately. Clicking a notification opens the
   session.
+- **The session you are viewing also notifies when it finishes.** DSH marks a
+  session unread only when it ends while you are away, so a session that ends
+  in the main view would never notify. The bridge reports that turn end
+  separately and DSH Status still shows the banner and plays the sound — no
+  "completed" row, no badge count, clicking still jumps to the session.
 - Do Not Disturb silences every notification and sound while keeping the
   individual preferences.
 - The alert sound can be the built-in DSH chime, one of eight macOS system

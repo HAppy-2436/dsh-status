@@ -109,6 +109,8 @@ const state = () => ({
   client: { connected: true, lastPushAt: Date.now() },
   counts: counts(),
   sessions: sessions.map((s) => ({ ...s })),
+  subagents: [],
+  notices: [],
 })
 
 // ---------- SSE ----------

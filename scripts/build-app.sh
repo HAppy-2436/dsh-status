@@ -85,9 +85,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.4.2</string>
+  <string>0.4.3</string>
   <key>CFBundleVersion</key>
-  <string>12</string>
+  <string>13</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>CFBundleIconFile</key>
@@ -107,5 +107,9 @@ codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
 # 自检：提示音资源是否真的进了 bundle、选项能否解析、AppSettings 默认值/持久化是否符合预期。
 echo "==> 自检：提示音资源 / 音量 / 设置持久化"
 "$APP/Contents/MacOS/DSHStatusBar" --self-test-sound
+
+# 自检：焦点会话完成通知（notices 解码 / 文案兜底 / 去重基线 / 通知过滤），纯逻辑、不依赖通知权限。
+echo "==> 自检：焦点会话完成通知"
+"$APP/Contents/MacOS/DSHStatusBar" --self-test-notice
 
 echo "==> 已生成：$APP"

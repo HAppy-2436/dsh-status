@@ -26,6 +26,11 @@ and [Semantic Versioning](https://semver.org/).
 - **行尾控件对齐**：右箭头 / 披露按钮 / 忽略 × 统一到同一条轨道（22pt 槽位、间距 4、右边距 8），
   图标中线一致，不再出现「三种控件各偏几 pt」。
 - **点这一行或点通知横幅跳转 = 已读**：和普通未读行一样，跳转后临时行自动删掉（不用再点 ×）。
+- **展开/收起子智能体不再抖**：修了两个会让面板在展开/收起时「闪一下」或「一卡一卡」的原因——
+  ① 高度动画途中收到桥的状态推送时，目标高度没变就保持当前动画；以前每次推送都会把 0.22s 动画
+  从 0 重启，运行中会话的快照一密集，展开会被拖长到 1s 以上且一顿一顿；
+  ② 面板内容改放在一块固定高度的画布顶部（与窗口尺寸解耦），不再出现 `NSHostingView` 把「比宿主高」
+  的内容垂直居中一帧、导致整块列表瞬间上下跳的情况。
 - 右键菜单新增 **「全部忽略」**：只在存在这类临时行时出现，一次清掉全部（角标随之减少）。
 - 通知仍由 `notices` 提供，与行通知共用 30s 去重，不会响两次。
 
@@ -55,6 +60,12 @@ and [Semantic Versioning](https://semver.org/).
   same 22 pt slot, 4 pt spacing and 8 pt inset, so their icon centers line up.
 - **Clicking the row (or the notification banner) opens the session and clears the row**, exactly
   like opening a normal unread row; the × remains for dismissing without jumping.
+- **Expanding/collapsing subagents no longer jitters.** Two causes are fixed: (1) a bridge state push
+  arriving mid-animation used to restart the 0.22 s height animation from zero, so frequent snapshots
+  stretched the reveal past 1 s and made it stutter — a same-target push is now ignored while the
+  animation runs; (2) the panel content now sits on a fixed-height canvas decoupled from the window, so
+  `NSHostingView` no longer vertically centres an over-tall root for one frame and makes the whole list
+  jump up/down at the start of the animation.
 - The right-click menu gains **Dismiss All**, shown only while such rows exist; it clears every
   transient row at once (badge drops accordingly).
 - Notifications still come from `notices` and share the 30 s de-duplication with row notifications,

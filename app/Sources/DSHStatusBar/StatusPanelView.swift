@@ -18,6 +18,11 @@ struct StatusPanelView: View {
     var body: some View {
         content
             .frame(width: width)
+            // 高度由外层窗口逐帧动画控制；这里把内容放在一块固定高度的画布顶部。
+            // 若让根视图高度跟着内容走，`NSHostingView` 会在「根视图比宿主高」时把它垂直居中，
+            // 展开/收起的第一帧内容会整体上下跳一下（观感就是闪/抖）。固定画布 + 顶部对齐后，
+            // 无论宿主此刻多高，内容的布局位置都不变，窗口只负责从底部揭幕。
+            .frame(maxHeight: .infinity, alignment: .top)
             .background(usesMaterial ? Color.clear : Theme.panelFallbackBackground)
     }
 

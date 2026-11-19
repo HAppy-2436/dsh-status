@@ -189,11 +189,18 @@ final class StatusPanelController: NSObject {
     private func fitToContent() {
         let previous = panel.frame
         guard let target = measuredContentSize() else { return }
+        // 高度动画进行中又收到状态推送：只要目标尺寸没变，就让当前动画继续跑。
+        // 之前每次推送都会重启动画（从当前帧重新计时 0.22s），运行中会话的快照一频繁，
+        // 展开/收起就会变成一卡一卡、拖到 1s 以上 —— 用户看到的就是「有时抖」。
+        if isAnimatingHeight,
+           abs(heightTo.width - target.width) <= 0.5,
+           abs(heightTo.height - target.height) <= 0.5 {
+            return
+        }
         guard abs(previous.width - target.width) > 0.5 || abs(previous.height - target.height) > 0.5 else { return }
         // **只有窗口在动**：顶边钉在菜单栏下沿，只让底边向下/向上长，底边位移做 0.22s 动画。
         // 内容侧不参与高度动画（`StatusPanelView` 里已移除 ScrollView 的高度动画、根视图顶部对齐），
         // 否则「窗口瞬间变高 + 内容自己在 0.24s 里长高」两套时间线打架，内容会在窗口里上下漂。
-        contentController?.pinContentHeight(target.height)
         let rect = NSRect(x: previous.minX,
                           y: previous.minY + previous.height - target.height,
                           width: target.width,
@@ -281,7 +288,6 @@ final class StatusPanelController: NSObject {
     /// 首次上屏前（还没显示过）直接把窗口设成目标尺寸，不做动画。
     private func applyContentSize() {
         guard let target = measuredContentSize() else { return }
-        contentController?.pinContentHeight(target.height)
         if abs(panel.frame.width - target.width) > 0.5 || abs(panel.frame.height - target.height) > 0.5 {
             panel.setContentSize(target)
         }
@@ -476,23 +482,14 @@ final class StatusPanelContentViewController: NSViewController {
         installBackground(in: container)
     }
 
-    /// 内容宿主：**顶部对齐、按目标高度摆放、超出部分裁切**。
+    /// 内容宿主：**固定画布、顶部对齐、超出部分裁切**。
     /// 面板高度做窗口动画时内容本身不动，窗口只负责「向下揭幕」；
-    /// 若让 hosting view 直接铺满窗口，SwiftUI 会把固定高度的根视图在窗口里垂直居中，
-    /// 窗口长高时内容会先被顶上、再滑下来（这就是「一会下一会上」的观感）。
+    /// 画布高度固定为最大面板高度，宿主（窗口）比它矮时只裁切、不做垂直居中，
+    /// 避免展开/收起第一帧内容整体偏移（见 `TopAlignedContentHost`）。
     private let contentHost = TopAlignedContentHost()
 
     func loadViewIfNeededCompat() {
         _ = view
-    }
-
-    /// 内容的目标高度（由 `StatusPanelController` 量出来后写进来）。
-    private(set) var pinnedContentHeight: CGFloat?
-
-    func pinContentHeight(_ height: CGFloat) {
-        guard pinnedContentHeight != height else { return }
-        pinnedContentHeight = height
-        contentHost.contentHeight = height
     }
 
     var intrinsicContentSize: NSSize {
@@ -538,7 +535,6 @@ final class StatusPanelContentViewController: NSViewController {
         contentHost.autoresizingMask = [.width, .height]
         contentHost.frame = host.bounds
         host.addSubview(contentHost)
-        contentHost.contentHeight = pinnedContentHeight
     }
 
     private func makeBackgroundView(in container: NSView) -> NSView {
@@ -601,24 +597,19 @@ final class StatusPanelContentViewController: NSViewController {
             host.addSubview(contentHost)
         }
         contentHost.frame = host.bounds
-        contentHost.contentHeight = pinnedContentHeight
     }
 }
 
 // MARK: - 顶部对齐的内容宿主
 
-/// 把 SwiftUI 内容固定在顶部并按「目标内容高度」摆放：
-/// - 宿主本身铺满窗口（圆角裁切由外层容器负责）；
-/// - 内容比窗口高时从底部被裁掉，窗口变高时自然向下露出；
-/// - 内容比窗口矮时（收起动画中）顶部对齐，底部留空并随窗口收缩。
+/// 把 SwiftUI 内容固定在一块「最大面板高度」的画布顶部：
+/// - 宿主本身铺满窗口（圆角裁切由外层容器负责），窗口变高/变矮都不改变内容的布局位置；
+/// - 画布高度固定（= 面板最大内容高度），内容比窗口高时从底部被裁掉，窗口长高时自然向下揭幕；
+/// - 关键是画布永远不矮于 SwiftUI 根视图：否则 `NSHostingView` 会把根视图在宿主里**垂直居中**，
+///   展开/收起后的第一帧内容会整体上下偏半个高度差（画面闪一下）。
 final class TopAlignedContentHost: NSView {
-    /// nil / 0 表示跟随宿主高度。
-    var contentHeight: CGFloat? {
-        didSet {
-            guard contentHeight != oldValue else { return }
-            needsLayout = true
-        }
-    }
+    /// 内容画布高度 = 面板最大高度；比窗口高时由宿主/窗口裁切。
+    private static let canvasHeight = Theme.Metrics.maxContentHeight
 
     private var content: NSView?
 
@@ -645,7 +636,8 @@ final class TopAlignedContentHost: NSView {
     override func layout() {
         super.layout()
         guard let content else { return }
-        let height = max(contentHeight ?? bounds.height, 1)
-        content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
+        content.frame = NSRect(x: 0, y: 0,
+                               width: bounds.width,
+                               height: max(Self.canvasHeight, bounds.height))
     }
 }

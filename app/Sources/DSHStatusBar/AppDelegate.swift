@@ -119,7 +119,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         notifications.onClick = { [weak self] sessionId in
             guard let self else { return }
-            if let sessionId { self.bridge.sendOpenSession(sessionId) }
+            if let sessionId {
+                // 点通知 = 打开会话（已读）：临时「已完成」行也一并清掉，和点面板行保持一致
+                self.dismissTransientIfNeeded(sessionId)
+                self.bridge.sendOpenSession(sessionId)
+            }
             self.openDSH()
         }
         model.onRequestNotificationPermission = { [weak self] in
@@ -372,6 +376,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - 动作
+
+    /// 面板里还有该会话的临时「已完成」行时删掉它（点行 / 点通知的「已读」语义）。
+    private func dismissTransientIfNeeded(_ sessionId: String) {
+        guard model.state.sessions.contains(where: { $0.id == sessionId && $0.isTransient }) else { return }
+        bridge.dismissSession(sessionId)
+    }
 
     private func openSession(_ sessionId: String) {
         bridge.sendOpenSession(sessionId)

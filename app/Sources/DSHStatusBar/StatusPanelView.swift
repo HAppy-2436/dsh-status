@@ -208,28 +208,10 @@ private struct SessionRowView: View {
             }
             .buttonStyle(PanelRowButtonStyle(cornerRadius: Theme.Metrics.rowHighlightCornerRadius))
 
-            // 行尾控件：焦点会话跑完的临时行带一个「忽略」×，有子会话时再跟披露按钮
-            if hasSubagents || row.isTransient {
-                HStack(spacing: 2) {
-                    if row.isTransient { dismissButton }
-                    if hasSubagents { subagentToggle }
-                }
-                .padding(.trailing, 8)
-            }
-        }
-        // 没有子会话：行尾只放一个右箭头作导航提示（不可单独点，点卡片任意位置都能进会话）。
-        .overlay(alignment: .trailing) {
-            if !hasSubagents && !row.isTransient {
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .padding(.trailing, 10)
-                }
-                .frame(height: Theme.Metrics.rowHeight)
-                .allowsHitTesting(false)
-            }
+            // 行尾统一轨道：右箭头（导航提示）/ 忽略 × / 子智能体披露按钮，
+            // 三者共用 22pt 槽位与右边距，图标中心落在同一条竖线上。
+            trailingRail
+                .padding(.trailing, Theme.Metrics.rowTrailingInset)
         }
         .frame(height: Theme.Metrics.rowHeight)
         .background(
@@ -245,9 +227,9 @@ private struct SessionRowView: View {
     private var dismissButton: some View {
         Button(action: onDismiss) {
             Image(systemName: "xmark")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(hoverDismiss ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                .frame(width: 24, height: 26)
+                .frame(width: Theme.Metrics.rowControlSize, height: Theme.Metrics.rowControlSize)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.Metrics.inlineControlCornerRadius, style: .continuous)
                         .fill(hoverDismiss ? Theme.controlHoverFill(colorScheme) : Color.clear)
@@ -284,7 +266,7 @@ private struct SessionRowView: View {
                     .animation(Theme.respectingReduceMotion(Theme.Motion.disclosure), value: expanded)
             }
             .foregroundStyle(toggleHovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-            .frame(height: 26)
+            .frame(height: Theme.Metrics.rowControlSize)
             .padding(.horizontal, 6)
             .background(
                 RoundedRectangle(cornerRadius: Theme.Metrics.inlineControlCornerRadius, style: .continuous)
@@ -299,16 +281,35 @@ private struct SessionRowView: View {
                        : "展开 \(subagentCount) 个子智能体")
     }
 
-    /// 行尾为箭头 / 「数量 + 箭头」预留的宽度。
-    /// 预留 = 控件实际宽度 + 间隙：标题截断不会压到控件，行尾也不会留出大片空白。
+    /// 行尾统一轨道：与 `trailingRail` 一一对应（右箭头 / × / 披露按钮）。
+    private var trailingRail: some View {
+        HStack(spacing: Theme.Metrics.rowControlSpacing) {
+            if row.isTransient { dismissButton }
+            if hasSubagents { subagentToggle }
+            if !hasSubagents && !row.isTransient { navigationChevron }
+        }
+    }
+
+    /// 无子会话时的右箭头导航提示（不可单独点，点卡片任意位置都能进会话）。
+    private var navigationChevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.tertiary)
+            .frame(width: Theme.Metrics.rowControlSize, height: Theme.Metrics.rowControlSize)
+            .allowsHitTesting(false)
+    }
+
+    /// 行尾为箭头 / 「数量 + 箭头」预留的宽度：标题截断不会压到控件，行尾也不会留出大片空白。
     private var trailingReserve: CGFloat {
-        var width: CGFloat = 12
-        if row.isTransient { width += 24 + 2 }   // × 按钮 + HStack 间隙
-        guard hasSubagents else { return width }
-        // 数字（11pt 等宽 ≈ 7pt/位）+ 3 间隙 + 9 箭头 + 6×2 胶囊内距 + 额外余量
-        // （SwiftUI 内建布局先于 overlay 排版，留一点余量保证标题截断后不会压到胶囊）
-        let numberWidth = CGFloat(String(subagentCount).count) * 7
-        return width + ceil(numberWidth + 3 + 9 + 12 + 14)
+        if !row.isTransient && !hasSubagents { return Theme.Metrics.rowControlSize }
+        var width: CGFloat = 0
+        if row.isTransient { width += Theme.Metrics.rowControlSize }
+        if hasSubagents {
+            if width > 0 { width += Theme.Metrics.rowControlSpacing }
+            // 数字（11pt 等宽 ≈ 7pt/位）+ 3 间隙 + 9 箭头 + 6×2 胶囊内距 + 余量
+            width += ceil(CGFloat(String(subagentCount).count) * 7 + 26)
+        }
+        return width
     }
 
     private var subtitle: String {

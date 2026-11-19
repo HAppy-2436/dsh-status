@@ -55,8 +55,10 @@
 
 - 会话行：行首 8pt 实心状态圆点（`systemYellow`/`systemBlue`/`systemGreen`/`systemRed`），
   标题 13 semibold `labelColor`，副标题 11 regular `secondaryLabelColor`；
-  trailing 统一为导航/披露区：无子会话 = `chevron.right`（9pt semibold `tertiaryLabelColor`，纯提示，不可单独点）；
-  有子会话 = 「数量 11pt medium 等宽数字 secondary + `chevron.down` 9pt semibold tertiary」披露按钮。
+  trailing 是**一条统一轨道**（22pt 槽位、槽间距 4、右边距 8），三种控件共用同一图标中线：
+  无子会话 = `chevron.right`（9pt semibold `tertiaryLabelColor`，纯提示，不可单独点）；
+  有子会话 = 「数量 11pt medium 等宽数字 secondary + `chevron.down` 9pt semibold tertiary」披露按钮（胶囊高 22、内距 6）；
+  焦点会话跑完的临时「已完成」行在最左侧多一个 `xmark` 9pt semibold 忽略按钮（同 22pt 槽位、同胶囊）。
 - 行 hover 仅底色（圆角 12，0.12s）+ 指针；整行可点，命中区覆盖行宽；hover 时不改变文字颜色。
 - 子智能体行：**默认折叠**；父行**行尾**的「数量 + 下箭头」是独立命中区，负责展开/收起
   （展开时箭头 `rotationEffect` 180° 变成上箭头，0.16s ease-out），点行其余区域仍然打开会话；

@@ -34,6 +34,11 @@ enum Theme {
         static let rowCornerRadius: CGFloat = 8
         /// 行尾披露按钮（数量 + 箭头）的悬停胶囊 —— 与系统菜单项里的行内按钮同款。
         static let inlineControlCornerRadius: CGFloat = 5
+        /// 行尾控件轨道：右箭头 / 忽略 × / 子智能体披露按钮共用同一槽位、间距与右边距，
+        /// 保证三种控件的图标中心落在同一条竖线上（数值经 `--dump-panel` 截图核对）。
+        static let rowControlSize: CGFloat = 22
+        static let rowControlSpacing: CGFloat = 4
+        static let rowTrailingInset: CGFloat = 8
         /// 面板内容外边距：圆角 16 的面板里行的圆角/内距都相对它对齐。
         static let panelContentInset: CGFloat = 8
         static let rowHorizontalPadding: CGFloat = 6

@@ -20,6 +20,7 @@ and [Semantic Versioning](https://semver.org/).
   - 行尾有 **×**：点一下即忽略（桥删掉该行，角标 -1，不影响会话）；
   - 在该会话里继续发消息（重新运行 / 待回答）或 DSH 自己报了未读时，临时行自动消失；
   - 临时行由 Host 维护：DSH 重启或桥重载后不再存在。
+- **点这一行跳转 = 已读**：和普通未读行一样，跳转后临时行自动删掉（不用再点 ×）。
 - 右键菜单新增 **「全部忽略」**：只在存在这类临时行时出现，一次清掉全部（角标随之减少）。
 - 通知仍由 `notices` 提供，与行通知共用 30s 去重，不会响两次。
 
@@ -40,6 +41,8 @@ and [Semantic Versioning](https://semver.org/).
   - starting another turn in that session (running / waiting) or DSH reporting the session unread
     clears the transient row automatically;
   - transient rows live in the host only: a DSH restart or bridge reload drops them.
+- **Clicking the row opens the session and clears the row**, exactly like opening a normal unread
+  row; the × remains for dismissing without jumping.
 - The right-click menu gains **Dismiss All**, shown only while such rows exist; it clears every
   transient row at once (badge drops accordingly).
 - Notifications still come from `notices` and share the 30 s de-duplication with row notifications,

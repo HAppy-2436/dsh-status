@@ -86,7 +86,11 @@ struct StatusPanelView: View {
                        expanded: expanded,
                        previewHover: model.previewHover.flatMap { $0.rowId == row.id ? $0.trailing : nil },
                        onToggleSubagents: { model.toggleSubagents(for: row.id) },
-                       onOpen: { model.onOpenSession?(row.id) },
+                       // 点行 = 跳转 + 当作已读：临时「已完成」行跳转后自动删掉（和普通未读行点开即清一致）
+                       onOpen: {
+                           if row.isTransient { model.onDismissSession?(row.id) }
+                           model.onOpenSession?(row.id)
+                       },
                        onDismiss: { model.onDismissSession?(row.id) })
         if expanded {
             // 逐条错开淡入 + 轻微下移（系统「列表展开」的节奏）；减弱动态效果时瞬时出现。

@@ -26,6 +26,9 @@ and [Semantic Versioning](https://semver.org/).
 - **行尾控件对齐**：右箭头 / 披露按钮 / 忽略 × 统一到同一条轨道（22pt 槽位、间距 4、右边距 8），
   图标中线一致，不再出现「三种控件各偏几 pt」。
 - **点这一行或点通知横幅跳转 = 已读**：和普通未读行一样，跳转后临时行自动删掉（不用再点 ×）。
+- **面板里的「已运行 m:ss」每秒刷新**：运行中会话的秒数不再等桥状态推送才跳。面板可见且有可见的
+  运行中会话时，内部 1s 时钟只驱动面板文案重绘（不重算高度、不打断动画）；面板关闭或没有运行中会话
+  即停表，后台不额外唤醒。
 - **展开/收起子智能体不再抖**：修了两个会让面板在展开/收起时「闪一下」或「一卡一卡」的原因——
   ① 高度动画途中收到桥的状态推送时，目标高度没变就保持当前动画；以前每次推送都会把 0.22s 动画
   从 0 重启，运行中会话的快照一密集，展开会被拖长到 1s 以上且一顿一顿；
@@ -60,6 +63,10 @@ and [Semantic Versioning](https://semver.org/).
   same 22 pt slot, 4 pt spacing and 8 pt inset, so their icon centers line up.
 - **Clicking the row (or the notification banner) opens the session and clears the row**, exactly
   like opening a normal unread row; the × remains for dismissing without jumping.
+- **The panel's "running for m:ss" now ticks every second** instead of waiting for the next bridge
+  state push. While the panel is visible with a running session, an internal 1 s clock redraws the
+  panel copy only (no height re-measure, no animation restart); it stops when the panel closes or
+  nothing is running, so there is no background wake-up.
 - **Expanding/collapsing subagents no longer jitters.** Two causes are fixed: (1) a bridge state push
   arriving mid-animation used to restart the 0.22 s height animation from zero, so frequent snapshots
   stretched the reveal past 1 s and made it stutter — a same-target push is now ignored while the

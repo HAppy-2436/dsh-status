@@ -205,9 +205,9 @@ enum Fmt {
         return "\(Int(seconds / 86_400)) 天前"
     }
 
-    static func elapsed(_ millis: Double?) -> String {
+    static func elapsed(_ millis: Double?, now: Date = Date()) -> String {
         guard let millis, millis > 0 else { return "" }
-        let seconds = max(0, Date().timeIntervalSince1970 - millis / 1000)
+        let seconds = max(0, now.timeIntervalSince1970 - millis / 1000)
         let m = Int(seconds) / 60
         let s = Int(seconds) % 60
         return String(format: "%d:%02d", m, s)

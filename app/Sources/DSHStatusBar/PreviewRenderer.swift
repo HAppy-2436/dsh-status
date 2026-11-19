@@ -479,7 +479,7 @@ enum PreviewRenderer {
     private static func renderPanel(model: AppModel, width: CGFloat,
                                     appearance: NSAppearance,
                                     colorScheme: ColorScheme) -> NSImage {
-        let root = StatusPanelView(model: model)
+        let root = StatusPanelView(model: model, clock: PanelClock())
             .environment(\.colorScheme, colorScheme)
             .environment(\.panelUsesMaterial, false)
         // 用独立 hosting 量「理想高度」：同一个 NSHostingView 改尺寸后会缓存旧高度，

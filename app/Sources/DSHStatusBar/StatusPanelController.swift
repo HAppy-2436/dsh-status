@@ -22,6 +22,9 @@ final class StatusPanelController: NSObject {
     private var themeObserver: NSObjectProtocol?
     private var hostingController: NSHostingController<StatusPanelView>?
     private var contentController: StatusPanelContentViewController?
+    /// 面板时钟：只在面板可见且有运行中会话时每秒走一格（见 `PanelClock`）。
+    private let clock = PanelClock()
+    private var clockTimer: Timer?
     private var localMonitor: Any?
     private var localMouseMonitor: Any?
     private var globalMonitor: Any?
@@ -38,7 +41,7 @@ final class StatusPanelController: NSObject {
         self.statusItem = statusItem
         self.settings = settings
         super.init()
-        let hosting = NSHostingController(rootView: StatusPanelView(model: model))
+        let hosting = NSHostingController(rootView: StatusPanelView(model: model, clock: clock))
         let content = StatusPanelContentViewController(
             hostingController: hosting,
             backgroundStyle: settings.panelBackgroundStyle
@@ -47,6 +50,7 @@ final class StatusPanelController: NSObject {
         contentController = content
         panel.contentViewController = content
         panel.onClose = { [weak self] in
+            self?.stopClock()
             self?.removeEventMonitors()
             self?.setStatusItemHighlighted(false)
         }
@@ -62,6 +66,7 @@ final class StatusPanelController: NSObject {
     var isShown: Bool { panel.isVisible }
 
     deinit {
+        stopClock()
         if let themeObserver {
             DistributedNotificationCenter.default().removeObserver(themeObserver)
         }
@@ -77,6 +82,9 @@ final class StatusPanelController: NSObject {
         guard let button = statusItem.button else { return }
         closeGeneration += 1
         isClosing = false
+        // 显示时先把面板时钟对齐到现在，再按秒驱动运行时长（不依赖桥推送）。
+        clock.tick()
+        startClock()
         // 取消可能进行中的淡出，重新从透明开始淡入
         panel.alphaValue = 1
         panel.alphaValue = 0
@@ -112,6 +120,7 @@ final class StatusPanelController: NSObject {
     func close() {
         guard panel.isVisible, !isClosing else { return }
         isClosing = true
+        stopClock()
         stopHeightAnimation()
         let generation = closeGeneration
         removeEventMonitors()
@@ -311,6 +320,30 @@ final class StatusPanelController: NSObject {
             if y + size.height > visible.maxY { y = visible.maxY - size.height }
         }
         panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    // MARK: 面板时钟（每秒刷新运行时长）
+
+    /// 只有面板可见、已连接且有可见的运行中会话时才走表：
+    /// 要让秒数动的是「已运行 m:ss」，空闲/全部跑完时没必要每秒重绘。
+    private func startClock() {
+        guard clockTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self,
+                  self.panel.isVisible,
+                  self.model.connected,
+                  self.model.orderedSessions.contains(where: { $0.statusKind == .running })
+            else { return }
+            self.clock.tick()
+        }
+        timer.tolerance = 0.1
+        RunLoop.main.add(timer, forMode: .common)
+        clockTimer = timer
+    }
+
+    private func stopClock() {
+        clockTimer?.invalidate()
+        clockTimer = nil
     }
 
     // MARK: 事件

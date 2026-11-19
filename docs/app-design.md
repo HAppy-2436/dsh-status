@@ -125,6 +125,8 @@
      运行中会话的快照一密集，展开会被拖长到 1s 以上且一卡一卡。
   早先「窗口一次变高 + 内容自己在 0.24s 里长高」是两套时间线，内容会被 SwiftUI 在窗口里垂直居中，
   展开时先被顶上再滑下来（观感就是「一会下一会上」），现已去掉内容侧高度动画。
+  运行中行的「已运行 m:ss」由面板内部的 1s 时钟（`PanelClock`）驱动：只在面板可见且有可见的
+  运行中会话时走表，面板关闭立即停；走表只重绘文案，不重算内容高度、也不触发窗口适配。
   **高度动画由 60fps 的 `Timer` 逐帧 `setFrame(display: true)` 驱动**（`startHeightAnimation` /
   `stepHeightAnimation`，easeInOutQuad）：不用 `animator().setFrame` 是因为 AppKit 的窗口 frame 动画走
   「快照缩放」快路径，动画期间窗口内容与阴影是拉伸的位图，Liquid Glass 与圆角在这种非等比拉伸下会在左右两侧

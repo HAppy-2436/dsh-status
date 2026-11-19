@@ -1,5 +1,18 @@
 import SwiftUI
 
+/// 面板文案的「当前时间」：面板可见且有运行中会话时每秒走一格，
+/// 让「已运行 3:02」的秒数持续跳动，而不是等下一次桥状态推送。
+///
+/// 只由 `StatusPanelController` 在面板显示期间驱动；面板关闭即停表，
+/// 不订阅全局时钟，避免后台每秒重绘（菜单栏 App 的功耗优先）。
+final class PanelClock: ObservableObject {
+    @Published private(set) var now = Date()
+
+    func tick() {
+        now = Date()
+    }
+}
+
 /// 弹出面板：**只显示会话**（docs/app-design.md §3.2）。
 ///
 /// - 不按状态分组，按 `since`（进入当前状态时刻）倒序，最近变化的在最上；
@@ -11,6 +24,8 @@ import SwiftUI
 ///   有会话时才显示列表。
 struct StatusPanelView: View {
     @ObservedObject var model: AppModel
+    /// 每秒走一格的面板时钟（只驱动运行时长/相对时间文案）。
+    @ObservedObject var clock: PanelClock
     @Environment(\.panelUsesMaterial) private var usesMaterial
 
     private var width: CGFloat { Theme.Metrics.panelWidth }
@@ -89,6 +104,7 @@ struct StatusPanelView: View {
         SessionRowView(row: row,
                        subagentCount: subagents.count,
                        expanded: expanded,
+                       now: clock.now,
                        previewHover: model.previewHover.flatMap { $0.rowId == row.id ? $0.trailing : nil },
                        onToggleSubagents: { model.toggleSubagents(for: row.id) },
                        // 点行 = 跳转 + 当作已读：临时「已完成」行跳转后自动删掉（和普通未读行点开即清一致）
@@ -166,6 +182,8 @@ private struct SessionRowView: View {
     let row: SessionRow
     let subagentCount: Int
     let expanded: Bool
+    /// 当前时间（由面板时钟每秒更新一次，驱动「已运行 m:ss」与相对时间）。
+    let now: Date
     /// 离屏预览用的强制悬停（真机永远 nil）。
     let previewHover: AppModel.PreviewHoverTrailing?
     let onToggleSubagents: () -> Void
@@ -324,10 +342,10 @@ private struct SessionRowView: View {
             if summary == row.displayTitle { return "\(row.projectName) · 等待你的回复" }
             return "\(row.projectName) · \(summary)"
         case .running:
-            let elapsed = Fmt.elapsed(row.since)
+            let elapsed = Fmt.elapsed(row.since, now: now)
             return elapsed.isEmpty ? row.projectName : "\(row.projectName) · 已运行 \(elapsed)"
         case .completed, .stopped:
-            let rel = Fmt.relative(row.updatedAt ?? row.lastTurn?.at)
+            let rel = Fmt.relative(row.updatedAt ?? row.lastTurn?.at, now: now)
             return rel.isEmpty ? row.projectName : "\(row.projectName) · \(rel)"
         case .idle:
             return row.projectName

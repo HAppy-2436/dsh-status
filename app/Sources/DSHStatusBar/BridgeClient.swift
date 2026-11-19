@@ -164,19 +164,28 @@ final class BridgeClient: NSObject {
 
     /// 让 Host 删掉焦点会话的临时「已完成」行（面板行尾 × 触发）；不经过队列，失败只记日志。
     func dismissSession(_ sessionId: String) {
+        sendDismiss(DismissCommand(sessionId: sessionId))
+    }
+
+    /// 右键菜单「全部忽略」：删掉所有临时「已完成」行（桥的 dismiss 不带 sessionId）。
+    func dismissAll() {
+        sendDismiss(DismissCommand(sessionId: nil))
+    }
+
+    private func sendDismiss(_ command: DismissCommand) {
         guard let info = bridgeInfo,
               let url = URL(string: "\(info.origin)/dsh-status/command") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(info.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONEncoder().encode(CommandRequest(type: "dismiss", sessionId: sessionId))
+        request.httpBody = try? JSONEncoder().encode(command)
         request.timeoutInterval = 5
         URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             if error == nil, (200..<300).contains(status) { return }
             DispatchQueue.main.async {
-                self?.log("忽略失败（\(status)），可再点一次")
+                self?.log("忽略失败（\(status)），可再试一次")
             }
         }.resume()
     }

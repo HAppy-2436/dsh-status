@@ -180,6 +180,12 @@ struct CommandRequest: Codable {
     let sessionId: String
 }
 
+/// `POST /command {type:"dismiss"}`：带 sessionId 忽略一条，不带 = 全部忽略。
+struct DismissCommand: Codable {
+    let type = "dismiss"
+    let sessionId: String?
+}
+
 struct CommandResponse: Codable {
     let ok: Bool?
     let requestId: String?

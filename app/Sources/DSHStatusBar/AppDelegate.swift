@@ -90,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
         statusItemController.onRequestNotificationPermission = { [weak self] in self?.notifications.requestPermission() }
         statusItemController.onOpenNotificationSettings = { [weak self] in self?.notifications.openSystemSettings() }
+        statusItemController.onDismissAllCompleted = { [weak self] in self?.bridge.dismissAll() }
 
         panelController = StatusPanelController(model: model, statusItem: statusItemController.statusItem, settings: settings)
         settingsWindow = SettingsWindowController(settings: settings, model: model,
@@ -193,6 +194,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             print("[dsh-status] launch-at-login action=\(action) state=\(controller.state) "
                   + "detail=\(controller.detailText)")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSApp.terminate(nil) }
+        }
+        // 调试：打印右键菜单结构（含「全部忽略」是否出现），随后退出。
+        if CommandLine.arguments.contains("--dump-menu") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.statusItemController.dumpMenuDebug()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSApp.terminate(nil) }
+            }
         }
         if CommandLine.arguments.contains("--dump-appearance") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in

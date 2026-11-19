@@ -17,6 +17,8 @@ final class StatusItemController: NSObject {
     var onOpenSettings: (() -> Void)?
     var onRequestNotificationPermission: (() -> Void)?
     var onOpenNotificationSettings: (() -> Void)?
+    /// 右键菜单「全部忽略」：删掉所有临时「已完成」行。
+    var onDismissAllCompleted: (() -> Void)?
 
     private var appearanceObserver: NSObjectProtocol?
     /// 菜单栏实际外观（`NSStatusBarButton.effectiveAppearance`）的 KVO 观察。
@@ -512,11 +514,29 @@ final class StatusItemController: NSObject {
     }
 
     private func showMenu() {
+        let menu = makeMenu()
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    /// 构造右键菜单（`showMenu` 与 `--dump-menu` 共用）。
+    func makeMenu() -> NSMenu {
         let menu = NSMenu()
 
         let open = NSMenuItem(title: "打开 DSH", action: #selector(menuOpenDSH), keyEquivalent: "")
         open.target = self
         menu.addItem(open)
+
+        // 只有存在「刚跑完」的临时行时才出现：一键清掉全部，角标随之减少。
+        if model.state.sessions.contains(where: \.isTransient) {
+            let dismissAll = NSMenuItem(title: "全部忽略",
+                                        action: #selector(menuDismissAllCompleted),
+                                        keyEquivalent: "")
+            dismissAll.target = self
+            dismissAll.toolTip = "忽略所有刚跑完的临时「已完成」行（角标随之减少）"
+            menu.addItem(dismissAll)
+        }
 
         menu.addItem(.separator())
 
@@ -547,12 +567,22 @@ final class StatusItemController: NSObject {
         quit.target = self
         menu.addItem(quit)
 
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+        return menu
+    }
+
+    /// 调试：打印右键菜单结构（`--dump-menu`），用于无人值守核对菜单项。
+    func dumpMenuDebug() {
+        for item in makeMenu().items {
+            if item.isSeparatorItem {
+                print("[dsh-status] menu: ---")
+            } else {
+                print("[dsh-status] menu: \(item.title) enabled=\(item.isEnabled) state=\(item.state.rawValue)")
+            }
+        }
     }
 
     @objc private func menuOpenDSH() { onOpenDSH?() }
+    @objc private func menuDismissAllCompleted() { onDismissAllCompleted?() }
     @objc private func menuQuit() { onQuit?() }
     @objc private func menuOpenSettings() { onOpenSettings?() }
     @objc private func menuToggleDoNotDisturb() { model.settings.doNotDisturb.toggle() }

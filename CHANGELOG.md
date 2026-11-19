@@ -20,6 +20,9 @@ and [Semantic Versioning](https://semver.org/).
   - 行尾有 **×**：点一下即忽略（桥删掉该行，角标 -1，不影响会话）；
   - 在该会话里继续发消息（重新运行 / 待回答）或 DSH 自己报了未读时，临时行自动消失；
   - 临时行由 Host 维护：DSH 重启或桥重载后不再存在。
+- **单实例保护**：同一 bundle id 已经有实例在跑时，新启动的第二个进程（比如又打开了一次仓库里的
+  `dist/DSHStatusBar.app`）会直接退出并激活已有实例，不会再出现「菜单栏两个图标 / 通知发两遍」。
+  调试入口（`--test-*` / `--dump-*` / `--render-*` / `--open-panel` / `--bridge-file` 等）不受限制。
 - **行尾控件对齐**：右箭头 / 披露按钮 / 忽略 × 统一到同一条轨道（22pt 槽位、间距 4、右边距 8），
   图标中线一致，不再出现「三种控件各偏几 pt」。
 - **点这一行或点通知横幅跳转 = 已读**：和普通未读行一样，跳转后临时行自动删掉（不用再点 ×）。
@@ -43,6 +46,11 @@ and [Semantic Versioning](https://semver.org/).
   - starting another turn in that session (running / waiting) or DSH reporting the session unread
     clears the transient row automatically;
   - transient rows live in the host only: a DSH restart or bridge reload drops them.
+- **Single instance**: launching a second process with the same bundle id (for example opening the
+  repository's `dist/DSHStatusBar.app` while the installed app runs) now exits immediately and
+  activates the existing instance, so the menu bar never shows two icons or sends duplicate
+  notifications. Debug entries (`--test-*`, `--dump-*`, `--render-*`, `--open-panel`,
+  `--bridge-file`, …) are exempt.
 - **Trailing controls share one rail**: the nav chevron, the disclosure toggle and the dismiss × use the
   same 22 pt slot, 4 pt spacing and 8 pt inset, so their icon centers line up.
 - **Clicking the row (or the notification banner) opens the session and clears the row**, exactly

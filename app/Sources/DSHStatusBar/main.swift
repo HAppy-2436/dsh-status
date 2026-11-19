@@ -69,6 +69,24 @@ if arguments.contains("--self-test-notice") {
     exit(NoticeSelfTest.run())
 }
 
+// 单实例保护：正常启动时如果已经有一个同 bundle id 的菜单栏 App 在跑（例如同时装了
+// `~/Applications/DSH Status.app` 和仓库里的 `dist/DSHStatusBar.app`），直接退出并激活已有实例，
+// 避免菜单栏出现两个图标、通知发两遍。
+// 调试入口（--test-* / --dump-* / --render-* / --self-test-* / --open-panel / --bridge-file 等）不受限制。
+let debugFlagPrefixes = ["--test", "--dump", "--render", "--self-test", "--open-panel",
+                         "--request-notify", "--bridge-file"]
+let isDebugLaunch = arguments.dropFirst().contains { argument in
+    debugFlagPrefixes.contains { argument.hasPrefix($0) }
+}
+if !isDebugLaunch, let bundleId = Bundle.main.bundleIdentifier {
+    let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+        .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
+    if let existing = others.first {
+        existing.activate(options: [])
+        exit(0)
+    }
+}
+
 let app = NSApplication.shared
 // 调试/截图：DSH_STATUS_APPEARANCE=light|dark 强制界面外观（不影响系统设置）。
 if let appearance = ProcessInfo.processInfo.environment["DSH_STATUS_APPEARANCE"] {

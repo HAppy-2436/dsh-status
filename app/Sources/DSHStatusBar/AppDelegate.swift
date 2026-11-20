@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         model.onStatusTransition = { [weak self] row, status in
             guard let self, !self.settings.doNotDisturb else { return }
+            // 用户自己按的停止：停止瞬间他一定正看着这个会话，不再弹横幅/响提示音。
+            // 0.1.6 起桥也不再下发这类状态行；这里兜底旧桥（0.1.5）。
+            guard !row.isUserInitiatedStop else { return }
             let enabled: Bool
             switch status {
             case .waiting:
@@ -67,6 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 开关 / 勿扰 / 项目过滤与状态跃迁完全一致（项目过滤在 AppModel 里做）。
         model.onCompletionNotice = { [weak self] notice in
             guard let self, !self.settings.doNotDisturb else { return }
+            // 焦点会话自己按了停止：同上，不提醒（旧桥 0.1.5 可能仍发带 cancel 的 notice）。
+            guard !notice.isUserInitiatedStop else { return }
             let enabled = notice.statusKind == .stopped
                 ? self.settings.notifyStopped
                 : self.settings.notifyCompleted
@@ -243,6 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let notice = SessionNotice(id: "test-\(UUID().uuidString)",
                                            sessionId: "test-session",
                                            kind: "completed",
+                                           cancel: nil,
                                            title: "测试会话",
                                            workspaceId: nil,
                                            workspaceTitle: "示例项目",

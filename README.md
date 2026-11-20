@@ -62,6 +62,10 @@ English · [简体中文](README.zh.md)
 - A system notification when a session needs an answer, finishes, or stops;
   each state can be enabled separately. Clicking a notification opens the
   session.
+- **Stops you trigger yourself are silent — and leave no trace**: pressing stop
+  on a turn you are already watching shows no banner, plays no sound, adds no
+  "stopped" row and does not raise the badge. Error stops and stops caused by
+  hooks/system disposal still alert.
 - **The session you are viewing also notifies when it finishes.** DSH marks a
   session unread only when it ends while you are away, so a session that ends
   in the main view would otherwise neither notify nor appear as completed. The

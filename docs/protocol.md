@@ -57,13 +57,15 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
 
 焦点会话（DSH 主视图里正在看的那个）跑完时，DSH 不置 `completionUnread`，所以没有
 `completed` / `stopped` 行可通知。Host 在收到该会话的 `turn/end` 时补一条 notice，
-App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角标**。
+App 据此弹一次通知；**notice 本身不产生面板行、不计入 counts / 角标**（0.4.4 起另有一条
+`transient` 行，见 `SessionRow`）。
 
 ```jsonc
 {
   "id": "session-7ca13994-...:1762324800123",  // 稳定唯一，App 按它去重
   "sessionId": "session-7ca13994-...",
   "kind": "completed",                     // completed | stopped（由 turn/end.reason.kind 映射）
+  "cancel": "user",                        // 可选：aborted 的取消来源，见下
   "title": "示例会话标题",
   "workspaceId": "35084b06-...",
   "workspaceTitle": "example-app",
@@ -73,7 +75,10 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 
 - Host 保留最近 120s、最多 20 条（`NOTICE_TTL_MS` / `NOTICE_LIMIT`），足够 SSE 重连；
 - App 首帧只登记不通知（与状态跃迁的「首帧基线不触发」一致），之后按 `id` 去重；
-- 旧版 App 忽略 `notices` 字段；旧版 Host 不下发该字段时 App 按空列表处理（向后兼容）。
+- `cancel == "user"` 表示用户自己按了停止：Host **不生成 notice、临时行或状态行**（连角标也不留；
+  他停止时一定正看着这个会话）；`error` / `parent` / `hook` / `disposed` 等来源仍照常提醒。
+  该字段主要保留给旧版桥（0.1.5）兼容：App 收到带 `cancel == "user"` 的 notice 会静音；
+- 旧版 App 忽略 `notices` / `cancel` 字段；旧版 Host 不下发时 App 按空列表 / 未知来源处理（向后兼容）。
 
 ### SubagentRow
 
@@ -100,7 +105,7 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
   "workspaceTitle": "dsh-status",
   "status": "waiting",                     // waiting | running | completed | stopped
   "pending": null,                         // waiting 时非空
-  "lastTurn": { "kind": "aborted", "at": 1762324799000 },
+  "lastTurn": { "kind": "aborted", "cancel": "user", "at": 1762324799000 },
   "since": 1762324799000,                  // 进入当前状态的时刻
   "updatedAt": 1762324800000,
   "transient": true                        // 可选：焦点会话跑完的临时「已完成」行（见下）
@@ -120,6 +125,10 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 
 `lastTurn.kind` 取值来自 Host 侧 `turn/end.reason.kind`：
 `completed` / `aborted` / `error` / `blocked` / `max-tokens`；未知时为 `null`。
+`lastTurn.cancel`（可选）只在 `kind == "aborted"` 时出现，取自 `turn/end.reason.reason.kind`，
+即 DSH 的 `AgentCancelCause`：`user`（用户按停止）/ `parent` / `hook` / `disposed` / `legacy`
+（旧记录没有取消来源）。`cancel == "user"` 且 `unread` 的条目会被 Host 直接丢弃（不进
+`sessions` / `counts` / 角标）；error 等其它停止照常显示「已停止」。
 
 ### ClientSnapshot（Client → Host）
 
@@ -158,7 +167,8 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 
 1. `pending != null` → `waiting`
 2. `running == true` → `running`
-3. `unread == true` 且 `lastTurn.kind ∈ {aborted, error, blocked}` → `stopped`
+3. `unread == true` 且 `lastTurn.kind ∈ {aborted, error, blocked}` → `stopped`；
+   其中 `lastTurn.kind == "aborted"` 且 `lastTurn.cancel == "user"`（用户主动停止）→ 丢弃
 4. `unread == true` → `completed`
 5. 其他 → 丢弃（空闲，不进 BridgeState）
 
@@ -166,7 +176,9 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 
 **焦点会话例外**：`completionUnread` 只在「跑完时不在主视图」才置位，所以正在看的会话跑完
 推导结果为 5（丢弃）。这条路径由 `notices` 补上通知——Host 收到该会话的 `turn/end` 且它出现在
-Client 快照的 `focused` 里时，生成一条 `SessionNotice`。
+Client 快照的 `focused` 里时，生成一条 `SessionNotice`。用户自己按停止（`aborted` +
+`cancel == "user"`）时**不生成** notice / 临时行，且该会话的 unread 状态行也会被丢弃；出错
+（`error`）等其它停止照常生成。旧桥 0.1.5 仍可能发带 `cancel` 的 notice，App 会静音提醒。
 
 ## 3. HTTP 接口
 

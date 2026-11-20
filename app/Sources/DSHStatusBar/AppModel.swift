@@ -223,7 +223,7 @@ enum DemoState {
             workspaceTitle: workspace,
             status: status,
             pending: pending,
-            lastTurn: status == "stopped" ? LastTurn(kind: "aborted", at: now - 42 * 60_000) : nil,
+            lastTurn: status == "stopped" ? LastTurn(kind: "aborted", cancel: nil, at: now - 42 * 60_000) : nil,
             since: since ?? now - updatedMinutesAgo * 60_000,
             updatedAt: now - updatedMinutesAgo * 60_000,
             transient: nil

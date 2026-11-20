@@ -65,7 +65,13 @@ struct PendingInfo: Codable, Equatable {
 
 struct LastTurn: Codable, Equatable {
     let kind: String?
+    /// `kind == "aborted"` 时的取消来源：`user` = 用户主动按停止，
+    /// `parent` / `hook` / `disposed` / `legacy` = 其它打断来源；旧版桥不发送该字段。
+    let cancel: String?
     let at: Double?
+
+    /// 用户本人在 DSH 里主动停止：不需要再提醒（停止时人一定正看着这个会话）。
+    var isUserInitiated: Bool { cancel == "user" }
 }
 
 enum SessionStatus: String, Codable, CaseIterable {
@@ -112,6 +118,9 @@ struct SessionRow: Codable, Equatable, Identifiable {
 
     var statusKind: SessionStatus { SessionStatus(rawValue: status) ?? .idle }
     var isTransient: Bool { transient == true }
+    /// 用户主动停止导致的「已停止」：通知层据此静音。桥 0.1.6 起不再下发这种行；
+    /// 这里保留判断用于兼容 0.1.5 桥或「行先到、cancel 后到」的竞态。
+    var isUserInitiatedStop: Bool { statusKind == .stopped && lastTurn?.isUserInitiated == true }
     var displayTitle: String {
         if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
         return "未命名会话"
@@ -157,12 +166,16 @@ struct SessionNotice: Codable, Equatable, Identifiable {
     let id: String
     let sessionId: String
     let kind: String?
+    /// 同 `LastTurn.cancel`：`user` = 用户主动停止，App 不弹提醒；旧版桥不发送该字段。
+    let cancel: String?
     let title: String?
     let workspaceId: String?
     let workspaceTitle: String?
     let at: Double?
 
     var statusKind: SessionStatus { kind == "stopped" ? .stopped : .completed }
+    /// 用户主动停止：不弹横幅/提示音（与 `SessionRow.isUserInitiatedStop` 保持一致）。
+    var isUserInitiatedStop: Bool { statusKind == .stopped && cancel == "user" }
 
     var displayTitle: String {
         if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }

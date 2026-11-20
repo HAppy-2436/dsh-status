@@ -8,11 +8,15 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
-## [0.4.4] - 2026-11-19
+## [0.4.4] - 2026-11-20
 
 ### 中文
 
 #### 改进
+- **自己按的停止不再提醒、也不留痕**：桥读取 `turn/end.reason.reason.kind`，把取消来源写进
+  `lastTurn.cancel`。`user`（你按了停止按钮）时 App 不弹横幅、不响提示音，桥也不生成「已停止」
+  行/临时行，角标不增加；`error`、被 hook/parent/dispose 打断等来源仍照常提醒。通知开关与
+  勿扰模式不变。
 - **焦点会话跑完，菜单栏图标不再直接跳空闲**：0.4.3 只补了通知，但图标/面板只认状态行，
   所以看起来是「运行中 → 空闲」。现在桥会为焦点会话补一条 **transient「已完成」行**
   （`SessionRow.transient = true`）：
@@ -38,12 +42,20 @@ and [Semantic Versioning](https://semver.org/).
 - 通知仍由 `notices` 提供，与行通知共用 30s 去重，不会响两次。
 
 #### 兼容
-- 协议 v1 纯增量：`SessionRow.transient`（可选）与 `POST /command {type:"dismiss"}`。
-  旧 App 忽略 `transient`，行照常显示、只是没有 ×；旧桥不下发时 App 行为不变（0.4.3 的纯通知）。
+- 协议 v1 纯增量：`SessionRow.transient`（可选）、`SessionRow.lastTurn.cancel` / `SessionNotice.cancel`
+  （可选）与 `POST /command {type:"dismiss"}`。
+  旧 App 忽略 `transient`，行照常显示、只是没有 ×；旧桥不下发 `cancel` 时 App 按「未知来源」处理，
+  行为与之前一致（该停止仍会提醒）。要连「已停止」行/角标也不留，桥需 **≥ 0.1.6**
+  （0.1.5 只让 App 静音通知，行仍在）。
 
 ### English
 
 #### Changed
+- **Stops you trigger yourself no longer alert or leave a trace.** The bridge reads
+  `turn/end.reason.reason.kind` and exposes the cancel cause as `lastTurn.cancel`. For `user`
+  (you pressed stop) the app skips the banner and sound, and the bridge emits no "stopped" row or
+  transient row, so the badge does not increase; `error` stops and hook/parent/dispose cancellations
+  still alert. The notification switches / Do Not Disturb keep their meaning.
 - **A focused session no longer makes the menu-bar icon jump straight to idle.** 0.4.3 only added
   the notification, but the icon and panel are driven by status rows, so it looked like
   running → idle. The bridge now adds a **transient "completed" row** (`SessionRow.transient = true`):
@@ -79,9 +91,12 @@ and [Semantic Versioning](https://semver.org/).
   so there is no double alert.
 
 #### Compatibility
-- Protocol v1, additive: `SessionRow.transient` (optional) and `POST /command {type:"dismiss"}`.
-  Old apps ignore `transient` and simply show the row without the ×; old bridges leave the app on the
-  notification-only behavior of 0.4.3.
+- Protocol v1, additive: `SessionRow.transient` (optional), `SessionRow.lastTurn.cancel` /
+  `SessionNotice.cancel` (optional) and `POST /command {type:"dismiss"}`.
+  Old apps ignore `transient` and simply show the row without the ×; old bridges leave `cancel`
+  absent, which the app treats as an unknown cause (such stops still alert exactly as before).
+  Dropping the "stopped" row and badge as well requires bridge **>= 0.1.6** (0.1.5 only silenced
+  the alert, the row remained).
 
 ## [0.4.3] - 2026-11-19
 

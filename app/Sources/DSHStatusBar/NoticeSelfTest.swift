@@ -58,13 +58,44 @@ enum NoticeSelfTest {
         check("transient 行状态标签",
               decodeRow(#"{"id":"s3","status":"stopped","transient":true}"#)?.statusKind == .stopped)
 
+        print("\n== 主动停止 / 出错停止（cancel 来源） ==")
+        let userStoppedRow = decodeRow(
+            #"{"id":"s1","title":"跑测试","status":"stopped","lastTurn":{"kind":"aborted","cancel":"user","at":1}}"#)
+        check("lastTurn.cancel 可解码", userStoppedRow?.lastTurn?.cancel == "user")
+        check("用户主动停止 → 不提醒", userStoppedRow?.isUserInitiatedStop == true)
+        let parentStoppedRow = decodeRow(
+            #"{"id":"s2","status":"stopped","lastTurn":{"kind":"aborted","cancel":"parent","at":1}}"#)
+        check("parent 打断 → 仍需提醒", parentStoppedRow?.isUserInitiatedStop == false)
+        let errorStoppedRow = decodeRow(
+            #"{"id":"s3","status":"stopped","lastTurn":{"kind":"error","at":1}}"#)
+        check("error 停止 → 仍需提醒", errorStoppedRow?.isUserInitiatedStop == false)
+        let legacyAbortedRow = decodeRow(
+            #"{"id":"s4","status":"stopped","lastTurn":{"kind":"aborted","at":1}}"#)
+        check("旧桥缺 cancel → 仍需提醒", legacyAbortedRow?.isUserInitiatedStop == false)
+        let completedWithCancelRow = decodeRow(
+            #"{"id":"s5","status":"completed","lastTurn":{"kind":"aborted","cancel":"user","at":1}}"#)
+        check("非 stopped 状态不受 cancel 影响", completedWithCancelRow?.isUserInitiatedStop == false)
+
+        let userStopState = decodeState("""
+        {"version":1,"generatedAt":1000,
+         "counts":{"waiting":0,"running":0,"completed":0,"stopped":1,"attention":1},
+         "sessions":[],
+         "notices":[{"id":"s1:900","sessionId":"s1","kind":"stopped","cancel":"user",
+                     "title":"跑测试","at":900}]}
+        """)
+        check("notice.cancel 可解码", userStopState?.noticeRows.first?.cancel == "user")
+        check("用户主动停止的 notice → 不提醒", userStopState?.noticeRows.first?.isUserInitiatedStop == true)
+        let userStopNotice = SessionNotice(id: "n1", sessionId: "s1", kind: "stopped", cancel: "user",
+                                           title: "t", workspaceId: nil, workspaceTitle: nil, at: 1)
+        check("SessionNotice 主动停止标记", userStopNotice.isUserInitiatedStop)
+
         print("\n== SessionNotice 文案兜底 ==")
-        let bare = SessionNotice(id: "n1", sessionId: "s1", kind: nil, title: nil,
+        let bare = SessionNotice(id: "n1", sessionId: "s1", kind: nil, cancel: nil, title: nil,
                                  workspaceId: nil, workspaceTitle: nil, at: nil)
         check("缺 kind → 已完成", bare.statusKind == .completed)
         check("空标题 → 未命名会话", bare.displayTitle == "未命名会话")
         check("空项目 → 未分组", bare.projectName == "未分组")
-        let blank = SessionNotice(id: "n2", sessionId: "s2", kind: "completed", title: "   ",
+        let blank = SessionNotice(id: "n2", sessionId: "s2", kind: "completed", cancel: nil, title: "   ",
                                   workspaceId: nil, workspaceTitle: "", at: 0)
         check("纯空白标题 → 未命名会话", blank.displayTitle == "未命名会话")
         check("空 workspaceTitle → 未分组", blank.projectName == "未分组")
@@ -92,7 +123,7 @@ enum NoticeSelfTest {
         settings.hiddenWorkspaces = []
         check("默认设置下已完成可见", settings.isVisible(bare))
         settings.hiddenWorkspaces = ["w1"]
-        let hidden = SessionNotice(id: "n3", sessionId: "s3", kind: "completed", title: "t",
+        let hidden = SessionNotice(id: "n3", sessionId: "s3", kind: "completed", cancel: nil, title: "t",
                                    workspaceId: "w1", workspaceTitle: "example-app", at: 1)
         check("隐藏项目不提醒", settings.isVisible(hidden) == false)
         settings.hiddenWorkspaces = []
@@ -100,7 +131,7 @@ enum NoticeSelfTest {
         check("关闭「已完成」显示后不提醒", settings.isVisible(bare) == false)
         settings.visibleStatuses.insert(.completed)
         settings.visibleStatuses.remove(.stopped)
-        let stoppedNotice = SessionNotice(id: "n4", sessionId: "s4", kind: "stopped", title: "t",
+        let stoppedNotice = SessionNotice(id: "n4", sessionId: "s4", kind: "stopped", cancel: nil, title: "t",
                                           workspaceId: nil, workspaceTitle: nil, at: 1)
         check("关闭「已停止」显示后不提醒", settings.isVisible(stoppedNotice) == false)
         settings.visibleStatuses.insert(.stopped)
@@ -123,7 +154,7 @@ enum NoticeSelfTest {
                         counts: Counts(waiting: 0, running: 1, completed: 0, stopped: 0, attention: 0),
                         sessions: [running], subagents: [], notices: notices)
         }
-        let notice = SessionNotice(id: "n1", sessionId: "s1", kind: "completed", title: "跑测试",
+        let notice = SessionNotice(id: "n1", sessionId: "s1", kind: "completed", cancel: nil, title: "跑测试",
                                    workspaceId: "w1", workspaceTitle: "example-app", at: 2)
         model.apply(state: frame([]))
         check("首帧（无 notice）不通知", received.isEmpty)
@@ -133,7 +164,7 @@ enum NoticeSelfTest {
         check("同一 notice 重放不重复通知", received == ["n1"])
 
         modelSettings.hiddenWorkspaces = ["w1"]
-        let hiddenNotice = SessionNotice(id: "n2", sessionId: "s1", kind: "completed", title: "跑测试",
+        let hiddenNotice = SessionNotice(id: "n2", sessionId: "s1", kind: "completed", cancel: nil, title: "跑测试",
                                          workspaceId: "w1", workspaceTitle: "example-app", at: 3)
         model.apply(state: frame([notice, hiddenNotice]))
         check("隐藏项目的 notice 不通知", received == ["n1"])

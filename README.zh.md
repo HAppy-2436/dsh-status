@@ -82,8 +82,8 @@
 ## 环境要求
 
 - **macOS 13 或更高版本。** 0.2.0 构建仅提供 Apple Silicon（arm64）版本。
-- **DeepSeek Harness Desktop 0.2.x**，需支持安装第三方插件；已在 0.2.1-rc.5 与
-  0.2.2-rc.1 上实测。
+- **DeepSeek Harness Desktop 0.2.2-rc.2 或更高版本**，需支持安装第三方插件；已在
+  0.2.3-alpha.2 上实测。桥插件 0.1.8 要求 DSH 不低于这个版本。
 - **液态玻璃（Liquid Glass）面板材质**需 macOS 26 或更高版本；旧系统上会自动使用
   经典磨砂材质或实色背景。
 
@@ -136,7 +136,7 @@ xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 | --- | --- |
 | 实测 macOS | macOS 27.2（最低支持 macOS 13） |
 | 架构 | Apple Silicon arm64 |
-| 实测 DeepSeek Harness | 0.2.1-rc.5、0.2.2-rc.1 |
+| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.8 需 0.2.2-rc.2+） |
 | 面板材质 | macOS 26+ 为液态玻璃；更低版本为磨砂 / 实色降级 |
 
 已知限制：
@@ -155,6 +155,13 @@ xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 确认 DeepSeek Harness 正在运行、`dsh-status-bridge` 插件已启用，并检查 DSH 是否生成了
 `~/.dsh-status/bridge.json`。文件不存在时，禁用插件再重新启用；文件存在但仍连不上时，
 重启 DSH 后重新打开 App。
+
+**DSH 升级之后就连不上了。**
+DSH 0.2.3 起，内置 web server 默认要求每个路由都有 DSH 登录态，**0.1.8 之前**的桥插件
+所有请求都会收到 `401 unauthorized`（此时 `bridge.json` 仍在、插件也显示已启用）；
+0.2.2-rc.2 起 `uiSession.sessionStatus` 也变成了需要注入的独立服务，旧 Client 半一条
+状态都不会上报。把 `dsh-status-bridge` 升级到 0.1.8 或更新版本（插件页 →「更新」）后
+重新启用即可。
 
 **收不到通知。**
 打开 设置 → 通知 检查权限状态，或在 系统设置 → 通知 → DSH Status 中允许通知。同时确认

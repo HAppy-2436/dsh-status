@@ -106,8 +106,8 @@ restore-to-defaults, and quit confirmation).
 ## Requirements
 
 - **macOS 13 or later.** The 0.2.0 build is Apple Silicon (arm64) only.
-- **DeepSeek Harness Desktop 0.2.x** with third-party plugin support. Tested
-  with 0.2.1-rc.5 and 0.2.2-rc.1.
+- **DeepSeek Harness Desktop 0.2.2-rc.2 or newer** with third-party plugin
+  support. Tested with 0.2.3-alpha.2; bridge 0.1.8 requires that floor.
 - **Liquid Glass panel material** requires macOS 26 or later; on older systems
   the panel uses the classic frosted material or a solid fill instead.
 
@@ -167,7 +167,7 @@ menu, or later under **System Settings → Notifications → DSH Status**.
 | --- | --- |
 | Tested macOS | macOS 27.2 (minimum supported: macOS 13) |
 | Architecture | Apple Silicon arm64 |
-| Tested DeepSeek Harness | 0.2.1-rc.5 and 0.2.2-rc.1 |
+| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.8 needs 0.2.2-rc.2+) |
 | Panel material | Liquid Glass on macOS 26+; frosted / solid fallback below that |
 
 Known limitations:
@@ -192,6 +192,15 @@ Make sure DeepSeek Harness is running and the `dsh-status-bridge` plugin is
 enabled. Check that DSH created `~/.dsh-status/bridge.json`. If the file is
 missing, disable and re-enable the plugin; if it exists but the app still does
 not connect, restart DSH, then open the app again.
+
+**It stopped connecting right after a DSH update.**
+DSH 0.2.3 changed the built-in web server to require a signed-in DSH session for
+every route by default, so bridge versions before **0.1.8** get a `401
+unauthorized` for every request even though `bridge.json` exists; 0.2.2-rc.2 also
+made `uiSession.sessionStatus` an injected service, so an older client half
+reports nothing even after the route is fixed. Update `dsh-status-bridge` to
+0.1.8 or newer (Plugins → the plugin’s Update button) and
+re-enable it.
 
 **I don't get notifications.**
 Open Settings → Notifications and check the permission row, or allow DSH Status

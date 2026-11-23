@@ -8,6 +8,48 @@ All notable changes to this project are documented here, in Chinese and English.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### 中文
+
+#### 修复
+- **DSH 升级后 App 连不上桥（桥 0.1.8）**：DSH 0.2.3 起内置 web server 的路由默认准入变成
+  `required`，没有 DSH 登录态的原生 App 请求会在进入桥的 handler 之前被 `401 unauthorized`
+  拦掉——`bridge.json` 照常生成、插件也显示已启用，但 SSE 永远收不到状态，App 一直是「未连接」。
+  桥改为显式声明 `auth: 'anonymous'`，仍由自己在 handler 内鉴权（回环 `Host` + Bearer token；
+  浏览器半用 `ctx.connection.admit`），安全模型与之前一致。另外 0.2.2-rc.2 起 `admit` 要求调用方
+  fiber 声明 `connection.authentication`，桥把它放进子 fiber 执行（没有该服务的老版本自动回退）。
+- **浏览器半一条状态都不上报**：DSH 0.2.2-rc.2 起 `ctx.uiSession.sessionStatus` 是独立服务，
+  不在 Client 半的 `inject` 里声明 `uiSession.sessionStatus` 就读取会抛错，`apply` 直接失败
+  （Host 的 SSE 通了、App 也连上，但 C 位数据一直是空的）。0.1.8 补上该注入。
+  要连接 DSH 0.2.3+ 需要桥 **≥ 0.1.8**。
+
+#### 兼容
+- 协议无变化（纯实现修复），App 无需更新。桥 0.1.8 的 `engines.dsh` 提到
+  `>=0.2.2-rc.2 <0.3.0`：它依赖该版本引入的路由准入与会话状态服务。
+
+### English
+
+#### Fixed
+- **The app could not connect to the bridge after a DSH update (bridge 0.1.8).** Since DSH 0.2.3
+  the built-in web server defaults route admission to `required`, so native app requests without a
+  DSH session get `401 unauthorized` before reaching the bridge handler: `bridge.json` is still
+  written and the plugin looks enabled, but the SSE stream never yields a state and the app stays
+  “not connected”. The bridge now registers its route with `auth: 'anonymous'` and keeps
+  authenticating inside the handler (loopback `Host` + bearer token; `ctx.connection.admit` for the
+  browser half), so the security model is unchanged. Since 0.2.2-rc.2 that `admit` call also needs
+  the calling fiber to declare `connection.authentication`; the bridge runs it in a child fiber and
+  falls back to the direct call where the service does not exist.
+- **The browser half reported nothing.** DSH 0.2.2-rc.2 split `ctx.uiSession.sessionStatus` into a
+  service that a client plugin must inject as `uiSession.sessionStatus`; reading it without the
+  injection throws and the client `apply` never runs (the app connects to the host but every list is
+  empty). 0.1.8 declares that injection. Connecting to DSH 0.2.3+ requires bridge **>= 0.1.8**.
+
+#### Compatibility
+- No protocol change (implementation fix only); the app needs no update. Bridge 0.1.8 declares
+  `engines.dsh` `>=0.2.2-rc.2 <0.3.0`, because it relies on the route admission and Session status
+  service introduced there.
+
 ## [0.4.4] - 2026-11-20
 
 ### 中文

@@ -127,7 +127,7 @@ DSH renderer（Desktop 主窗口 / Web 标签页）
 
 DSH Host 进程
  └─ 插件 Host 半（薄桥）
-      ├─ 注册 /dsh-status/* 路由（ctx.webServer.register，admit 校验浏览器请求）
+      ├─ 注册 /dsh-status/* 路由（ctx.webServer.register，auth: 'anonymous' + 自行鉴权）
       ├─ 全局监听 session/event，维护 lastTurnOutcome[sessionId]
       ├─ 写 ~/.dsh-status/bridge.json（端口 + 本机 token）
       └─ 启动 / 监视 DSHStatusBar.app
@@ -141,8 +141,10 @@ DSH Host 进程
 
 - **插件安装**：DSH 侧边栏 → Plugins → Add plugin → 填插件包绝对路径（支持本地目录 + HMR）。
 - **App 安装**：`install.sh` 构建放入 `~/Applications`，ad-hoc 签名；Host 插件激活时拉起。
-- **桥安全**：只绑 127.0.0.1；浏览器侧路由用 `ctx.connection.admit` 校验同源；App 侧用
-  `~/.dsh-status/bridge.json` 里的随机 token。
+- **桥安全**：只绑 127.0.0.1；路由向 DSH 声明 `auth: 'anonymous'`（DSH 0.2.3 起 web server
+  默认要求登录态，会 401 掉原生 App），由桥自己鉴权：浏览器侧用 `ctx.connection.admit` 校验同源
+  （DSH 0.2.2-rc.2 起该调用要放在声明 `connection.authentication` 的子 fiber 里，否则服务读取
+  被拒、浏览器请求全 401），App 侧用 `~/.dsh-status/bridge.json` 里的随机 token + 回环 Host。
 
 ## 7. 分期
 

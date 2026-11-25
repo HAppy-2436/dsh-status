@@ -6,14 +6,15 @@
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-black?logo=apple&logoColor=white)
 ![DeepSeek Harness 0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-4D6BFE)
 
-**A native macOS menu bar companion for DeepSeek Harness.** It notifies you when
-a session finishes, errors, or waits for your input, keeps live status in the
-menu bar, and shows the details in a native panel with one click.
+**A native macOS menu bar companion for DeepSeek Harness.** It keeps live session
+status in the menu bar — what is running, what needs you, what is done — and
+notifies you when a session finishes, errors, or waits for your input. Click the
+icon for the details in a native panel.
 
 English · [简体中文](README.zh.md)
 
-> Only need notifications? The bridge plugin works on its own; the app adds the
-> panel, jump, sounds, and Do Not Disturb.
+> The bridge plugin works on its own for basic notifications. The app is the full
+> experience: menu bar panel, badge, click-to-jump, sounds, and Do Not Disturb.
 > [Compare notification options →](docs/notifications.md)
 
 ## Why use it
@@ -99,7 +100,7 @@ restore-to-defaults, and quit confirmation).
 
 - **macOS 13 or later.** The current build is Apple Silicon (arm64) only.
 - **DeepSeek Harness Desktop 0.2.2-rc.2 or newer** with third-party plugin
-  support. Tested with 0.2.3-alpha.2; bridge 0.1.10 requires that floor.
+  support. Tested with 0.2.3-alpha.2; bridge 0.1.11 requires that floor.
 - **Liquid Glass panel material** requires macOS 26 or later; on older systems
   the panel uses the classic frosted material or a solid fill instead.
 
@@ -115,7 +116,7 @@ the menu bar panel, click-to-jump, sounds, and Do Not Disturb.
 1. Open DeepSeek Harness.
 2. In the sidebar, go to **Plugins → Add plugin → Install a third-party plugin**.
 3. Enter the package name **`dsh-status-bridge`** and click **Install**.
-   If your registry does not have 0.1.10 or newer, paste the Git URL
+   If your registry does not have 0.1.11 or newer, paste the Git URL
    `github:HAppy-2436/dsh-status-bridge` in the same field instead.
 4. Click **Enable now** when the installation finishes. If DSH prompts for a
    restart, restart it so the plugin can load.
@@ -165,7 +166,7 @@ menu, or later under **System Settings → Notifications → DSH Status**.
 | --- | --- |
 | Tested macOS | macOS 27.2 (minimum supported: macOS 13) |
 | Architecture | Apple Silicon arm64 |
-| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.10 needs 0.2.2-rc.2+) |
+| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.11 needs 0.2.2-rc.2+) |
 | Panel material | Liquid Glass on macOS 26+; frosted / solid fallback below that |
 
 Known limitations:

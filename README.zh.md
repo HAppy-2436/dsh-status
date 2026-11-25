@@ -6,13 +6,12 @@
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-black?logo=apple&logoColor=white)
 ![DeepSeek Harness 0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-4D6BFE)
 
-**DeepSeek Harness 的原生 macOS 菜单栏伴侣。** 会话完成、出错或等待你输入时通知你，
-并把会话状态常驻在菜单栏——多少在运行、多少在等你回答、多少刚完成、多少已停止——
-单击图标即可查看详情。
+**DeepSeek Harness 的原生 macOS 菜单栏伴侣。** 它把 DSH 会话状态常驻在菜单栏——
+谁在跑、谁需要你、谁刚完成——并在会话完成、出错或等待你输入时通知你；单击图标看原生面板详情。
 
 [English](README.md) · 简体中文
 
-> 只需要通知？桥插件可以单独使用；App 额外提供菜单栏面板、点击跳转、提示音与勿扰。
+> 桥插件本身能发基础通知；App 是完整体验：菜单栏面板、角标、点击跳转、提示音与勿扰。
 > [对比通知方案 →](docs/notifications.zh.md)
 
 ## 为什么用它
@@ -90,7 +89,7 @@ DSH Status 由两部分组成：运行在 DeepSeek Harness 里的桥插件，以
 1. 打开 DeepSeek Harness。
 2. 在左侧边栏进入 **插件 → 添加插件 → 安装第三方插件**。
 3. 输入 npm 包名 **`dsh-status-bridge`**，点击**安装**。
-   若 registry 上没有 0.1.10 或更高版本，可在同一输入框改填 Git 地址
+   若 registry 上没有 0.1.11 或更高版本，可在同一输入框改填 Git 地址
    `github:HAppy-2436/dsh-status-bridge`。
 4. 安装完成后点击**立即启用**；若 DSH 提示需要重启，请重启 DSH。
 
@@ -133,7 +132,7 @@ App 的通知权限默认未开启。可以在**设置**中的通知一栏开启
 | --- | --- |
 | 实测 macOS | macOS 27.2（最低支持 macOS 13） |
 | 架构 | Apple Silicon arm64 |
-| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.10 需 0.2.2-rc.2+） |
+| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.11 需 0.2.2-rc.2+） |
 | 面板材质 | macOS 26+ 为液态玻璃；更低版本为磨砂 / 实色降级 |
 
 已知限制：

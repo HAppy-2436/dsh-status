@@ -10,6 +10,15 @@ the smallest thing that solves your problem.
 > about them; check each project's README for its current behavior and
 > compatibility. All of them are unofficial third-party tools.
 
+## What makes DSH Status different
+
+- **A native panel, not just a banner.** Per-session rows, a badge for what needs
+  you, and subagents folded under their parent.
+- **One click back.** Click a row to open that session in DSH.
+- **Focused-session aware.** A session you are watching still gets a completion
+  alert, without leaving a stale “completed” row.
+- **Local by design.** No account, no cloud sync, no telemetry.
+
 | Option | Form | What it adds | Install |
 | --- | --- | --- | --- |
 | **DSH Status** | Native macOS app + DSH plugin | macOS notifications, a menu bar panel with live status and badges, click-to-jump, sounds, Do Not Disturb | DMG from [Releases](https://github.com/HAppy-2436/dsh-status/releases/latest), then `dsh plugin --profile web add dsh-status-bridge` |

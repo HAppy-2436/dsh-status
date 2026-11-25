@@ -12,10 +12,6 @@ finished, or stopped — and shows the details in a native panel with one click.
 
 English · [简体中文](README.zh.md)
 
-![DSH Status scene — offscreen render with demo data](docs/previews/scene-preview-dark.png)
-
-*Offscreen render with demo data (no real sessions, titles or project names).*
-
 ## Why use it
 
 - **Status at a glance.** The menu bar tells you whether a session needs you
@@ -41,10 +37,6 @@ English · [简体中文](README.zh.md)
   ring color, or nothing.
 - Transitions between states are animated; Reduced Motion, Low Power Mode, and
   the in-app animation switches are respected.
-
-![The session panel — offscreen render with demo data](docs/previews/panel-preview-dark.png)
-
-*The session panel, offscreen render with demo data (running / waiting / completed / stopped).*
 
 ### Session panel
 
@@ -99,13 +91,9 @@ projects, notifications, sounds, panel material, background, and general
 options (including the app icon — brand double ring or the DeepSeek blue whale —
 restore-to-defaults, and quit confirmation).
 
-![DSH Status settings window — offscreen render](docs/previews/settings-preview-dark.png)
-
-*The settings window, offscreen render (menu bar icon / display / projects / notifications / sounds / panel / background / general).*
-
 ## Requirements
 
-- **macOS 13 or later.** The 0.2.0 build is Apple Silicon (arm64) only.
+- **macOS 13 or later.** The current build is Apple Silicon (arm64) only.
 - **DeepSeek Harness Desktop 0.2.2-rc.2 or newer** with third-party plugin
   support. Tested with 0.2.3-alpha.2; bridge 0.1.8 requires that floor.
 - **Liquid Glass panel material** requires macOS 26 or later; on older systems
@@ -118,12 +106,12 @@ DeepSeek Harness. Install the app first, then the plugin.
 
 ### 1. Install the app
 
-1. Download **`DSH-Status-0.2.0.dmg`** from the
+1. Download the latest **DSH-Status DMG** from the
    [latest release](https://github.com/HAppy-2436/dsh-status/releases/latest).
 2. Open the DMG and drag **DSH Status** into `/Applications`.
 3. Open the app from `/Applications`.
 
-The 0.2.0 build is ad-hoc signed and not notarized, so macOS blocks the first
+The current build is ad-hoc signed and not notarized, so macOS blocks the first
 launch. To allow it:
 
 - **Right-click (Control-click) the app → Open**, then confirm **Open**; or

@@ -11,10 +11,6 @@
 
 [English](README.md) · 简体中文
 
-![DSH Status 场景示意 — 离屏渲染（示例数据）](docs/previews/scene-preview-dark.png)
-
-*离屏渲染 + 示例数据：不包含任何真实会话、标题或项目名。*
-
 ## 为什么用它
 
 - **一眼看清状态。** 不用切回 DSH，菜单栏就会告诉你是否有会话需要你处理。
@@ -32,10 +28,6 @@
 - 有会话运行中时，外圈有一段动画圆弧。中心数字可在设置中选择：全部任务（默认）、
   仅需要介入、与环色一致的数量、不显示。
 - 状态切换带过渡动画，并遵循「减弱动态效果」、低电量模式与 App 内的动画开关。
-
-![会话面板 — 离屏渲染（示例数据）](docs/previews/panel-preview-dark.png)
-
-*会话面板离屏渲染（运行中 / 待回答 / 已完成 / 已停止，示例数据）。*
 
 ### 会话面板
 
@@ -75,13 +67,9 @@
 标准分组设置窗口涵盖菜单栏图标、显示、项目、通知、提示音、面板材质、后台与通用选项
 （含**应用图标**：品牌双层环 / DeepSeek 蓝色鲸鱼；恢复默认设置、退出前确认）。
 
-![DSH Status 设置窗口 — 离屏渲染](docs/previews/settings-preview-dark.png)
-
-*设置窗口离屏渲染（菜单栏图标 / 显示 / 项目显示 / 通知 / 提示音 / 面板 / 后台 / 通用）。*
-
 ## 环境要求
 
-- **macOS 13 或更高版本。** 0.2.0 构建仅提供 Apple Silicon（arm64）版本。
+- **macOS 13 或更高版本。** 当前构建仅提供 Apple Silicon（arm64）版本。
 - **DeepSeek Harness Desktop 0.2.2-rc.2 或更高版本**，需支持安装第三方插件；已在
   0.2.3-alpha.2 上实测。桥插件 0.1.8 要求 DSH 不低于这个版本。
 - **液态玻璃（Liquid Glass）面板材质**需 macOS 26 或更高版本；旧系统上会自动使用
@@ -95,11 +83,11 @@ DSH Status 由两部分组成：菜单栏 App 和运行在 DeepSeek Harness 里�
 ### 1. 安装 App
 
 1. 从[最新 Release](https://github.com/HAppy-2436/dsh-status/releases/latest) 下载
-   **`DSH-Status-0.2.0.dmg`**。
+   最新的 **DSH-Status DMG**。
 2. 打开 DMG，把 **DSH Status** 拖入 `/Applications`。
 3. 从 `/Applications` 打开 App。
 
-0.2.0 构建为 ad-hoc 签名、未公证，macOS 会拦截首次打开。放行方式：
+当前构建为 ad-hoc 签名、未公证，macOS 会拦截首次打开。放行方式：
 
 - **右键（或 Control-单击）App → 打开**，在弹窗中再点 **打开**；或
 - 打开**系统设置 → 隐私与安全性**，向下滚动，点击 DSH Status 条目旁的**仍要打开**。

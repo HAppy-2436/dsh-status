@@ -16,7 +16,7 @@ the smallest thing that solves your problem.
   you, and subagents folded under their parent.
 - **One click back.** Click a row to open that session in DSH.
 - **Focused-session aware.** A session you are watching still gets a completion
-  alert, without leaving a stale “completed” row.
+  alert; the app adds a transient row instead of a permanent unread row.
 - **Local by design.** No account, no cloud sync, no telemetry.
 
 | Option | Form | What it adds | Install |

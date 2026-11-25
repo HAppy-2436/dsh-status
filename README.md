@@ -6,11 +6,15 @@
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-black?logo=apple&logoColor=white)
 ![DeepSeek Harness 0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-4D6BFE)
 
-**A native macOS menu bar companion for DeepSeek Harness.** It keeps the state of
-your DSH sessions visible at all times — how many are running, waiting for you,
-finished, or stopped — and shows the details in a native panel with one click.
+**A native macOS menu bar companion for DeepSeek Harness.** It notifies you when
+a session finishes, errors, or waits for your input, keeps live status in the
+menu bar, and shows the details in a native panel with one click.
 
 English · [简体中文](README.zh.md)
+
+> Only need notifications? The bridge plugin works on its own; the app adds the
+> panel, jump, sounds, and Do Not Disturb.
+> [Compare notification options →](docs/notifications.md)
 
 ## Why use it
 
@@ -95,16 +99,33 @@ restore-to-defaults, and quit confirmation).
 
 - **macOS 13 or later.** The current build is Apple Silicon (arm64) only.
 - **DeepSeek Harness Desktop 0.2.2-rc.2 or newer** with third-party plugin
-  support. Tested with 0.2.3-alpha.2; bridge 0.1.8 requires that floor.
+  support. Tested with 0.2.3-alpha.2; bridge 0.1.9 requires that floor.
 - **Liquid Glass panel material** requires macOS 26 or later; on older systems
   the panel uses the classic frosted material or a solid fill instead.
 
 ## Install
 
-DSH Status has two parts: the menu bar app and a bridge plugin that runs inside
-DeepSeek Harness. Install the app first, then the plugin.
+DSH Status has two parts: a bridge plugin that runs inside DeepSeek Harness and
+the menu bar app. **The plugin works on its own** and sends basic macOS
+notifications for completion, errors, and waiting-for-input events. The app adds
+the menu bar panel, click-to-jump, sounds, and Do Not Disturb.
 
-### 1. Install the app
+### 1. Install the bridge plugin (required)
+
+1. Open DeepSeek Harness.
+2. In the sidebar, go to **Plugins → Add plugin → Install a third-party plugin**.
+3. Enter the package name **`dsh-status-bridge`** and click **Install**.
+   If your registry does not have 0.1.9 or newer, paste the Git URL
+   `github:HAppy-2436/dsh-status-bridge` in the same field instead.
+4. Click **Enable now** when the installation finishes. If DSH prompts for a
+   restart, restart it so the plugin can load.
+
+The plugin lives in its own repository:
+[HAppy-2436/dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge).
+It writes `~/.dsh-status/bridge.json`, sends the standalone notifications, and
+launches the app automatically when it is installed.
+
+### 2. Install the app (optional, recommended)
 
 1. Download the latest **DSH-Status DMG** from the
    [latest release](https://github.com/HAppy-2436/dsh-status/releases/latest).
@@ -125,27 +146,16 @@ and open it again:
 xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 ```
 
-### 2. Install the bridge plugin
-
-1. Open DeepSeek Harness.
-2. In the sidebar, go to **Plugins → Add plugin → Install a third-party plugin**.
-3. Enter the package name **`dsh-status-bridge`** and click **Install**.
-   If your registry does not have 0.1.8 or newer, paste the Git URL
-   `github:HAppy-2436/dsh-status-bridge` in the same field instead.
-4. Click **Enable now** when the installation finishes. If DSH prompts for a
-   restart, restart it so the plugin can load.
-
-The plugin lives in its own repository:
-[HAppy-2436/dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge).
-It writes `~/.dsh-status/bridge.json`, launches the menu bar app automatically,
-and keeps it connected while DSH is running.
-
 ### 3. Confirm it works
 
-The DSH Status icon appears in the menu bar. If the app did not start
-automatically, open **/Applications/DSH Status.app** manually.
+If you installed the app, the DSH Status icon appears in the menu bar. If the app
+did not start automatically, open **/Applications/DSH Status.app** manually.
 
-Notifications are off until macOS grants permission. Enable them from the
+If you installed only the plugin, it still sends basic notifications when a
+session finishes, errors, or waits for your input. The sender is
+`terminal-notifier` when installed, otherwise `Script Editor` (from `osascript`).
+
+App notifications are off until macOS grants permission. Enable them from the
 notification row in **Settings**, from the notification entry in the right-click
 menu, or later under **System Settings → Notifications → DSH Status**.
 
@@ -155,7 +165,7 @@ menu, or later under **System Settings → Notifications → DSH Status**.
 | --- | --- |
 | Tested macOS | macOS 27.2 (minimum supported: macOS 13) |
 | Architecture | Apple Silicon arm64 |
-| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.8 needs 0.2.2-rc.2+) |
+| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.9 needs 0.2.2-rc.2+) |
 | Panel material | Liquid Glass on macOS 26+; frosted / solid fallback below that |
 
 Known limitations:
@@ -190,11 +200,18 @@ reports nothing even after the route is fixed. Update `dsh-status-bridge` to
 0.1.8 or newer (Plugins → the plugin’s Update button) and
 re-enable it.
 
+**Do I need the app, or is the plugin enough?**
+The plugin alone sends basic macOS notifications for completion, errors, and
+waiting-for-input events. The app adds the menu bar panel, click-to-jump, sounds,
+and Do Not Disturb. See [the comparison](docs/notifications.md).
+
 **I don't get notifications.**
 Open Settings → Notifications and check the permission row, or allow DSH Status
 under System Settings → Notifications. Also make sure the three state toggles
 are on and that Do Not Disturb is off. With the “system notification sound”
-delivery mode, macOS Focus can mute the sound.
+delivery mode, macOS Focus can mute the sound. If you use the plugin without the
+app, check the notification permission for `terminal-notifier` or `Script Editor`
+instead.
 
 **macOS won't open the app.**
 Use the Gatekeeper steps in [Install](#install): right-click → Open, or allow it
@@ -247,6 +264,7 @@ protocol between the plugin and the app is documented in
 
 | Document | Contents |
 | --- | --- |
+| [docs/notifications.md](docs/notifications.md) | Notifications vs status: comparing the options |
 | [docs/app-design.md](docs/app-design.md) | App design system: menu-bar icon states, panel structure, settings |
 | [docs/icon-transitions.md](docs/icon-transitions.md) | Menu-bar icon state transitions and timing |
 | [docs/icon-audit.md](docs/icon-audit.md) | Animation and alignment acceptance report |

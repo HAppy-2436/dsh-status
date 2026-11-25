@@ -6,10 +6,14 @@
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-black?logo=apple&logoColor=white)
 ![DeepSeek Harness 0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-4D6BFE)
 
-**DeepSeek Harness 的原生 macOS 菜单栏伴侣。** 它把 DSH 会话的状态常驻在菜单栏——
-有多少在运行、多少在等你回答、多少刚完成、多少已停止——单击图标即可查看详情。
+**DeepSeek Harness 的原生 macOS 菜单栏伴侣。** 会话完成、出错或等待你输入时通知你，
+并把会话状态常驻在菜单栏——多少在运行、多少在等你回答、多少刚完成、多少已停止——
+单击图标即可查看详情。
 
 [English](README.md) · 简体中文
+
+> 只需要通知？桥插件可以单独使用；App 额外提供菜单栏面板、点击跳转、提示音与勿扰。
+> [对比通知方案 →](docs/notifications.zh.md)
 
 ## 为什么用它
 
@@ -77,10 +81,24 @@
 
 ## 安装
 
-DSH Status 由两部分组成：菜单栏 App 和运行在 DeepSeek Harness 里的桥插件。
-请先安装 App，再安装插件。
+DSH Status 由两部分组成：运行在 DeepSeek Harness 里的桥插件，以及菜单栏 App。
+**桥插件可以单独用**，先装它就有基础的完成 / 出错 / 等待输入通知；App 额外提供
+菜单栏面板、点击跳转、提示音与勿扰。
 
-### 1. 安装 App
+### 1. 安装桥插件（必需）
+
+1. 打开 DeepSeek Harness。
+2. 在左侧边栏进入 **插件 → 添加插件 → 安装第三方插件**。
+3. 输入 npm 包名 **`dsh-status-bridge`**，点击**安装**。
+   若 registry 上没有 0.1.9 或更高版本，可在同一输入框改填 Git 地址
+   `github:HAppy-2436/dsh-status-bridge`。
+4. 安装完成后点击**立即启用**；若 DSH 提示需要重启，请重启 DSH。
+
+插件源码在独立仓库：
+[HAppy-2436/dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge)。
+插件会写入 `~/.dsh-status/bridge.json`、发送独立通知，并在装好 App 后自动拉起它。
+
+### 2. 安装 App（可选，推荐）
 
 1. 从[最新 Release](https://github.com/HAppy-2436/dsh-status/releases/latest) 下载
    最新的 **DSH-Status DMG**。
@@ -98,25 +116,15 @@ DSH Status 由两部分组成：菜单栏 App 和运行在 DeepSeek Harness 里�
 xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 ```
 
-### 2. 安装桥插件
-
-1. 打开 DeepSeek Harness。
-2. 在左侧边栏进入 **插件 → 添加插件 → 安装第三方插件**。
-3. 输入 npm 包名 **`dsh-status-bridge`**，点击**安装**。
-   若 registry 上没有 0.1.8 或更高版本，可在同一输入框改填 Git 地址
-   `github:HAppy-2436/dsh-status-bridge`。
-4. 安装完成后点击**立即启用**；若 DSH 提示需要重启，请重启 DSH。
-
-插件源码在独立仓库：
-[HAppy-2436/dsh-status-bridge](https://github.com/HAppy-2436/dsh-status-bridge)。
-插件会写入 `~/.dsh-status/bridge.json`、自动拉起菜单栏 App，并在 DSH 运行期间保持连接。
-
 ### 3. 确认可用
 
-菜单栏出现 DSH Status 图标即接入成功。如果 App 没有被自动拉起，手动打开
+装了 App 的话，菜单栏会出现 DSH Status 图标；如果 App 没有被自动拉起，手动打开
 **/Applications/DSH Status.app**。
 
-通知权限默认未开启。可以在**设置**中的通知一栏开启，也可以从右键菜单的
+只装插件的话，会话完成 / 出错 / 等待输入时仍会收到基础通知；发送者是
+`terminal-notifier`（如果装了）或 `Script Editor`（`osascript`）。
+
+App 的通知权限默认未开启。可以在**设置**中的通知一栏开启，也可以从右键菜单的
 **「通知未开启，点此开启…」** 开启，或稍后在**系统设置 → 通知 → DSH Status** 中允许。
 
 ## 兼容性与已知限制
@@ -125,7 +133,7 @@ xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 | --- | --- |
 | 实测 macOS | macOS 27.2（最低支持 macOS 13） |
 | 架构 | Apple Silicon arm64 |
-| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.8 需 0.2.2-rc.2+） |
+| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.9 需 0.2.2-rc.2+） |
 | 面板材质 | macOS 26+ 为液态玻璃；更低版本为磨砂 / 实色降级 |
 
 已知限制：
@@ -152,9 +160,14 @@ DSH 0.2.3 起，内置 web server 默认要求每个路由都有 DSH 登录态�
 状态都不会上报。把 `dsh-status-bridge` 升级到 0.1.8 或更新版本（插件页 →「更新」）后
 重新启用即可。
 
+**只装插件、不装 App 够吗？**
+够收基础通知：完成、出错、等待输入。App 额外提供菜单栏面板、点击跳转、提示音与勿扰。
+见[通知方案对比](docs/notifications.zh.md)。
+
 **收不到通知。**
 打开 设置 → 通知 检查权限状态，或在 系统设置 → 通知 → DSH Status 中允许通知。同时确认
 三个状态开关已打开、勿扰模式已关闭。若使用「系统通知音」送达方式，macOS 专注模式可能静音。
+只装插件、不装 App 时，请检查 `terminal-notifier` 或 `Script Editor` 的通知权限。
 
 **macOS 打不开 App。**
 按[安装](#安装)中的 Gatekeeper 步骤处理：右键 → 打开，或在 系统设置 → 隐私与安全性
@@ -201,6 +214,7 @@ cd app && swift build -c release   # 原生 SwiftPM 构建
 
 | 文档 | 内容 |
 | --- | --- |
+| [docs/notifications.zh.md](docs/notifications.zh.md) | 通知与状态方案对比 |
 | [docs/app-design.md](docs/app-design.md) | App 设计规范：菜单栏图标状态、面板结构、设置页 |
 | [docs/icon-transitions.md](docs/icon-transitions.md) | 菜单栏图标状态切换动效与时长 |
 | [docs/icon-audit.md](docs/icon-audit.md) | 动效与对齐验收报告 |

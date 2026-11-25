@@ -90,7 +90,7 @@ DSH Status 由两部分组成：运行在 DeepSeek Harness 里的桥插件，以
 1. 打开 DeepSeek Harness。
 2. 在左侧边栏进入 **插件 → 添加插件 → 安装第三方插件**。
 3. 输入 npm 包名 **`dsh-status-bridge`**，点击**安装**。
-   若 registry 上没有 0.1.9 或更高版本，可在同一输入框改填 Git 地址
+   若 registry 上没有 0.1.10 或更高版本，可在同一输入框改填 Git 地址
    `github:HAppy-2436/dsh-status-bridge`。
 4. 安装完成后点击**立即启用**；若 DSH 提示需要重启，请重启 DSH。
 
@@ -133,7 +133,7 @@ App 的通知权限默认未开启。可以在**设置**中的通知一栏开启
 | --- | --- |
 | 实测 macOS | macOS 27.2（最低支持 macOS 13） |
 | 架构 | Apple Silicon arm64 |
-| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.9 需 0.2.2-rc.2+） |
+| 实测 DeepSeek Harness | 0.2.3-alpha.2（桥 0.1.10 需 0.2.2-rc.2+） |
 | 面板材质 | macOS 26+ 为液态玻璃；更低版本为磨砂 / 实色降级 |
 
 已知限制：
@@ -151,7 +151,8 @@ App 的通知权限默认未开启。可以在**设置**中的通知一栏开启
 **图标一直显示未连接 / 面板显示「未连接」。**
 确认 DeepSeek Harness 正在运行、`dsh-status-bridge` 插件已启用，并检查 DSH 是否生成了
 `~/.dsh-status/bridge.json`。文件不存在时，禁用插件再重新启用；文件存在但仍连不上时，
-重启 DSH 后重新打开 App。
+重启 DSH 后重新打开 App。也可以在 DSH 里运行 `/dsh-status`，查看桥版本、会话计数、
+App 是否已安装以及下载链接。
 
 **DSH 升级之后就连不上了。**
 DSH 0.2.3 起，内置 web server 默认要求每个路由都有 DSH 登录态，**0.1.8 之前**的桥插件

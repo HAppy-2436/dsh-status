@@ -99,7 +99,7 @@ restore-to-defaults, and quit confirmation).
 
 - **macOS 13 or later.** The current build is Apple Silicon (arm64) only.
 - **DeepSeek Harness Desktop 0.2.2-rc.2 or newer** with third-party plugin
-  support. Tested with 0.2.3-alpha.2; bridge 0.1.9 requires that floor.
+  support. Tested with 0.2.3-alpha.2; bridge 0.1.10 requires that floor.
 - **Liquid Glass panel material** requires macOS 26 or later; on older systems
   the panel uses the classic frosted material or a solid fill instead.
 
@@ -115,7 +115,7 @@ the menu bar panel, click-to-jump, sounds, and Do Not Disturb.
 1. Open DeepSeek Harness.
 2. In the sidebar, go to **Plugins → Add plugin → Install a third-party plugin**.
 3. Enter the package name **`dsh-status-bridge`** and click **Install**.
-   If your registry does not have 0.1.9 or newer, paste the Git URL
+   If your registry does not have 0.1.10 or newer, paste the Git URL
    `github:HAppy-2436/dsh-status-bridge` in the same field instead.
 4. Click **Enable now** when the installation finishes. If DSH prompts for a
    restart, restart it so the plugin can load.
@@ -165,7 +165,7 @@ menu, or later under **System Settings → Notifications → DSH Status**.
 | --- | --- |
 | Tested macOS | macOS 27.2 (minimum supported: macOS 13) |
 | Architecture | Apple Silicon arm64 |
-| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.9 needs 0.2.2-rc.2+) |
+| Tested DeepSeek Harness | 0.2.3-alpha.2 (bridge 0.1.10 needs 0.2.2-rc.2+) |
 | Panel material | Liquid Glass on macOS 26+; frosted / solid fallback below that |
 
 Known limitations:
@@ -189,7 +189,9 @@ Known limitations:
 Make sure DeepSeek Harness is running and the `dsh-status-bridge` plugin is
 enabled. Check that DSH created `~/.dsh-status/bridge.json`. If the file is
 missing, disable and re-enable the plugin; if it exists but the app still does
-not connect, restart DSH, then open the app again.
+not connect, restart DSH, then open the app again. Run `/dsh-status` in DSH to
+see the bridge version, session counts, whether the app is installed, and the
+download link.
 
 **It stopped connecting right after a DSH update.**
 DSH 0.2.3 changed the built-in web server to require a signed-in DSH session for

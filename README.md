@@ -129,9 +129,9 @@ xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 
 1. Open DeepSeek Harness.
 2. In the sidebar, go to **Plugins → Add plugin → Install a third-party plugin**.
-3. Enter the package name **`dsh-status-bridge`** and click **Install**.
-   If the package is not available from your registry yet, enter the Git URL
-   `github:HAppy-2436/dsh-status-bridge` in the same field instead.
+3. Enter the Git URL **`github:HAppy-2436/dsh-status-bridge`** and click
+   **Install**.
+   The npm package name `dsh-status-bridge` works once 0.1.8 or newer is available.
 4. Click **Enable now** when the installation finishes. If DSH prompts for a
    restart, restart it so the plugin can load.
 

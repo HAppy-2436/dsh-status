@@ -102,8 +102,9 @@ xattr -dr com.apple.quarantine "/Applications/DSH Status.app"
 
 1. 打开 DeepSeek Harness。
 2. 在左侧边栏进入 **插件 → 添加插件 → 安装第三方插件**。
-3. 输入 Git 地址 **`github:HAppy-2436/dsh-status-bridge`**，点击**安装**。
-   npm 包名 `dsh-status-bridge` 在 0.1.8 或更高版本发布后同样可用。
+3. 输入 npm 包名 **`dsh-status-bridge`**，点击**安装**。
+   若 registry 上没有 0.1.8 或更高版本，可在同一输入框改填 Git 地址
+   `github:HAppy-2436/dsh-status-bridge`。
 4. 安装完成后点击**立即启用**；若 DSH 提示需要重启，请重启 DSH。
 
 插件源码在独立仓库：
